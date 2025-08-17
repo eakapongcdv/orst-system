@@ -27,16 +27,20 @@ export default function ClientLayout({
     <>
       {/* Header - only show if not on editor page */}
       {!isEditorPage && (
-        <header className="bg-white shadow-sm sticky top-0 z-10">
+        <header className="brand-header sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-2 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
                 <Link href="/" className="flex-shrink-0 flex items-center">
                   <img
-                    src="https://transliteration.orst.go.th/img/royin-logo2.c03c8949.png"
+                    src="/logo.png"
                     alt="สำนักงานราชบัณฑิตยสภา"
-                    className="h-16 w-auto"
+                    className="brand-logo"
                   />
+                  <div className="ml-3 hidden sm:flex flex-col">
+                    <span className="brand-title text-xl leading-5">สำนักงานราชบัณฑิตยสภา</span>
+                    <span className="brand-subtitle text-sm leading-4">Office of the Royal Society</span>
+                  </div>
                 </Link>
                 {isAuthenticated && (
                   <nav className="hidden md:ml-6 md:flex md:space-x-8">
@@ -44,7 +48,7 @@ export default function ClientLayout({
                       <Link
                         key={item.name}
                         href={item.href}
-                        className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-md font-bold text-black-500 hover:border-gray-300 hover:text-gray-700"
+                        className="inline-flex items-center px-2 pt-1 border-b-2 border-transparent text-md font-bold text-white hover:text-white hover:border-white/50"
                       >
                         {item.name}
                       </Link>
@@ -56,13 +60,13 @@ export default function ClientLayout({
               <div className="flex items-center">
                 {isAuthenticated ? (
                   <div className="flex items-center space-x-4">
-                    <span className="text-md text-gray-700 hidden md:inline">
+                    <span className="text-md text-white/90 hidden md:inline">
                       {payload?.firstName} {payload?.lastName}
                     </span>
                     <form action="/api/auth/logout" method="post">
                       <button
                         type="submit"
-                        className="text-md font-bold text-black-500 hover:text-gray-700"
+                        className="text-md font-bold text-white hover:text-white/80"
                       >
                         ออกจากระบบ
                       </button>
@@ -72,13 +76,13 @@ export default function ClientLayout({
                   <div className="flex space-x-4">
                     <Link
                       href="/login"
-                      className="text-md font-bold text-black-500 hover:text-gray-700"
+                      className="text-md font-bold text-white hover:text-white/80"
                     >
                       เข้าสู่ระบบ
                     </Link>
                     <Link
                       href="/register"
-                      className="text-md font-bold text-blue-600 hover:text-blue-800"
+                      className="text-md font-bold text-white hover:text-white/80"
                     >
                       ลงทะเบียน
                     </Link>
@@ -97,9 +101,9 @@ export default function ClientLayout({
 
       {/* Footer - only show if not on editor page */}
       {!isEditorPage && (
-        <footer className="bg-white border-t">
+        <footer className="brand-footer">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-2 lg:px-8">
-            <p className="text-center text-md text-black-500">
+            <p className="text-center text-md">
               © {new Date().getFullYear() + 543} ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
             </p>
           </div>

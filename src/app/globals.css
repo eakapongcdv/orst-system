@@ -46,34 +46,92 @@
 }
 /* --- End TH Sarabun New Font Definitions --- */
 
+/* --- TH Sarabun New (alias family for CI) --- */
+/* Regular */
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: url('/fonts/THSarabunNew.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+/* Italic */
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: url('/fonts/THSarabunNew Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+/* Bold */
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: url('/fonts/THSarabunNew Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* Bold Italic */
+@font-face {
+  font-family: 'TH Sarabun New';
+  src: url('/fonts/THSarabunNew BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+/* --- End TH Sarabun New alias --- */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  /* --- Override Tailwind's default sans font --- */
-  --font-sans: 'TH Sarabun New', /* Fallbacks */ 'Leelawadee UI', 'Tahoma', sans-serif;
-  /* --- End Override --- */
+  /* --- Base CI palette (Royal Society logo) --- */
+  --brand-gold: #C9A04D;       /* primary accent (outline/trim) */
+  --brand-gold-700: #A27F2C;   /* hover/active */
+  --brand-green: #0B6B3A;      /* header/background strip */
+  --brand-green-700: #08542E;  /* hover/active */
+  --brand-ink: #171717;        /* body text */
+  --brand-bg: #ffffff;         /* page background */
+  --brand-muted: #6B7280;      /* secondary text */
+  --brand-border: #E5E7EB;     /* card/table borders */
+
+  /* Typography */
+  --font-sans: 'TH Sarabun New', 'TH SarabunPSK', 'Leelawadee UI', 'Tahoma', sans-serif;
+
+  /* Radii & shadow */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-elev-1: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+
+  /* App theming bridges */
+  --background: var(--brand-bg);
+  --foreground: var(--brand-ink);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  /* --- Use the overridden value from :root --- */
+  --color-background: var(--brand-bg);
+  --color-foreground: var(--brand-ink);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-green: var(--brand-green);
+  --color-muted: var(--brand-muted);
+  --color-border: var(--brand-border);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --brand-bg: #0a0a0a;
+    --brand-ink: #ededed;
+    --brand-border: #262626;
   }
 }
 
 /* --- Set default font size --- */
 html {
-  /* Base font size is often set on html */
-  font-size: 20px; /* This sets 1rem = 20px */
+  font-size: 20px;
+  scroll-behavior: smooth;
+  letter-spacing: .01em;
 }
 
 body {
@@ -85,5 +143,77 @@ body {
   font-size: 1rem; /* 1rem equals the html font-size (20px) */
 }
 
+/* Selection & focus align to CI gold */
+::selection { background: color-mix(in srgb, var(--brand-gold) 30%, #fff); color: #1f2937; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand-gold) 65%, transparent); outline-offset: 2px; border-radius: 4px; }
 
 /* --- End Updated globals.css --- */
+
+/* =========================
+   Royal Society CI Helpers
+   ========================= */
+
+/* Header/Topbar using logo colors */
+.brand-header {
+  background: linear-gradient(180deg, var(--brand-green) 0%, var(--brand-green-700) 100%);
+  border-bottom: 4px solid var(--brand-gold);
+  box-shadow: var(--shadow-elev-1);
+}
+.brand-logo {
+  height: 56px;
+  width: auto;
+  image-rendering: -webkit-optimize-contrast;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.15));
+}
+.brand-title {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0,0,0,.35);
+}
+.brand-subtitle {
+  color: #F6E7BF; /* light gold for EN subtitle */
+}
+
+/* Primary & secondary buttons */
+.btn-primary {
+  background: var(--brand-gold);
+  color: #1f2937;
+  border-radius: var(--radius-md);
+  padding: .5rem 1rem;
+  font-weight: 700;
+}
+.btn-primary:hover { background: var(--brand-gold-700); }
+.btn-secondary {
+  background: var(--brand-green);
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: .5rem 1rem;
+  font-weight: 700;
+}
+.btn-secondary:hover { background: var(--brand-green-700); }
+
+/* Links styled with brand green */
+a { color: var(--brand-green); text-underline-offset: 3px; }
+a:hover { color: var(--brand-green-700); }
+
+/* Cards with gold accent */
+.card {
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-top: 4px solid var(--brand-gold);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elev-1);
+}
+
+/* Table header highlight */
+.table-brand thead th {
+  background: color-mix(in srgb, var(--brand-gold) 16%, #fff);
+  color: #111827;
+}
+
+/* Footer strip */
+.brand-footer {
+  border-top: 4px solid var(--brand-gold);
+  background: #0d0d0d;
+  color: #e5e7eb;
+}

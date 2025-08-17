@@ -52,19 +52,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-2 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-body)] py-12 px-4 sm:px-2 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* ส่วนหัว */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+          <img src="/logo.png" alt="สำนักงานราชบัณฑิตยสภา" className="brand-logo mx-auto" />
+          <h2 className="mt-6 text-3xl font-extrabold brand-title text-[var(--brand-green)]">
             ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา
           </h2>
-          <p className="mt-2 text-md text-gray-600">
+          <p className="mt-2 text-md text-[color:var(--brand-green)]/80">
             ป้อนข้อมูลคุณเพื่อเข้าสู่ระบบ
           </p>
         </div>
@@ -88,11 +84,11 @@ export default function LoginPage() {
         )}
 
         {/* แบบฟอร์มเข้าสู่ระบบ */}
-        <div className="bg-white py-8 px-4 shadow rounded-lg sm:px-10 border border-gray-200">
+        <div className="bg-white py-8 px-4 shadow rounded-lg sm:px-10 border border-[var(--brand-gold)]/25">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* ช่องอีเมล */}
             <div>
-              <label htmlFor="email" className="block text-md font-bold text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-md font-bold text-[var(--brand-green)] mb-1">
                 ที่อยู่อีเมล
               </label>
               <div className="relative rounded-md shadow-sm">
@@ -110,7 +106,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400"
+                  className="focus:ring-[var(--brand-gold)] focus:border-[var(--brand-gold)] block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400"
                   placeholder="you@example.com"
                 />
               </div>
@@ -118,7 +114,7 @@ export default function LoginPage() {
 
             {/* ช่องรหัสผ่าน */}
             <div>
-              <label htmlFor="password" className="block text-md font-bold text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-md font-bold text-[var(--brand-green)] mb-1">
                 รหัสผ่าน
               </label>
               <div className="relative rounded-md shadow-sm">
@@ -135,14 +131,14 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-md placeholder-gray-400"
+                  className="focus:ring-[var(--brand-gold)] focus:border-[var(--brand-gold)] block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-md placeholder-gray-400"
                   placeholder="••••••••"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-gray-400 hover:text-black-500 focus:outline-none"
+                    className="text-gray-400 hover:text-[var(--brand-green)] focus:outline-none"
                   >
                     {showPassword ? (
                       <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -169,7 +165,7 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-[var(--brand-green)] focus:ring-[var(--brand-gold)] border-gray-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-md text-gray-700">
                   จำฉันไว้
@@ -177,7 +173,7 @@ export default function LoginPage() {
               </div>
 
               <div className="text-sm">
-                <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
+                <Link href="/forgot-password" className="font-medium text-[var(--brand-gold)] hover:text-[var(--brand-green)]">
                   ลืมรหัสผ่าน?
                 </Link>
               </div>
@@ -188,7 +184,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-md font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="w-full flex justify-center py-3 px-4 rounded-md shadow-sm text-md font-bold text-white bg-[var(--brand-green)] hover:bg-[var(--brand-green)]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--brand-gold)] disabled:opacity-50 transition-colors"
               >
                 {loading ? (
                   <>
@@ -212,7 +208,7 @@ export default function LoginPage() {
                 <div className="w-full border-t border-gray-300"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-black-500">
+                <span className="px-2 bg-white text-[color:var(--brand-green)]/80">
                   หรือดำเนินการต่อผ่าน
                 </span>
               </div>
@@ -223,7 +219,7 @@ export default function LoginPage() {
               <div>
                 <button
                   type="button"
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-md font-bold text-black-500 hover:bg-gray-50"
+                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-md font-bold text-[color:var(--brand-green)] hover:bg-gray-50"
                 >
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/>
@@ -233,7 +229,7 @@ export default function LoginPage() {
               <div>
                 <button
                   type="button"
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-md font-bold text-black-500 hover:bg-gray-50"
+                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-md font-bold text-[color:var(--brand-green)] hover:bg-gray-50"
                 >
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M22.675 0H1.325C.593 0 0 .593 0 1.325v21.351C0 23.407.593 24 1.325 24H12.82v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12V24h6.116c.73 0 1.323-.593 1.323-1.325V1.325C24 .593 23.407 0 22.675 0z"/>
@@ -248,7 +244,7 @@ export default function LoginPage() {
         <div className="text-center">
           <p className="text-md text-gray-600">
             ยังไม่มีบัญชี?{' '}
-            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/register" className="font-medium text-[var(--brand-gold)] hover:text-[var(--brand-green)]">
               ลงทะเบียนที่นี่
             </Link>
           </p>
