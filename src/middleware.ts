@@ -80,6 +80,54 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
   // --- Apply CORS headers to the default response ---
   setCORSHeaders(request, response);
 
+  // --- Smart redirects for root and login pages ---
+  // If hit root '/', redirect to /dashboard when authenticated; otherwise to /login
+  if (pathname === '/') {
+    const token = request.cookies.get('auth-token')?.value ?? null;
+
+    // default redirect target when unauthenticated
+    const unauthTarget = new URL('/login', request.url);
+
+    if (!token) {
+      const r = NextResponse.redirect(unauthTarget);
+      setCORSHeaders(request, r);
+      return r;
+    }
+
+    try {
+      const secret = new TextEncoder().encode(
+        process.env.JWT_SECRET || 'fallback_jwt_secret_for_dev_only_change_me'
+      );
+      await jwtVerify(token, secret);
+      const authedTarget = new URL('/dashboard', request.url);
+      const r = NextResponse.redirect(authedTarget);
+      setCORSHeaders(request, r);
+      return r;
+    } catch {
+      const r = NextResponse.redirect(unauthTarget);
+      setCORSHeaders(request, r);
+      return r;
+    }
+  }
+
+  // If user navigates to /login but already authenticated, send to /dashboard
+  if (pathname === '/login' || pathname.startsWith('/login/')) {
+    const token = request.cookies.get('auth-token')?.value ?? null;
+    if (token) {
+      try {
+        const secret = new TextEncoder().encode(
+          process.env.JWT_SECRET || 'fallback_jwt_secret_for_dev_only_change_me'
+        );
+        await jwtVerify(token, secret);
+        const r = NextResponse.redirect(new URL('/dashboard', request.url));
+        setCORSHeaders(request, r);
+        return r;
+      } catch {
+        // invalid token: allow reaching /login; middleware below may clear cookie on protected routes
+      }
+    }
+  }
+
   // --- Handle Authentication for Non-Public Routes ---
   // Check if the current route requires authentication
   if (!isPublicRoute(pathname)) {

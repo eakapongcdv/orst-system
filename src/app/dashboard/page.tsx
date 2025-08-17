@@ -120,34 +120,49 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/dictionaries'); // Fetch all dictionaries
         if (!res.ok) {
-            console.error("Failed to fetch dictionaries");
-            return;
+          console.error("Failed to fetch dictionaries", res.status, res.statusText);
+          return;
         }
-        const dictData: SpecializedDictionary[] = await res.json();
-        setDictionaries(dictData);
 
-        // --- Group dictionaries by category and subcategory ---
-        const grouped: { [key: string]: { [key: string]: SpecializedDictionary[] } } = {};
-        dictData.forEach(dict => {
-            const category = dict.category;
-            const subcategory = dict.subcategory || 'Uncategorized'; // Use 'Uncategorized' for null subcategories if needed, or handle differently
+        // Normalize payload to an array shape before grouping
+        const raw: unknown = await res.json();
+        const dictArray: SpecializedDictionary[] = Array.isArray(raw)
+          ? raw as SpecializedDictionary[]
+          : Array.isArray((raw as any)?.data)
+            ? (raw as any).data as SpecializedDictionary[]
+            : Array.isArray((raw as any)?.items)
+              ? (raw as any).items as SpecializedDictionary[]
+              : [];
 
-            if (!grouped[category]) {
-                grouped[category] = {};
-            }
-            if (!grouped[category][subcategory]) {
-                grouped[category][subcategory] = [];
-            }
-            grouped[category][subcategory].push(dict);
+        if (dictArray.length === 0 && raw && !Array.isArray(raw)) {
+          console.warn('Unexpected /api/dictionaries payload shape; expected array. Got:', raw);
+        }
+
+        setDictionaries(dictArray);
+
+        // --- Group dictionaries by category and subcategory with safe fallbacks ---
+        const grouped: Record<string, Record<string, SpecializedDictionary[]>> = {};
+
+        dictArray.forEach((dict) => {
+          const categoryKey = (dict.category ?? 'ไม่ระบุหมวด') as string;
+          const subcategoryKey = (dict.subcategory ?? 'Uncategorized') as string;
+
+          if (!grouped[categoryKey]) {
+            grouped[categoryKey] = {};
+          }
+          if (!grouped[categoryKey][subcategoryKey]) {
+            grouped[categoryKey][subcategoryKey] = [];
+          }
+          grouped[categoryKey][subcategoryKey].push(dict);
         });
 
         // Convert grouped object to array structure for easier rendering
         const groupedArray: DictionaryCategory[] = Object.entries(grouped).map(([categoryName, subcats]) => ({
-            name: categoryName,
-            subcategories: Object.entries(subcats).map(([subcatName, dicts]) => ({
-                name: subcatName === 'Uncategorized' && !dicts[0]?.subcategory ? null : subcatName, // Adjust if you used 'Uncategorized'
-                dictionaries: dicts
-            }))
+          name: categoryName,
+          subcategories: Object.entries(subcats).map(([subcatName, dicts]) => ({
+            name: subcatName === 'Uncategorized' && !dicts[0]?.subcategory ? null : subcatName,
+            dictionaries: dicts
+          }))
         }));
 
         setGroupedDictionaries(groupedArray);
