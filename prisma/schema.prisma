@@ -1,0 +1,356 @@
+// prisma/schema.prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- User Management ---
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  username  String   @unique
+  password  String? // Optional to support OAuth
+  firstName String
+  lastName  String
+  role      Role     @default(USER)
+  isActive  Boolean  @default(true)
+  lastLogin DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // --- Password reset support fields ---
+  resetToken        String?   @db.VarChar(255)
+  resetTokenExpiry  DateTime?
+
+  // Relations
+  documents        Document[]
+  documentVersions DocumentVersion[]
+  comments         Comment[]
+  uploadLogs       UploadLog[]
+  userGroups       UserGroup[]
+  permissions      Permission[]
+  folders          Folder[] // Folders owned by the user
+  sharedDocuments  DocumentShare[]   @relation("SharedDocuments") // Documents shared with this user
+
+  @@index([resetToken], map: "idx_user_reset_token")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  USER
+  GUEST
+}
+
+// --- User Groups for Role Management ---
+model Group {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userGroups UserGroup[]
+  groupRoles GroupRole[]
+}
+
+// Many-to-Many relationship between Users and Groups
+model UserGroup {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  groupId   Int
+  user      User     @relation(fields: [userId], references: [id])
+  group     Group    @relation(fields: [groupId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, groupId])
+}
+
+// Group Roles for Permission Management
+model GroupRole {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  roleName  String
+  group     Group    @relation(fields: [groupId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([groupId, roleName])
+}
+
+// --- Folder Hierarchy ---
+model Folder {
+  id        Int        @id @default(autoincrement())
+  name      String
+  userId    Int // Owner of the folder
+  user      User       @relation(fields: [userId], references: [id])
+  parentId  Int? // Null for root folders
+  parent    Folder?    @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children  Folder[]   @relation("FolderHierarchy")
+  documents Document[] // Documents directly in this folder
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+// --- Document Management ---
+model Document {
+  id        Int               @id @default(autoincrement())
+  name      String // Original file name
+  type      String // MIME type (e.g., application/pdf)
+  size      Int // Size in bytes
+  // --- Updated Fields ---
+  url       String // Stores the SIGNED URL for immediate preview/access
+  ossKey    String            @unique // Unique key/path in OSS (e.g., uploads/user-123/folder-456/uuid-filename.ext)
+  content   String?           @db.Text // NEW: Extracted text content for search (very large string)
+  // --- End Updated Fields ---
+  version   Int               @default(1) // Version number (for potential future versioning)
+  userId    Int // Owner
+  user      User              @relation(fields: [userId], references: [id])
+  folderId  Int? // Optional: link to a folder
+  folder    Folder?           @relation(fields: [folderId], references: [id])
+  comments  Comment[]
+  versions  DocumentVersion[]
+  shares    DocumentShare[]   @relation("DocumentShares") // Users this document is shared with
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([ossKey])
+}
+
+// Document Version Control (If used for explicit versioning beyond OSS)
+model DocumentVersion {
+  id         Int      @id @default(autoincrement())
+  documentId Int // The main document this is a version of
+  document   Document @relation(fields: [documentId], references: [id])
+  version    Int // Version number
+  name       String // Name at the time of versioning
+  type       String // Type at the time of versioning
+  size       Int // Size at the time of versioning
+  url        String // URL for this specific version (might be different OSS key)
+  ossKey     String // OSS key for this specific version
+  userId     Int // User who created this version
+  user       User     @relation(fields: [userId], references: [id])
+  changes    String? // JSON string describing changes
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@index([userId])
+}
+
+// Sharing Documents with Users
+model DocumentShare {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  userId     Int // The user the document is shared with
+  document   Document @relation(name: "DocumentShares", fields: [documentId], references: [id])
+  user       User     @relation(name: "SharedDocuments", fields: [userId], references: [id])
+  permission String // e.g., "READ", "WRITE", "COMMENT"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([documentId, userId]) // A document can only be shared once with a user
+  @@index([documentId])
+  @@index([userId])
+}
+
+// Comments on Documents
+model Comment {
+  id         Int       @id @default(autoincrement())
+  content    String
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id])
+  documentId Int
+  document   Document  @relation(fields: [documentId], references: [id])
+  parentId   Int? // For nested replies
+  parent     Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies    Comment[] @relation("CommentReplies")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([documentId])
+  @@index([parentId])
+}
+
+// --- Permission System ---
+model Permission {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// --- Dashboard Analytics ---
+model DashboardMetric {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  value     String // Store as string to accommodate different data types
+  category  String? // Optional category for grouping metrics
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- File Upload Logs ---
+model UploadLog {
+  id        Int      @id @default(autoincrement())
+  fileName  String
+  fileType  String // MIME type
+  fileSize  Int // Size in bytes
+  userId    Int // User who initiated the upload
+  user      User     @relation(fields: [userId], references: [id])
+  status    String // e.g., 'SUCCESS', 'FAILED', 'PENDING'
+  message   String? // Optional message (e.g., error details)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// หมวด 1: พจนานุกรมเฉพาะสาขาวิชา
+model SpecializedDictionary {
+  id             Int               @id @default(autoincrement())
+  title          String // ชื่อเล่ม เช่น พจนานุกรมศัพท์เคมี
+  category       String // สาขาวิชา เช่น วิทยาศาสตร์, คอมพิวเตอร์
+  subcategory    String? // กลุ่มย่อย เช่น เคมี, ฟิสิกส์, ชีววิทยา
+  year_published Int?
+  entries        DictionaryEntry[] // ความสัมพันธ์ 1:N กับคำศัพท์
+  created_at     DateTime          @default(now())
+  updated_at     DateTime          @updatedAt
+}
+
+// รายการคำศัพท์ในแต่ละพจนานุกรม
+// รายการคำศัพท์ในแต่ละพจนานุกรม
+model DictionaryEntry {
+  id                      Int                    @id @default(autoincrement())
+  specializedDictionaryId Int // FK
+  term_th                 String?                @db.Text
+  term_en                 String?                @db.Text
+  definition_html         String?                @db.Text
+  // --- Added version field ---
+  version                 Int                    @default(1) // Starts at version 1
+  // --- End added version field ---
+  related_transliteration TransliterationEntry[] @relation("EntryTranslit")
+  related_encyclopedia    EncyclopediaEntry[]    @relation("EntryEncyclo")
+  // --- Added relation to version log ---
+  versions                DictionaryEntryVersion[] // Relation to change log
+  // --- End added relation ---
+  created_at              DateTime               @default(now())
+  updated_at              DateTime               @updatedAt
+  SpecializedDictionary   SpecializedDictionary  @relation(fields: [specializedDictionaryId], references: [id])
+  @@unique([specializedDictionaryId, term_th, term_en], name: "uniq_entry_th_en")
+  @@index([term_th, term_en], name: "idx_entries_th_en")
+  // --- Add index for versioning ---
+  @@index([id, version], name: "idx_entry_id_version") // Useful for fetching specific versions
+  // --- End add index ---
+}
+
+// --- New model for DictionaryEntry version history ---
+model DictionaryEntryVersion {
+  id                      Int      @id @default(autoincrement())
+  dictionaryEntryId       Int      // FK to the main entry
+  version                 Int      // The version number this log represents
+  term_th                 String?  @db.Text // Snapshot of the term
+  term_en                 String?  @db.Text // Snapshot of the term
+  definition_html         String?  @db.Text // Snapshot of the definition
+  changed_at              DateTime @default(now()) // When the change occurred
+  changed_by_user_id      Int?     // Optional: FK to User who made the change (requires User model link)
+  // changed_by              User?    @relation(fields: [changed_by_user_id], references: [id]) // Optional relation
+  DictionaryEntry         DictionaryEntry @relation(fields: [dictionaryEntryId], references: [id])
+
+
+  @@unique([dictionaryEntryId, version], name: "uniq_entry_version") // Ensure one log per entry version
+  @@index([dictionaryEntryId], name: "idx_dict_entry_versions_entry_id")
+  @@index([changed_at], name: "idx_dict_entry_versions_changed_at")
+}
+
+// หมวด 2: คำทับศัพท์
+model TransliterationEntry {
+  id                Int       @id @default(autoincrement())
+  romanization      String    @unique
+  originalScript1   String?
+  originalScript2   String?
+  language          String?
+  wordType          String?
+  category          String?
+  transliteration1  String?
+  transliteration2  String?
+  otherFoundWords   String?
+  meaning           String?
+  notes             String?
+  referenceCriteria String?
+  publicationDate   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // เพิ่ม relation ย้อนกลับ
+  dictionaryEntry   DictionaryEntry? @relation("EntryTranslit", fields: [dictionaryEntryId], references: [id])
+  dictionaryEntryId Int?
+}
+
+// หมวด 3: สารานุกรม
+model Encyclopedia {
+  id         Int                 @id @default(autoincrement())
+  title      String // ชื่อเล่มหรือหมวด
+  category   String? // หมวดหลัก
+  entries    EncyclopediaEntry[] // รายการหัวข้อสารานุกรม
+  created_at DateTime            @default(now())
+  updated_at DateTime            @updatedAt
+}
+
+model EncyclopediaEntry {
+  id              Int               @id @default(autoincrement())
+  encyclopediaId  Int
+  term            String
+  content_html    String? // รายละเอียด
+  related_entries DictionaryEntry[] @relation("EntryEncyclo")
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  Encyclopedia Encyclopedia @relation(fields: [encyclopediaId], references: [id])
+}
+
+// หมวด 4: อนุกรมวิธาน
+model Taxonomy {
+  id              Int        @id @default(autoincrement())
+  scientific_name String // ชื่อวิทยาศาสตร์
+  common_name     String? // ชื่อสามัญ
+  rank            String? // ลำดับชั้น (Kingdom, Phylum, Genus, Species, ฯลฯ)
+  parent_id       Int? // สำหรับเชื่อมโยงลำดับชั้น
+  parent          Taxonomy?  @relation("ParentChild", fields: [parent_id], references: [id])
+  children        Taxonomy[] @relation("ParentChild")
+  description     String?
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+}
+
+// หมวด 5: อักษรานุกรมภูมิศาสตร์ไทย
+model GazetteerEntry {
+  id            Int      @id @default(autoincrement())
+  place_name_th String // ชื่อสถานที่ (ไทย)
+  place_name_en String? // ชื่อสถานที่ (อังกฤษ)
+  province      String? // จังหวัด
+  district      String? // อำเภอ
+  location      String? // พิกัด/ภูมิประเทศ
+  description   String? // รายละเอียด
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
