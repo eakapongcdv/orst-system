@@ -34,6 +34,27 @@ interface Pagination {
   total?: number; // total results
 }
 
+// Version snapshot returned by GET /api/transliteration/:id
+interface TransliterationVersionSnapshot {
+  version: number;
+  changed_at?: string; // backend may use snake_case
+  changedAt?: string;  // or camelCase
+  updatedAt?: string;
+  createdAt?: string;
+  // snapshot fields (mirror main entry keys)
+  romanization?: string | null;
+  originalScript1?: string | null;
+  originalScript2?: string | null;
+  language?: string | null;
+  wordType?: string | null;
+  category?: string | null;
+  transliteration1?: string | null;
+  transliteration2?: string | null;
+  meaning?: string | null;
+  notes?: string | null;
+  referenceCriteria?: string | null;
+}
+
 // Mapping language names to ISO country codes for flag display (UPPERCASE to match component names)
 const languageToCountryCode: Record<string, string> = {
   'อังกฤษ': 'GB',
@@ -57,6 +78,48 @@ const languageToCountryCode: Record<string, string> = {
   'กัมพูชา': 'KH',
   // หมายเหตุ: บางรายการอย่าง "สหภาพยุโรป" อาจไม่มีในไลบรารีนี้ → ใช้ fallback กลมโลก
 };
+// Build edit form shape
+type EditFormState = {
+  language: string;
+  wordType: string;
+  romanization: string;
+  transliteration1: string;
+  transliteration2: string;
+  category: string;
+  originalScript1: string;
+  originalScript2: string;
+  meaning: string;
+  notes: string;
+  referenceCriteria: string;
+};
+
+const mapFromEntry = (e: Partial<TransliterationSearchResult>): EditFormState => ({
+  language: e.language ?? '',
+  wordType: e.wordType ?? '',
+  romanization: e.romanization ?? '',
+  transliteration1: e.transliteration1 ?? '',
+  transliteration2: e.transliteration2 ?? '',
+  category: e.category ?? '',
+  originalScript1: e.originalScript1 ?? '',
+  originalScript2: e.originalScript2 ?? '',
+  meaning: e.meaning ?? '',
+  notes: e.notes ?? '',
+  referenceCriteria: e.referenceCriteria ?? '',
+});
+
+const mapFromVersion = (v?: TransliterationVersionSnapshot): EditFormState => ({
+  language: v?.language ?? '',
+  wordType: v?.wordType ?? '',
+  romanization: v?.romanization ?? '',
+  transliteration1: v?.transliteration1 ?? '',
+  transliteration2: v?.transliteration2 ?? '',
+  category: v?.category ?? '',
+  originalScript1: v?.originalScript1 ?? '',
+  originalScript2: v?.originalScript2 ?? '',
+  meaning: v?.meaning ?? '',
+  notes: v?.notes ?? '',
+  referenceCriteria: v?.referenceCriteria ?? '',
+});
 
 // Helper: Thai date formatter (dd/MM/yyyy HH:mm:ss, B.E. year)
 function formatThaiDate(input?: string | null): string {
@@ -150,10 +213,17 @@ export default function SearchTransliterationPage() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ==== Modal & versioning states ====
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<TransliterationSearchResult | null>(null);
+  const [editBase, setEditBase] = useState<TransliterationSearchResult | null>(null); // latest from API
+  const [versions, setVersions] = useState<TransliterationVersionSnapshot[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<string>('current'); // 'current' | version number string
+  const [editForm, setEditForm] = useState<EditFormState>(mapFromEntry({}));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Language dropdown state & ref
@@ -182,7 +252,7 @@ export default function SearchTransliterationPage() {
     { value: 'จีน', label: 'ภาษาจีน', code: 'CN' },
     { value: 'อังกฤษ', label: 'ภาษาอังกฤษ', code: 'GB' },
     { value: 'ฝรั่งเศส', label: 'ภาษาฝรั่งเศส', code: 'FR' },
-    { value: 'เยอรมัน', label: 'ภาษาเยอรมัน', code: 'DE' },
+    { value: 'เยอรมัน', label: 'ภาษายูรมน', code: 'DE' },
     { value: 'ฮินดี', label: 'ภาษาฮินดี', code: 'IN' },
     { value: 'อินโดนีเซีย', label: 'ภาษาอินโดนีเซีย', code: 'ID' },
     { value: 'อิตาลี', label: 'ภาษาอิตาลี', code: 'IT' },
@@ -235,7 +305,30 @@ export default function SearchTransliterationPage() {
     await loadResults(1);
   };
 
-  const openEdit = (row: TransliterationSearchResult) => { setEditRow(row); setEditOpen(true); };
+  // === Open modal & load versions ===
+  const openEdit = async (row: TransliterationSearchResult) => {
+    setEditRow(row);
+    setEditOpen(true);
+    setEditBase(row);
+    setVersions([]);
+    setSelectedVersion('current');
+    setEditForm(mapFromEntry(row));
+
+    try {
+      const res = await fetch(`/api/transliteration/${row.id}`);
+      if (res.ok) {
+        const j = await res.json();
+        const base: Partial<TransliterationSearchResult> = j.data || row;
+        const vers: TransliterationVersionSnapshot[] = j.versions || [];
+        setEditBase(base as TransliterationSearchResult);
+        setEditForm(mapFromEntry(base));
+        setVersions(vers);
+      }
+    } catch (e) {
+      console.warn('Load versions failed', e);
+    }
+  };
+
   const closeEdit = () => { setEditOpen(false); setEditRow(null); setSaveError(null); };
 
   // Build page numbers: 1 ... (current-2) (current-1) current (current+1) (current+2) ... total
@@ -458,6 +551,36 @@ export default function SearchTransliterationPage() {
             <div className="modal">
               <div className="modal__header">
                 <h3 className="modal__title">แก้ไขข้อมูลคำทับศัพท์ (ID: {editRow.id})</h3>
+                {/* Version dropdown */}
+                <div className="flex items-center gap-2 ml-auto">
+                  <label className="form-label" htmlFor="versionSelect">เวอร์ชัน</label>
+                  <select
+                    id="versionSelect"
+                    className="select"
+                    value={selectedVersion}
+                    onChange={(e) => {
+                      const val = e.target.value; // 'current' | version as string
+                      setSelectedVersion(val);
+                      if (val === 'current') {
+                        setEditForm(mapFromEntry(editBase || editRow));
+                      } else {
+                        const vNum = Number(val);
+                        const snap = versions.find(v => v.version === vNum);
+                        setEditForm(mapFromVersion(snap));
+                      }
+                    }}
+                  >
+                    <option value="current">เวอร์ชันล่าสุด (ฐานข้อมูลปัจจุบัน)</option>
+                    {versions.sort((a,b)=> b.version - a.version).map(v => {
+                      const ts = v.changedAt || v.changed_at || v.updatedAt || v.createdAt || '';
+                      return (
+                        <option key={v.version} value={String(v.version)}>
+                          รุ่น {v.version} • {formatThaiDate(ts)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
                 <button className="btn-icon" aria-label="ปิด" onClick={closeEdit}>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/></svg>
                 </button>
@@ -469,17 +592,17 @@ export default function SearchTransliterationPage() {
                   setSaving(true); setSaveError(null);
                   try{
                     const payload = {
-                      romanization: (e.currentTarget as any).romanization.value,
-                      originalScript1: (e.currentTarget as any).originalScript1.value,
-                      originalScript2: (e.currentTarget as any).originalScript2.value,
-                      language: (e.currentTarget as any).language.value,
-                      wordType: (e.currentTarget as any).wordType.value,
-                      category: (e.currentTarget as any).category.value,
-                      transliteration1: (e.currentTarget as any).transliteration1.value,
-                      transliteration2: (e.currentTarget as any).transliteration2.value,
-                      meaning: (e.currentTarget as any).meaning.value,
-                      notes: (e.currentTarget as any).notes.value,
-                      referenceCriteria: (e.currentTarget as any).referenceCriteria.value,
+                      romanization: editForm.romanization,
+                      originalScript1: editForm.originalScript1,
+                      originalScript2: editForm.originalScript2,
+                      language: editForm.language,
+                      wordType: editForm.wordType,
+                      category: editForm.category,
+                      transliteration1: editForm.transliteration1,
+                      transliteration2: editForm.transliteration2,
+                      meaning: editForm.meaning,
+                      notes: editForm.notes,
+                      referenceCriteria: editForm.referenceCriteria,
                       createNewVersion: true,
                     };
                     const res = await fetch(`/api/transliteration/${editRow.id}`,{
@@ -496,55 +619,54 @@ export default function SearchTransliterationPage() {
                   <div className="form-grid">
                     <div>
                       <label className="form-label">ภาษา</label>
-                      <input name="language" defaultValue={editRow.language || ''} className="input" />
+                      <input name="language" value={editForm.language} onChange={e=>setEditForm(p=>({...p, language:e.target.value}))} className="input" />
                     </div>
                     <div>
                       <label className="form-label">ชนิดคำ/Word Type</label>
-                      <input name="wordType" defaultValue={editRow.wordType || ''} className="input" />
+                      <input name="wordType" value={editForm.wordType} onChange={e=>setEditForm(p=>({...p, wordType:e.target.value}))} className="input" />
                     </div>
                     <div>
                       <label className="form-label">Romanization</label>
-                      <input name="romanization" defaultValue={editRow.romanization || ''} className="input" />
+                      <input name="romanization" value={editForm.romanization} onChange={e=>setEditForm(p=>({...p, romanization:e.target.value}))} className="input" />
                     </div>
                     <div>
                       <label className="form-label">คำทับศัพท์ 1</label>
-                      <input name="transliteration1" defaultValue={editRow.transliteration1 || ''} className="input" />
+                      <input name="transliteration1" value={editForm.transliteration1} onChange={e=>setEditForm(p=>({...p, transliteration1:e.target.value}))} className="input" />
                     </div>
                     <div>
                       <label className="form-label">คำทับศัพท์ 2</label>
-                      <input name="transliteration2" defaultValue={editRow.transliteration2 || ''} className="input" />
+                      <input name="transliteration2" value={editForm.transliteration2} onChange={e=>setEditForm(p=>({...p, transliteration2:e.target.value}))} className="input" />
                     </div>
                     <div>
                       <label className="form-label">หมวดหมู่</label>
-                      <input name="category" defaultValue={editRow.category || ''} className="input" />
+                      <input name="category" value={editForm.category} onChange={e=>setEditForm(p=>({...p, category:e.target.value}))} className="input" />
                     </div>
 
                     <div>
                       <label className="form-label">ต้นฉบับ (สคริปต์ 1)</label>
-                      <input name="originalScript1" defaultValue={editRow.originalScript1 || ''} className="input" />
+                      <input name="originalScript1" value={editForm.originalScript1} onChange={e=>setEditForm(p=>({...p, originalScript1:e.target.value}))} className="input" />
                     </div>
                     <div>
                       <label className="form-label">ต้นฉบับ (สคริปต์ 2)</label>
-                      <input name="originalScript2" defaultValue={editRow.originalScript2 || ''} className="input" />
+                      <input name="originalScript2" value={editForm.originalScript2} onChange={e=>setEditForm(p=>({...p, originalScript2:e.target.value}))} className="input" />
                     </div>
 
                     <div className="col-span-2">
                       <label className="form-label">ความหมาย</label>
-                      <textarea name="meaning" defaultValue={editRow.meaning || ''} className="textarea" />
+                      <textarea name="meaning" value={editForm.meaning} onChange={e=>setEditForm(p=>({...p, meaning:e.target.value}))} className="textarea" />
                     </div>
                     <div className="col-span-2">
                       <label className="form-label">หมายเหตุ</label>
-                      <textarea name="notes" defaultValue={editRow.notes || ''} className="textarea" />
+                      <textarea name="notes" value={editForm.notes} onChange={e=>setEditForm(p=>({...p, notes:e.target.value}))} className="textarea" />
                     </div>
                     <div className="col-span-2">
                       <label className="form-label">เกณฑ์อ้างอิง (referenceCriteria)</label>
-                      <input name="referenceCriteria" defaultValue={editRow.referenceCriteria || ''} className="input" />
+                      <input name="referenceCriteria" value={editForm.referenceCriteria} onChange={e=>setEditForm(p=>({...p, referenceCriteria:e.target.value}))} className="input" />
                     </div>
                   </div>
                   {saveError && <p className="mt-3 text-red-600">{saveError}</p>}
                 </div>
                 <div className="modal__footer">
-                  <button type="button" className="btn-ghost" onClick={closeEdit}>ยกเลิก</button>
                   <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชันใหม่'}</button>
                 </div>
               </form>

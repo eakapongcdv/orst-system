@@ -61,6 +61,14 @@ interface GroupedDictionaries {
   };
 }
 
+// Summary group for Transliteration (by wordType, language, or category)
+interface TranslitGroup {
+  key: string;         // e.g., wordType key, language label, or category key
+  label: string;       // Display label (e.g., ชนิดคำ / ภาษา / หมวด)
+  type: 'wordType' | 'language' | 'category';
+  entryCount: number;  // number of entries within this group
+}
+
 // Helper: icon per category name (Heroicons)
 const iconForCategoryName = (name: string) => {
   const n = (name || '').toLowerCase();
@@ -99,15 +107,22 @@ export default function DictionariesPage() {
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [expandedSubs, setExpandedSubs] = useState<Record<string, Record<string, boolean>>>({});
 
-  useEffect(() => {
-    const fetchDictionaries = async () => {
-      try {
-        const response = await fetch('/api/dictionaries');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const apiData: APIDictionaryResponse = await response.json();
+  // --- Transliteration summary state ---
+  const [translitGroups, setTranslitGroups] = useState<TranslitGroup[]>([]);
+  const [expandedTranslit, setExpandedTranslit] = useState<boolean>(true);
 
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      try {
+        const [dictRes, translitRes] = await Promise.all([
+          fetch('/api/dictionaries'),
+          fetch('/api/transliteration/summary')
+        ]);
+
+        // --- Handle dictionaries ---
+        if (!dictRes.ok) throw new Error(`Dict HTTP error! status: ${dictRes.status}`);
+        const apiData: APIDictionaryResponse = await dictRes.json();
         const groupedForComponent: GroupedDictionaries = {};
         Object.entries(apiData).forEach(([category, subcategoryDict]) => {
           groupedForComponent[category] = { subcategories: {} };
@@ -117,7 +132,7 @@ export default function DictionariesPage() {
         });
         setGroupedDictionaries(groupedForComponent);
 
-        // เปิดทุกหมวดไว้ก่อน (สามารถกดปิดได้ภายหลัง)
+        // init expand states for dictionaries
         const catInit: Record<string, boolean> = {};
         const subsInit: Record<string, Record<string, boolean>> = {};
         Object.keys(groupedForComponent).forEach((cat) => {
@@ -129,14 +144,80 @@ export default function DictionariesPage() {
         });
         setExpandedCats(catInit);
         setExpandedSubs(subsInit);
+
+        // --- Handle transliteration summary ---
+        if (translitRes.ok) {
+          const tjson: any = await translitRes.json();
+          const groups: TranslitGroup[] = [];
+
+          // Primary: group by wordType (ชนิดคำ)
+          if (Array.isArray(tjson?.wordTypes)) {
+            // Expected: [{ wordType, entryCount, categoryCounts, lastUpdatedAt }, ...]
+            tjson.wordTypes.forEach((it: any) => {
+              const label = (String(it.wordType ?? '')).trim() || 'ไม่ระบุ';
+              groups.push({
+                key: label,
+                label,
+                type: 'wordType',
+                entryCount: Number(it.entryCount ?? 0),
+              });
+            });
+          } else if (tjson?.byWordType && typeof tjson.byWordType === 'object') {
+            // Fallback: object map { [wordType]: { entryCount, ... } }
+            Object.entries(tjson.byWordType).forEach(([wordType, val]: any) => {
+              const label = (String(wordType ?? '')).trim() || 'ไม่ระบุ';
+              const count = Number(val?.entryCount ?? 0);
+              groups.push({
+                key: label,
+                label,
+                type: 'wordType',
+                entryCount: count,
+              });
+            });
+          } else {
+            // Final fallback: single total group
+            const total = Number(tjson?.total ?? 0);
+            groups.push({
+              key: 'ทุกชนิดคำ',
+              label: 'ทุกชนิดคำ',
+              type: 'wordType',
+              entryCount: total,
+            });
+          }
+
+          // Normalize & de-duplicate groups by composite key (type + key)
+          const map = new Map<string, TranslitGroup>();
+          for (const item of groups) {
+            const normKey = (item.key ?? '').toString().trim() || 'ไม่ระบุ';
+            const normLabel = (item.label ?? '').toString().trim() || 'ไม่ระบุ';
+            const composite = `${item.type}:${normKey}`;
+            const existing = map.get(composite);
+            if (existing) {
+              existing.entryCount += item.entryCount || 0;
+            } else {
+              map.set(composite, { ...item, key: normKey, label: normLabel });
+            }
+          }
+          const merged = Array.from(map.values());
+
+          // Sort by entryCount desc, then label asc (Thai locale)
+          merged.sort((a, b) => {
+            if (b.entryCount !== a.entryCount) return b.entryCount - a.entryCount;
+            return a.label.localeCompare(b.label, 'th');
+          });
+
+          setTranslitGroups(merged);
+        } else {
+          setTranslitGroups([]);
+        }
       } catch (err) {
-        console.error('Error fetching dictionaries:', err);
-        setError('เกิดข้อผิดพลาดในการโหลดข้อมูลพจนานุกรม');
+        console.error('Error loading data:', err);
+        setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
       } finally {
         setLoading(false);
       }
     };
-    fetchDictionaries();
+    loadAll();
   }, []);
 
   const handlePreview = (dictId: number) => {
@@ -161,6 +242,43 @@ export default function DictionariesPage() {
     } catch (err) {
       console.error('Error exporting PDF:', err);
       alert(`เกิดข้อผิดพลาดในการส่งออก PDF สำหรับ ID: ${dictId}`);
+    }
+  };
+
+  const handleTranslitPreview = (group: TranslitGroup) => {
+    if (group.type === 'wordType') {
+      router.push(`/search-transliteration?wordType=${encodeURIComponent(group.key)}`);
+    } else if (group.type === 'language') {
+      router.push(`/search-transliteration?lang=${encodeURIComponent(group.key)}`);
+    } else {
+      router.push(`/search-transliteration?category=${encodeURIComponent(group.key)}`);
+    }
+  };
+
+  const handleTranslitExportPdf = async (group: TranslitGroup) => {
+    try {
+      // Example export endpoint; adjust backend accordingly
+      const qs = group.type === 'wordType'
+        ? `wordType=${encodeURIComponent(group.key)}`
+        : group.type === 'language'
+        ? `language=${encodeURIComponent(group.key)}`
+        : `category=${encodeURIComponent(group.key)}`;
+      const response = await fetch(`/api/export-transliteration/pdf?${qs}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/pdf' },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting transliteration PDF:', err);
+      alert(`เกิดข้อผิดพลาดในการส่งออก PDF สำหรับกลุ่ม: ${group.label}`);
     }
   };
 
@@ -283,15 +401,98 @@ export default function DictionariesPage() {
             <p className="text-lead">สำรวจพจนานุกรมเฉพาะสาขาวิชา พร้อมตัวเลือกดูตัวอย่างและส่งออกเอกสาร</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={expandAll} className="btn-secondary" title="ขยายทั้งหมด">
+            <button onClick={expandAll} className="btn-secondary btn--sm" title="ขยายทั้งหมด">
               <ChevronDoubleDownIcon className="h-5 w-5" aria-hidden="true" />
               <span className="sr-only">ขยายทั้งหมด</span>
             </button>
-            <button onClick={collapseAll} className="btn-primary" title="ยุบทั้งหมด">
+            <button onClick={collapseAll} className="btn-primary btn--sm" title="ยุบทั้งหมด">
               <ChevronDoubleUpIcon className="h-5 w-5" aria-hidden="true" />
               <span className="sr-only">ยุบทั้งหมด</span>
             </button>
           </div>
+        </div>
+
+        {/* Transliteration Section (Grouped by Word Types) */}
+        <div className="mb-6 grid grid-cols-1">
+          <section className="card overflow-hidden h-full">
+            {/* Section Header */}
+            <button
+              type="button"
+              onClick={() => setExpandedTranslit((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+              aria-expanded={expandedTranslit}
+              aria-controls="translit-panel"
+            >
+              <div className="flex items-center gap-3 text-left">
+                <span className="inline-flex items-center justify-center">
+                  <LanguageIcon className="h-5 w-5 text-brand-green" aria-hidden="true" />
+                </span>
+                <span className="font-extrabold text-gray-900 text-lg">คำทับศัพท์</span>
+                <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {translitGroups.reduce((acc, g) => acc + (g.entryCount || 0), 0).toLocaleString()} รายการ
+                </span>
+              </div>
+              {expandedTranslit ? (
+                <ChevronUpIcon className="h-5 w-5 text-muted-ink" aria-hidden="true" />
+              ) : (
+                <ChevronDownIcon className="h-5 w-5 text-muted-ink" aria-hidden="true" />
+              )}
+            </button>
+
+            {/* Section Body */}
+            {expandedTranslit && (
+              <div id="translit-panel" className="border-t border-border px-4 py-3 bg-gray-50">
+                {translitGroups.length === 0 ? (
+                  <p className="text-muted-ink">ไม่มีสรุปคำทับศัพท์ให้แสดง</p>
+                ) : (
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {translitGroups.map((g) => (
+                      <li key={`${g.type}:${g.key}`} className="border border-border rounded-md bg-white p-3 hover:shadow-sm transition">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-brand-green block truncate">
+                              <LanguageIcon className="h-4 w-4 text-muted-ink mr-2 inline-block" aria-hidden="true" />
+                              {g.label}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                                {g.entryCount.toLocaleString()} รายการ
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                จัดกลุ่มโดย {g.type === 'wordType' ? 'ชนิดคำ' : g.type === 'language' ? 'ภาษา' : 'หมวด'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {g.entryCount > 0 && (
+                              <>
+                                <button
+                                  onClick={() => handleTranslitPreview(g)}
+                                  className="btn-secondary btn--sm px-2 py-1 flex items-center gap-1"
+                                  title="ดูตัวอย่าง"
+                                >
+                                  <EyeIcon className="h-4 w-4 text-brand-white" aria-hidden="true" />
+                                  <span className="sr-only sm:not-sr-only sm:inline">Preview</span>
+                                </button>
+                                <button
+                                  onClick={() => handleTranslitExportPdf(g)}
+                                  className="btn-primary btn--sm px-2 py-1 flex items-center gap-1"
+                                  title="ส่งออกเป็น PDF"
+                                >
+                                  <ArrowDownTrayIcon className="h-4 w-4 text-brand-white" aria-hidden="true" />
+                                  <span className="sr-only sm:not-sr-only sm:inline">PDF</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Category Accordion (Compact) */}
@@ -403,26 +604,26 @@ export default function DictionariesPage() {
                                             )}
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                          <button
-                                            onClick={() => handlePreview(dict.id)}
-                                            className="btn-secondary px-2 py-1  flex items-center gap-1"
-                                            disabled={dict.entryCount <= 0}
-                                            title="ดูตัวอย่าง"
-                                          >
-                                            <EyeIcon className="h-4 w-4 text-brand-white" aria-hidden="true" />
-                                            <span className="sr-only sm:not-sr-only sm:inline">Preview</span>
-                                          </button>
-                                          <button
-                                            onClick={() => handleExportPdf(dict.id)}
-                                            className="btn-primary px-2 py-1  flex items-center gap-1"
-                                            disabled={dict.entryCount <= 0}
-                                            title="ส่งออกเป็น PDF"
-                                          >
-                                            <ArrowDownTrayIcon className="h-4 w-4 text-brand-white" aria-hidden="true" />
-                                            <span className="sr-only sm:not-sr-only sm:inline">PDF</span>
-                                          </button>
-                                        </div>
+                                        {(dict.entryCount ?? 0) > 0 && (
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            <button
+                                              onClick={() => handlePreview(dict.id)}
+                                              className="btn-secondary  btn--sm px-2 py-1 flex items-center gap-1"
+                                              title="ดูตัวอย่าง"
+                                            >
+                                              <EyeIcon className="h-4 w-4 text-brand-white" aria-hidden="true" />
+                                              <span className="sr-only sm:not-sr-only sm:inline">Preview</span>
+                                            </button>
+                                            <button
+                                              onClick={() => handleExportPdf(dict.id)}
+                                              className="btn-primary btn--sm px-2 py-1 flex items-center gap-1"
+                                              title="ส่งออกเป็น PDF"
+                                            >
+                                              <ArrowDownTrayIcon className="h-4 w-4 text-brand-white" aria-hidden="true" />
+                                              <span className="sr-only sm:not-sr-only sm:inline">PDF</span>
+                                            </button>
+                                          </div>
+                                        )}
                                       </div>
                                     </li>
                                   ))}
@@ -439,6 +640,7 @@ export default function DictionariesPage() {
             );
           })}
         </div>
+
       </main>
     </div>
   );
