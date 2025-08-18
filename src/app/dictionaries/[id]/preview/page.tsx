@@ -1,6 +1,15 @@
+//dictionaries/[id]/preview/pages.tsx
+//dictionaries/[id]/preview/pages.tsx
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
+import {
+  DocumentArrowDownIcon,
+  ArrowDownTrayIcon,
+  MagnifyingGlassPlusIcon,
+  MagnifyingGlassMinusIcon,
+  ArrowPathIcon
+} from '@heroicons/react/24/solid';
 import { useRouter } from "next/navigation";
 
 // --- Utility: Replace all <img> with base64 data URI ---
@@ -29,6 +38,10 @@ async function replaceImagesWithBase64(htmlString: string) {
   return tempDiv.innerHTML;
 }
 
+function isMeaningfulText(node: ChildNode) {
+  return node.nodeType === Node.TEXT_NODE && node.textContent && node.textContent.trim().length > 0;
+}
+
 const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +50,8 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
   const [dictId, setDictId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   // --- Effect to unwrap params and set dictId ---
   useEffect(() => {
@@ -92,12 +107,105 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
     fetchPreview();
   }, [dictId]);
 
-  // Inject the HTML content
+  // Render paginated A4 pages
   useEffect(() => {
-    if (htmlContent && previewContainerRef.current) {
-      previewContainerRef.current.innerHTML = htmlContent;
-    }
+    if (!htmlContent || !previewContainerRef.current) return;
+
+    const host = previewContainerRef.current as HTMLDivElement;
+    // Reset container
+    host.innerHTML = "";
+    host.classList.add("preview-shell");
+    host.style.overflow = 'auto';
+
+    // Wrapper to center pages and add gaps
+    const wrapper = document.createElement("div");
+    wrapper.className = "a4-wrapper";
+    host.appendChild(wrapper);
+    wrapperRef.current = wrapper;
+    // initial zoom transform
+    wrapper.style.transformOrigin = 'top center';
+    wrapper.style.transform = `scale(${zoom})`;
+
+    // Helper to create a new page
+    let pageIndex = 0;
+    const newPage = () => {
+      const page = document.createElement("div");
+      page.className = "a4-page";
+
+      const content = document.createElement("div");
+      content.className = "a4-content";
+      page.appendChild(content);
+
+      const footer = document.createElement("div");
+      footer.className = "a4-footer";
+      footer.textContent = ""; // will set after pagination complete
+      page.appendChild(footer);
+
+      wrapper.appendChild(page);
+      return { page, content, footer };
+    };
+
+    const { content: firstContent } = newPage();
+    let currentContent = firstContent;
+
+    // Parse incoming HTML into nodes
+    const temp = document.createElement("div");
+    temp.innerHTML = htmlContent;
+
+    // Determine max content height in px from styled A4 content box
+    // Force layout by reading clientHeight (A4 height minus footer/padding set in CSS)
+    const getMax = () => currentContent.clientHeight;
+
+    const appendOrPaginate = (node: ChildNode) => {
+      // Normalize text nodes into <p> for better flow
+      let toAppend: Node = node;
+      if (isMeaningfulText(node)) {
+        const p = document.createElement("p");
+        p.textContent = (node.textContent || "").trim();
+        toAppend = p;
+      }
+
+      currentContent.appendChild(toAppend);
+
+      // If overflow, move node to a new page
+      const overflowed = currentContent.scrollHeight > currentContent.clientHeight;
+      if (overflowed) {
+        currentContent.removeChild(toAppend);
+
+        // Insert page separator between pages
+        const sep = document.createElement("hr");
+        sep.className = "page-sep";
+        wrapper.appendChild(sep);
+
+        const { content: nextContent } = newPage();
+        currentContent = nextContent;
+        currentContent.appendChild(toAppend);
+
+        // If a single element is taller than a page, allow overflow (edge case)
+        if (currentContent.scrollHeight > getMax()) {
+          currentContent.style.overflow = "hidden"; // visually contained
+        }
+      }
+    };
+
+    Array.from(temp.childNodes).forEach(appendOrPaginate);
+
+    // Set page numbers
+    const pages = wrapper.querySelectorAll<HTMLDivElement>(".a4-page");
+    pages.forEach((page, idx) => {
+      const footer = page.querySelector<HTMLDivElement>(".a4-footer");
+      if (footer) footer.textContent = `หน้า ${idx + 1}`;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [htmlContent]);
+
+  // Effect to apply zoom transform to wrapper when zoom changes
+  useEffect(() => {
+    if (wrapperRef.current) {
+      wrapperRef.current.style.transformOrigin = 'top center';
+      wrapperRef.current.style.transform = `scale(${zoom})`;
+    }
+  }, [zoom]);
 
   // --- PDF Export Handler ---
   const handleExportPdf = async () => {
@@ -177,22 +285,56 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: "8px", marginBottom: 16 }}>
-        <button
-          onClick={handleExportDocx}
-          disabled={isLoading || !!error || !dictId || isExporting}
-          style={{ padding: "8px 16px", borderRadius: 4, border: "none", background: "#28a745", color: "white", fontWeight: "bold" }}
-        >
-          {isExporting ? "Exporting..." : "Export DOCX"}
-        </button>
-        <button
-          onClick={handleExportPdf}
-          disabled={isLoading || !!error || !dictId || isExporting}
-          style={{ padding: "8px 16px", borderRadius: 4, border: "none", background: "#dc3545", color: "white", fontWeight: "bold" }}
-        >
-          {isExporting ? "Exporting..." : "Export PDF"}
-        </button>
+    <div className="preview-page">
+      <div className="preview-toolbar">
+        <div className="toolbar-group">
+          <button
+            onClick={handleExportDocx}
+            disabled={isLoading || !!error || !dictId || isExporting}
+            className="btn-icon"
+            title="ส่งออกเป็น DOCX"
+            aria-label="ส่งออกเป็น DOCX"
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={isLoading || !!error || !dictId || isExporting}
+            className="btn-icon"
+            title="ส่งออกเป็น PDF"
+            aria-label="ส่งออกเป็น PDF"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="toolbar-sep" aria-hidden="true"></div>
+        <div className="toolbar-group">
+          <button
+            onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)))}
+            className="btn-icon"
+            title="ซูมออก"
+            aria-label="ซูมออก"
+          >
+            <MagnifyingGlassMinusIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <span className="zoom-label" aria-live="polite">{Math.round(zoom * 100)}%</span>
+          <button
+            onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.1).toFixed(2)))}
+            className="btn-icon"
+            title="ซูมเข้า"
+            aria-label="ซูมเข้า"
+          >
+            <MagnifyingGlassPlusIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            onClick={() => setZoom(1)}
+            className="btn-icon"
+            title="รีเซ็ตขนาด"
+            aria-label="รีเซ็ตขนาด"
+          >
+            <ArrowPathIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       {isLoading && (
         <div style={{ textAlign: "center", margin: "40px 0" }}>
@@ -202,13 +344,124 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
       {error && (
         <div style={{ textAlign: "center", margin: "40px 0" }}>
           <p style={{ color: "red" }}>Error: {error}</p>
-          <button onClick={() => window.location.reload()}>Retry</button>{" "}
-          <button onClick={() => router.back()}>Go Back</button>
+          <button onClick={() => window.location.reload()} className="btn-secondary">Retry</button>{" "}
+          <button onClick={() => router.back()} className="btn-ghost">Go Back</button>
         </div>
       )}
       {!isLoading && !error && (
         <div ref={previewContainerRef} />
       )}
+
+      {/* Page-specific global styles */}
+      <style jsx global>{`
+        /* Leather-green background like login-pane--left for the preview shell */
+        .preview-shell{
+          min-height: calc(100dvh - var(--header-h, 0px) - var(--footer-h, 0px));
+          width: 100%;
+          padding: 0; /* full width, no outer margin/padding */
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background-color: var(--leather-base);
+          background-image:
+            radial-gradient(12px 12px at 20% 30%, rgba(255,255,255,0.02), transparent 60%),
+            radial-gradient(10px 10px at 70% 65%, rgba(0,0,0,0.08), transparent 60%),
+            radial-gradient(14px 14px at 40% 85%, rgba(255,255,255,0.025), transparent 60%),
+            radial-gradient(600px 400px at 50% -10%, rgba(255,255,255,0.10), transparent 70%),
+            radial-gradient(900px 600px at 110% 120%, rgba(0,0,0,0.30), transparent 70%),
+            linear-gradient(145deg, var(--leather-deep), var(--leather-base) 45%, var(--leather-high) 100%);
+          background-blend-mode: overlay, overlay, overlay, soft-light, multiply, normal;
+          background-repeat: no-repeat;
+          background-size: cover;
+          background-position: center;
+          overflow: auto; /* allow scrolling when zoomed */
+        }
+
+        .preview-toolbar{
+          position: sticky;
+          top: 0;
+          z-index: 5;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: .5rem;
+          padding: .5rem .75rem;
+          width: 100%;
+          background: color-mix(in srgb, #ffffff 80%, rgba(255,255,255,.3));
+          border-bottom: 1px solid var(--brand-border);
+          backdrop-filter: blur(6px) saturate(1.05);
+          -webkit-backdrop-filter: blur(6px) saturate(1.05);
+        }
+        .preview-toolbar .toolbar-group{ display: inline-flex; align-items: center; gap: .5rem; }
+        .preview-toolbar .toolbar-sep{
+          width: 1px; height: 26px;
+          background: color-mix(in srgb, var(--brand-gold) 45%, transparent);
+        }
+        .preview-toolbar .zoom-label{
+          min-width: 3.2ch;
+          text-align: center;
+          font-weight: 800;
+          color: #1f2937;
+        }
+
+        /* Center and separate pages */
+        .a4-wrapper{
+          width: 100%;
+          max-width: calc(210mm + 24px);
+          display: flex; flex-direction: column; align-items: center; gap: 8mm;
+          will-change: transform;
+          padding-top:30px;
+        }
+
+        /* A4 page box */
+        .a4-page{
+          position: relative;
+          width: 210mm;
+          min-height: 297mm;
+          background: #fff;
+          border-radius: var(--radius-md);
+          box-shadow: 0 10px 30px rgba(0,0,0,.35);
+          overflow: hidden;
+        }
+
+        /* Content area inside page; fixed height to measure overflow, with padding */
+        .a4-content{
+          position: relative;
+          height: calc(297mm - 18mm); /* reserve space for footer visually */
+          padding: 14mm 14mm 22mm 14mm; /* bottom padding so text won't overlap footer */
+          overflow: hidden; /* we control pagination in JS */
+          color: var(--brand-ink);
+        }
+
+        /* Page footer with page number (bottom-right) */
+        .a4-footer{
+          position: absolute;
+          bottom: 8mm;
+          right: 12mm;
+          font-size: .9rem;
+          color: #374151;
+        }
+
+        /* Separator (hr) between pages */
+        .page-sep{
+          height: 2px;
+          width: 210mm;
+          border: 0;
+          margin: 0;
+          background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-gold) 65%, transparent), transparent);
+          opacity: .9;
+        }
+
+        /* Print styles: remove shadows/background, force page breaks */
+        @media print{
+          body { background: #fff !important; }
+          .preview-shell { background: #fff !important; padding: 0; }
+          .a4-wrapper{ gap: 0; }
+          .a4-page{ box-shadow: none; page-break-after: always; border-radius: 0; width: 210mm; min-height: 297mm; }
+          .page-sep{ display: none; }
+          .a4-content{ height: auto; overflow: visible; }
+        }
+      `}</style>
     </div>
   );
 };

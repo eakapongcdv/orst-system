@@ -29,8 +29,8 @@ export default function ClientLayout({
 }) {
   const pathname = usePathname();
   
-  // Check if we're on a real full-screen page (editor/view, not dictionary/search)
-  const isEditorPage = /^\/(editor|view)(?:\/|$)/.test(pathname ?? '');
+  // Check if we're on a real full-screen page (editor/view, or /dictionaries/:id/preview)
+  const isEditorPage = (/^\/dictionaries\/[^\/]+\/preview(?:\/|$)/.test(pathname ?? ''));
   // Detect dictionary routes for subnav highlight
   const dictActive = pathname?.startsWith('/dictionaries');
   const translitActive = pathname?.startsWith('/search-transliteration');

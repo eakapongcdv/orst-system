@@ -1,72 +1,202 @@
 // app/search-transliteration/page.tsx
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
+import * as FlagIcons from 'country-flag-icons/react/3x2';
 
-// Mapping language names to country codes for flag display
-const languageToCountryCode: Record<string, string> = {
-  'อาหรับ': 'SA',
-  'พม่า': 'MM',
-  'จีน': 'CN',
-  'อังกฤษ': 'GB',
-  'ฝรั่งเศส': 'FR',
-  'เยอรมัน': 'DE',
-  'ฮินดี': 'IN',
-  'อินโดนีเซีย': 'ID',
-  'อิตาลี': 'IT',
-  'ญี่ปุ่น': 'JP',
-  'เกาหลี': 'KR',
-  'มลายู': 'MY',
-  'รัสเซีย': 'RU',
-  'สเปน': 'ES',
-  'เวียดนาม': 'VN',
-  // Add more mappings as needed
-};
-
-// Interface for search result items
-// Fields marked for highlighting should contain HTML from the API
-interface TransliterationSearchResult { // ✅ PascalCase for interface name
+// === Types ===
+interface TransliterationSearchResult {
   id: number;
-  romanization: string; // Highlighted HTML
-  originalScript1: string | null; // Highlighted HTML
-  originalScript2: string | null; // Highlighted HTML
-  language: string | null;
+  romanization: string;
+  originalScript1: string | null;
+  originalScript2: string | null;
+  originalScript3?: string | null;
+  language: string | null;                // ex. "ญี่ปุ่น", "ฝรั่งเศส", "พม่า"
   wordType: string | null;
   category: string | null;
-  transliteration1: string | null; // Highlighted HTML
-  transliteration2: string | null; // Highlighted HTML
+  transliteration1: string | null;
+  transliteration2: string | null;
   otherFoundWords: string | null;
-  meaning: string | null; // Highlighted HTML
-  notes: string | null; // Highlighted HTML
-  referenceCriteria: string | null;
-  formattedPublicationDate: string | null; // Formatted date string from API
+  meaning: string | null;
+  notes: string | null;
+  referenceCriteria: string | null;       // ≈ เกณฑ์อ้างอิง
+  formattedPublicationDate: string | null;
+  updatedAt?: string | null;
 }
 
-export default function SearchTransliterationPage() { // ✅ PascalCase for component name
+interface Pagination {
+  currentPage: number;
+  totalPages: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
+  prevPage?: number;
+  nextPage?: number;
+  pageSize?: number;
+  total?: number; // total results
+}
+
+// Mapping language names to ISO country codes for flag display (UPPERCASE to match component names)
+const languageToCountryCode: Record<string, string> = {
+  'อังกฤษ': 'GB',
+  'สหรัฐอเมริกา': 'US',
+  'ฝรั่งเศส': 'FR',
+  'เยอรมัน': 'DE',
+  'รัสเซีย': 'RU',
+  'อิตาลี': 'IT',
+  'สเปน': 'ES',
+  'โปรตุเกส': 'PT',
+  'ญี่ปุ่น': 'JP',
+  'จีน': 'CN',
+  'เกาหลี': 'KR',
+  'พม่า': 'MM',
+  'อินโดนีเซีย': 'ID',
+  'เวียดนาม': 'VN',
+  'มลายู': 'MY',
+  'อาหรับ': 'SA',
+  'ฮินดี': 'IN',
+  'ลาว': 'LA',
+  'กัมพูชา': 'KH',
+  // หมายเหตุ: บางรายการอย่าง "สหภาพยุโรป" อาจไม่มีในไลบรารีนี้ → ใช้ fallback กลมโลก
+};
+
+// Helper: Thai date formatter (dd/MM/yyyy HH:mm:ss, B.E. year)
+function formatThaiDate(input?: string | null): string {
+  if (!input) return '-';
+  const d = new Date(input);
+  if (isNaN(d.getTime())) return input;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear() + 543;
+  const HH = String(d.getHours()).padStart(2, '0');
+  const MM = String(d.getMinutes()).padStart(2, '0');
+  const SS = String(d.getSeconds()).padStart(2, '0');
+  return `${dd}/${mm}/${yyyy} ${HH}:${MM}:${SS}`;
+}
+
+// ★ ADD: การ์ดผลลัพธ์ (ใช้ class จาก globals.css: result-card, meta-chip ฯลฯ)
+function ResultCard({ data, onEdit }: { data: TransliterationSearchResult, onEdit: (row: TransliterationSearchResult) => void }) {
+  const title =
+    (data.meaning || data.originalScript1 || data.originalScript2 || data.originalScript3 || data.otherFoundWords || data.romanization || '').trim();
+
+  const langLabel = data.language ? `ภาษา${data.language}` : '';
+  const countryCode = data.language ? languageToCountryCode[data.language] : undefined;
+  const FlagSvg: React.ComponentType<React.SVGProps<SVGSVGElement>> | undefined =
+    countryCode ? (FlagIcons as any)[countryCode] : undefined;
+
+  const handleOpen = () => onEdit(data);
+
+  return (
+    <article className="result-card mx-auto max-w-5xl" role="button" tabIndex={0}
+      onClick={handleOpen}
+      onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handleOpen(); } }}>
+      {/* หัวเรื่องพร้อมอัญประกาศ + (notes) ต่อท้าย */}
+      <h3 className="result-card__title">
+        <span dangerouslySetInnerHTML={{ __html: title }} />
+        {data.notes ? <span> ({data.notes})</span> : null}
+      </h3>
+
+      {/* แถวผลลัพธ์หลักแบบ 2 คอลัมน์: ซ้าย = ธง, ขวา = ข้อความ */}
+      <div className="result-grid">
+        <div className="result-flag-col">
+          {FlagSvg ? (
+            <FlagSvg className="meta-flag meta-flag--lg" title={langLabel} />
+          ) : (
+            <div className="meta-flag meta-flag--lg" aria-hidden="true">🌐</div>
+          )}
+        </div>
+        <div className="result-main-col">
+          {/* ป้ายภาษา */}
+          {langLabel && <span className="meta-chip meta-chip--lang">{langLabel}</span>}
+
+          {/* บรรทัดโรมัน/คำทับศัพท์ */}
+          {(data.romanization || data.transliteration1) && (
+            <p className="result-card__roman">
+              {data.romanization}
+              {data.transliteration1 ? (
+                <>
+                  {data.romanization ? ', ' : null}
+                  <span dangerouslySetInnerHTML={{ __html: data.transliteration1 }} />
+                </>
+              ) : null}
+              {' '}
+              <span>( คำทับศัพท์ : {data.transliteration1 || data.transliteration2 || '-'} )</span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ส่วนล่าง: ซ้าย = หมวดหมู่; ขวา = เวลาแก้ไขล่าสุด */}
+      <div className="result-card__footer--split">
+        <span className="text-md text-gray-600"><span className="font-bold mr-2">หมวดหมู่</span>{(data.category && data.category.trim() !== '' ? data.category : '-')}
+        </span>
+        <span className="text-md text-gray-600"><span className="font-bold mr-2">แหล่งอ้างอิง</span>{(data.referenceCriteria && data.referenceCriteria.trim() !== '' ? data.referenceCriteria : '-')}
+        </span>
+        {(data.updatedAt || data.formattedPublicationDate) && (
+          <span className="result-card__timestamp">แก้ไขล่าสุดเมื่อ : {formatThaiDate(data.updatedAt || data.formattedPublicationDate)}</span>
+        )}
+      </div>
+    </article>
+  );
+}
+
+export default function SearchTransliterationPage() {
   const [query, setQuery] = useState('');
   const [languageFilter, setLanguageFilter] = useState('all');
   const [results, setResults] = useState<TransliterationSearchResult[]>([]);
-  const [pagination, setPagination] = useState<any | null>(null); // Consider defining a specific type for pagination data
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editRow, setEditRow] = useState<TransliterationSearchResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load initial results on component mount
+  // Language dropdown state & ref
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     loadResults();
   }, []);
 
-  // Function to fetch search results from the API
+  // Close lang panel on outside click
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!langRef.current) return;
+      if (!langRef.current.contains(e.target as Node)) setLangOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  // Language options for dropdown
+  const LANG_OPTIONS: { value: string; label: string; code?: string }[] = [
+    { value: 'all', label: 'ทุกภาษา' },
+    { value: 'อาหรับ', label: 'ภาษาอาหรับ', code: 'SA' },
+    { value: 'พม่า', label: 'ภาษาพม่า', code: 'MM' },
+    { value: 'จีน', label: 'ภาษาจีน', code: 'CN' },
+    { value: 'อังกฤษ', label: 'ภาษาอังกฤษ', code: 'GB' },
+    { value: 'ฝรั่งเศส', label: 'ภาษาฝรั่งเศส', code: 'FR' },
+    { value: 'เยอรมัน', label: 'ภาษาเยอรมัน', code: 'DE' },
+    { value: 'ฮินดี', label: 'ภาษาฮินดี', code: 'IN' },
+    { value: 'อินโดนีเซีย', label: 'ภาษาอินโดนีเซีย', code: 'ID' },
+    { value: 'อิตาลี', label: 'ภาษาอิตาลี', code: 'IT' },
+    { value: 'ญี่ปุ่น', label: 'ภาษาญี่ปุ่น', code: 'JP' },
+    { value: 'เกาหลี', label: 'ภาษาเกาหลี', code: 'KR' },
+    { value: 'มลายู', label: 'ภาษามลายู', code: 'MY' },
+    { value: 'รัสเซีย', label: 'ภาษารัสเซีย', code: 'RU' },
+    { value: 'สเปน', label: 'ภาษาสเปน', code: 'ES' },
+    { value: 'เวียดนาม', label: 'ภาษาเวียดนาม', code: 'VN' },
+  ];
+
   const fetchResults = async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (query.trim()) {
-        params.append('q', query.trim());
-      }
-      if (languageFilter !== 'all') {
-        params.append('language', languageFilter);
-      }
+      if (query.trim()) params.append('q', query.trim());
+      if (languageFilter !== 'all') params.append('language', languageFilter);
       params.append('page', page.toString());
 
       const response = await fetch(`/api/search-transliteration?${params.toString()}`);
@@ -75,16 +205,14 @@ export default function SearchTransliterationPage() { // ✅ PascalCase for comp
         try {
           const errorData = await response.json();
           errorMsg = errorData.error || errorMsg;
-        } catch (e) {
-          // Ignore JSON parse error for error message
-        }
+        } catch {}
         throw new Error(errorMsg);
       }
       const data = await response.json();
       setResults(data.results || []);
-      setPagination(data.pagination || null); // Store pagination data
+      setPagination(data.pagination || null);
     } catch (err) {
-      console.error("Search transliteration error:", err);
+      console.error('Search transliteration error:', err);
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการค้นหาคำศัพท์ กรุณาลองใหม่อีกครั้ง');
       setResults([]);
       setPagination(null);
@@ -93,282 +221,322 @@ export default function SearchTransliterationPage() { // ✅ PascalCase for comp
     }
   };
 
-  // Wrapper function to load results, defaulting to page 1
   const loadResults = async (page = 1) => {
     await fetchResults(page);
   };
 
-  // Handle form submission for search
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Reset to first page on new search
     await loadResults(1);
   };
 
+  const openEdit = (row: TransliterationSearchResult) => { setEditRow(row); setEditOpen(true); };
+  const closeEdit = () => { setEditOpen(false); setEditRow(null); setSaveError(null); };
+
+  // Build page numbers: 1 ... (current-2) (current-1) current (current+1) (current+2) ... total
+  const pageNumbers = useMemo(() => {
+    if (!pagination) return [] as (number | '…')[];
+    const { currentPage, totalPages } = pagination;
+    const pages: (number | '…')[] = [];
+    const add = (n: number | '…') => pages.push(n);
+    const pushRange = (s: number, e: number) => { for (let i = s; i <= e; i++) add(i); };
+
+    if (totalPages <= 7) {
+      pushRange(1, totalPages);
+    } else {
+      add(1);
+      if (currentPage > 4) add('…');
+      const start = Math.max(2, currentPage - 2);
+      const end = Math.min(totalPages - 1, currentPage + 2);
+      pushRange(start, end);
+      if (currentPage < totalPages - 3) add('…');
+      add(totalPages);
+    }
+    return pages;
+  }, [pagination]);
+
+  const totalResults = pagination?.total ?? results.length;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="a4-shell bg-brand-pattern-light">
       <Head>
         <meta charSet="UTF-8" />
         <title>ระบบฐานข้อมูลคำทับศัพท์ - สำนักงานราชบัณฑิตยสภา</title>
       </Head>
+      <main className="a4-container py-8">
+        <div className="a4-sheet">
+          {/* Title */}
+          <h1 className="section-title text-center mb-6">ค้นหาคำทับศัพท์</h1>
 
-      {/* Header */}
-      <header className="bg-blue-600 text-white p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <img
-            src="https://transliteration.orst.go.th/img/royin-logo2.c03c8949.png"
-            alt="สำนักงานราชบัณฑิตยสภา"
-            // style={{ backgroundColor: 'white' }} // Not typically needed for logos
-            className="h-10 w-10 mr-2 bg-white" // Moved background color to className
-          />
-          <h1 className="text-xl font-bold">ระบบฐานข้อมูลคำทับศัพท์ของสำนักงานราชบัณฑิตยสภา</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Flag_of_the_United_Kingdom.svg/1280px-Flag_of_the_United_Kingdom.svg.png" alt="English Flag" className="h-6 w-6" />
-            <span>English</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Flag_of_Thailand.svg/1280px-Flag_of_Thailand.svg.png" alt="Thai Flag" className="h-6 w-6" />
-            <span>ภาษาไทย</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span>ขยาย</span>
-            <button>-</button>
-            <span>100%</span>
-            <button>+</button>
-          </div>
-        </div>
-      </header>
+          {/* Search Bar – V layout (button | input | icons) */}
+          <form onSubmit={handleSearch} className="mb-8" role="search" aria-label="ค้นหาคำทับศัพท์">
+            <div className="searchbar-v searchbar-v--tight">
+              {/* Language button + panel */}
+              <div className="searchbar-v__lang" ref={langRef}>
+                <button
+                  type="button"
+                  className="lang-btn-v"
+                  aria-haspopup="listbox"
+                  aria-expanded={langOpen}
+                  onClick={() => setLangOpen(v => !v)}
+                >
+                  {(() => {
+                    const active = LANG_OPTIONS.find(o => o.value === languageFilter);
+                    const code = active?.code;
+                    const ActiveFlag = code ? (FlagIcons as any)[code] : undefined;
+                    return (
+                      <>
+                        {ActiveFlag ? <ActiveFlag className="flag" aria-hidden="true" /> : <span className="flag" aria-hidden="true">🌐</span>}
+                        <span>{active?.label || 'ทุกภาษา'}</span>
+                        <svg className="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z" clipRule="evenodd" />
+                        </svg>
+                      </>
+                    );
+                  })()}
+                </button>
 
-      {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <h2 className="text-3xl font-bold mb-4 text-center">ค้นหาคำทับศัพท์ (Transliteration)</h2>
+                {langOpen && (
+                  <div className="searchbar__panel" role="listbox" aria-label="เลือกภาษา">
+                    {LANG_OPTIONS.map(opt => {
+                      const code = opt.code;
+                      const OptFlag = code ? (FlagIcons as any)[code] : undefined;
+                      const active = languageFilter === opt.value;
+                      return (
+                        <div
+                          key={opt.value}
+                          role="option"
+                          aria-selected={active}
+                          className={`lang-option ${active ? 'is-active' : ''}`}
+                          onClick={() => { setLanguageFilter(opt.value); setLangOpen(false); }}
+                        >
+                          {OptFlag ? <OptFlag className="flag" aria-hidden="true" /> : <span className="flag" aria-hidden="true">🌐</span>}
+                          <span>{opt.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-        {/* Google-like Search Form */}
-        <form onSubmit={handleSearch} className="mb-8">
-          <div className="flex items-center border border-gray-300 rounded-full px-4 py-3 shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow duration-200 ease-in-out max-w-3xl mx-auto">
-            {/* Language Dropdown - Integrated inside the search bar */}
-            <div className="relative mr-2">
-              <select
-                value={languageFilter}
-                onChange={(e) => setLanguageFilter(e.target.value)}
-                className="bg-transparent border-none focus:ring-0 focus:outline-none text-md appearance-none pr-4 cursor-pointer"
-                // Style the select to remove default browser styling
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' strokeLinecap='round' strokeLinejoin='round' strokeWidth='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 0.5rem center',
-                  backgroundSize: '16px 16px',
+              {/* Input (wrapped so we can place clear icon inside without gaps) */}
+              <div className="searchbar-v__inputwrap">
+                <input
+                  ref={inputRef}
+                  id="search"
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="ระบุคำทับศัพท์"
+                  autoFocus
+                  autoComplete="off"
+                  aria-label="ช่องค้นหาคำทับศัพท์"
+                  className="searchbar-v__input"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    aria-label="ล้างคำค้นหา"
+                    className="searchbar-v__clear"
+                    onClick={() => { setQuery(''); inputRef.current?.focus(); }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+                      <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Submit button as the last column (no internal gap) */}
+              <button
+                type="submit"
+                className="searchbar-v__submit"
+                aria-label="ค้นหา"
+                disabled={!query.trim()}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22" aria-hidden="true">
+                  <path fillRule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </form>
+
+          {/* State messages */}
+          {loading && !error && (
+            <div className="brand-card text-center py-12">
+              <div className="spinner mx-auto mb-4" />
+              <p>กำลังค้นหาคำศัพท์...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="alert alert--danger" role="alert">
+              <strong>เกิดข้อผิดพลาด:</strong> {error}
+            </div>
+          )}
+
+          {!loading && !error && (
+            <section aria-label="ผลการค้นหา">
+              {/* Summary header */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">ผลการค้นหาคำทับศัพท์</h2>
+                <span className="text-sm text-gray-600">{totalResults} รายการ</span>
+              </div>
+
+              <section className="mx-auto max-w-5xl space-y-6">
+                {results.length === 0 ? (
+                  <div className="brand-card p-6 text-center text-gray-600">ไม่พบผลการค้นหา</div>
+                ) : (
+                  results.map((row: TransliterationSearchResult) => <ResultCard key={row.id} data={row} onEdit={openEdit} />)
+                )}
+              </section>
+
+              {/* Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <nav className="pagination" role="navigation" aria-label="เลขหน้า">
+                  <button
+                    className="btn-secondary btn--sm"
+                    onClick={() => loadResults(pagination.prevPage || Math.max(1, (pagination.currentPage - 1)))}
+                    disabled={!pagination.hasPrevPage}
+                  >
+                    ←
+                  </button>
+
+                  <ul className="pagination__list" role="list">
+                    {pageNumbers.map((p, idx) => (
+                      <li key={`${p}-${idx}`}>
+                        {p === '…' ? (
+                          <span className="pagination__ellipsis">…</span>
+                        ) : (
+                          <button
+                            onClick={() => loadResults(p as number)}
+                            className={`pagination__item ${p === pagination.currentPage ? 'is-active' : ''}`}
+                            aria-current={p === pagination.currentPage ? 'page' : undefined}
+                          >
+                            {p}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    className="btn-secondary btn--sm"
+                    onClick={() => loadResults(pagination.nextPage || Math.min(pagination.totalPages, (pagination.currentPage + 1)))}
+                    disabled={!pagination.hasNextPage}
+                  >
+                    →
+                  </button>
+                </nav>
+              )}
+            </section>
+          )}
+        {/* Modal for editing */}
+        {editOpen && editRow && (
+          <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="แก้ไขคำทับศัพท์">
+            <div className="modal">
+              <div className="modal__header">
+                <h3 className="modal__title">แก้ไขข้อมูลคำทับศัพท์ (ID: {editRow.id})</h3>
+                <button className="btn-icon" aria-label="ปิด" onClick={closeEdit}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/></svg>
+                </button>
+              </div>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if(!editRow) return;
+                  setSaving(true); setSaveError(null);
+                  try{
+                    const payload = {
+                      romanization: (e.currentTarget as any).romanization.value,
+                      originalScript1: (e.currentTarget as any).originalScript1.value,
+                      originalScript2: (e.currentTarget as any).originalScript2.value,
+                      originalScript3: (e.currentTarget as any).originalScript3.value,
+                      language: (e.currentTarget as any).language.value,
+                      wordType: (e.currentTarget as any).wordType.value,
+                      category: (e.currentTarget as any).category.value,
+                      transliteration1: (e.currentTarget as any).transliteration1.value,
+                      transliteration2: (e.currentTarget as any).transliteration2.value,
+                      meaning: (e.currentTarget as any).meaning.value,
+                      notes: (e.currentTarget as any).notes.value,
+                      referenceCriteria: (e.currentTarget as any).referenceCriteria.value,
+                      createNewVersion: true,
+                    };
+                    const res = await fetch(`/api/transliteration/${editRow.id}/update`,{
+                      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload)
+                    });
+                    if(!res.ok){ let m = 'บันทึกไม่สำเร็จ'; try{ const j = await res.json(); m = j.error || m; }catch{} throw new Error(m); }
+                    await loadResults(pagination?.currentPage || 1);
+                    closeEdit();
+                  }catch(err:any){ setSaveError(err.message || 'เกิดข้อผิดพลาดระหว่างบันทึก'); }
+                  finally{ setSaving(false); }
                 }}
               >
-                <option value="all">ทุกภาษา</option>
-                <option value="อาหรับ">อาหรับ</option>
-                <option value="พม่า">พม่า</option>
-                <option value="จีน">จีน</option>
-                <option value="อังกฤษ">อังกฤษ</option>
-                <option value="ฝรั่งเศส">ฝรั่งเศส</option>
-                <option value="เยอรมัน">เยอรมัน</option>
-                <option value="ฮินดี">ฮินดี</option>
-                <option value="อินโดนีเซีย">อินโดนีเซีย</option>
-                <option value="อิตาลี">อิตาลี</option>
-                <option value="ญี่ปุ่น">ญี่ปุ่น</option>
-                <option value="เกาหลี">เกาหลี</option>
-                <option value="มลายู">มลายู</option>
-                <option value="รัสเซีย">รัสเซีย</option>
-                <option value="สเปน">สเปน</option>
-                <option value="เวียดนาม">เวียดนาม</option>
-              </select>
-            </div>
-
-            {/* Divider Line */}
-            <div className="h-6 border-l border-gray-300 mr-3"></div>
-
-            {/* Search Input */}
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ระบุคำทับศัพท์"
-              className="flex-grow border-none focus:ring-0 focus:outline-none text-base"
-              aria-label="ช่องค้นหาคำศัพท์"
-            />
-
-            {/* Search Button */}
-            <button
-              type="submit"
-              className="ml-2 p-1 text-gray-500 hover:text-blue-500 focus:outline-none"
-              aria-label="ค้นหา"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                <path fillRule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        </form>
-
-        {/* Loading Indicator */}
-        {loading && !error && (
-          <div className="flex flex-col justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-            <p className="text-gray-600">กำลังค้นหาคำศัพท์...</p>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded relative" role="alert">
-            <strong className="font-bold">เกิดข้อผิดพลาด:</strong> {error}
-          </div>
-        )}
-
-        {/* Results Display */}
-        {!loading && !error && (
-          <div>
-            {results.length > 0 ? (
-              <div>
-                <h3 className="text-lg font-bold mb-4">ผลการค้นหาคำทับศัพท์</h3>
-                <div className="space-y-4">
-                  {results.map((result) => (
-                    <div key={result.id} className="border p-4 rounded shadow hover:shadow-md transition-shadow">
-                      {/* Display language with flag */}
-                      <div className="flex items-center mb-1">
-                        {result.language && (
-                          <>
-                            {/* Attempt to get country code, fallback to generic globe icon if not found */}
-                            {languageToCountryCode[result.language] ? (
-                              <span className={`fi fi-${languageToCountryCode[result.language]?.toLowerCase()} mr-2 text-sm`}></span>
-                            ) : (
-                              <span className="mr-2 text-sm">🌐</span>
-                            )}
-                            <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                              {result.language}
-                            </span>
-                          </>
-                        )}
-                        {result.wordType && (
-                          <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded ml-2">
-                            {result.wordType}
-                          </span>
-                        )}
-                        {result.category && (
-                          <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded ml-2">
-                            {result.category}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Display Original Script (Highlighted) */}
-                      {result.originalScript1 && (
-                        <div
-                          className="text-xl font-bold mb-1"
-                          // ✅ Use dangerouslySetInnerHTML for highlighted text
-                          dangerouslySetInnerHTML={{ __html: result.originalScript1 }}
-                        />
-                      )}
-
-                      {/* Display Romanization */}
-                      {result.romanization && (
-                        <p className="text-base font-medium text-gray-800 mb-1">{result.romanization}</p>
-                      )}
-
-                      {/* Display Transliteration (Highlighted) */}
-                      {result.transliteration1 && (
-                        <div
-                          className="text-base text-gray-700 mb-1"
-                          // ✅ Use dangerouslySetInnerHTML for highlighted text
-                          dangerouslySetInnerHTML={{ __html: result.transliteration1 }}
-                        />
-                      )}
-
-                      {/* Display Meaning (Highlighted) */}
-                      {result.meaning && (
-                        <div
-                          className="text-base text-gray-900 mb-2"
-                          // ✅ Use dangerouslySetInnerHTML for highlighted text
-                          dangerouslySetInnerHTML={{ __html: result.meaning }}
-                        />
-                      )}
-
-                      {/* Display Notes (Highlighted) */}
-                      {result.notes && (
-                        <div
-                          className="text-sm text-gray-600 italic"
-                          // ✅ Use dangerouslySetInnerHTML for highlighted text
-                          dangerouslySetInnerHTML={{ __html: result.notes }}
-                        />
-                      )}
-
-                      {/* Display Other Found Words */}
-                      {result.otherFoundWords && (
-                        <p className="text-xs text-gray-500 mt-2">
-                          <span className="font-medium">พบเพิ่มเติม:</span> {result.otherFoundWords}
-                        </p>
-                      )}
-
-                      {/* Display Reference Criteria */}
-                      {result.referenceCriteria && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          <span className="font-medium">เกณฑ์อ้างอิง:</span> {result.referenceCriteria}
-                        </p>
-                      )}
-
-                      {/* Display Formatted Publication Date */}
-                      {result.formattedPublicationDate && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          <span className="font-medium">วันที่ประกาศ:</span> {result.formattedPublicationDate}
-                        </p>
-                      )}
+                <div className="modal__body">
+                  <div className="form-grid">
+                    <div>
+                      <label className="form-label">ภาษา</label>
+                      <input name="language" defaultValue={editRow.language || ''} className="input" />
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <label className="form-label">ชนิดคำ/Word Type</label>
+                      <input name="wordType" defaultValue={editRow.wordType || ''} className="input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Romanization</label>
+                      <input name="romanization" defaultValue={editRow.romanization || ''} className="input" />
+                    </div>
+                    <div>
+                      <label className="form-label">คำทับศัพท์ 1</label>
+                      <input name="transliteration1" defaultValue={editRow.transliteration1 || ''} className="input" />
+                    </div>
+                    <div>
+                      <label className="form-label">คำทับศัพท์ 2</label>
+                      <input name="transliteration2" defaultValue={editRow.transliteration2 || ''} className="input" />
+                    </div>
+                    <div>
+                      <label className="form-label">หมวดหมู่</label>
+                      <input name="category" defaultValue={editRow.category || ''} className="input" />
+                    </div>
 
-                {/* TODO: Implement Pagination Controls */}
-                {/* Example placeholder for pagination (requires API support) */}
-                {/* {pagination && (
-                  <div className="flex justify-between items-center mt-6">
-                    <button
-                      onClick={() => loadResults(pagination.prevPage)}
-                      disabled={!pagination.hasPrevPage}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
-                    >
-                      ก่อนหน้า
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      หน้า {pagination.currentPage} จาก {pagination.totalPages}
-                    </span>
-                    <button
-                      onClick={() => loadResults(pagination.nextPage)}
-                      disabled={!pagination.hasNextPage}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
-                    >
-                      ถัดไป
-                    </button>
+                    <div>
+                      <label className="form-label">ต้นฉบับ (สคริปต์ 1)</label>
+                      <input name="originalScript1" defaultValue={editRow.originalScript1 || ''} className="input" />
+                    </div>
+                    <div>
+                      <label className="form-label">ต้นฉบับ (สคริปต์ 2)</label>
+                      <input name="originalScript2" defaultValue={editRow.originalScript2 || ''} className="input" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="form-label">ต้นฉบับ (สคริปต์ 3)</label>
+                      <input name="originalScript3" defaultValue={editRow.originalScript3 || ''} className="input" />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="form-label">ความหมาย</label>
+                      <textarea name="meaning" defaultValue={editRow.meaning || ''} className="textarea" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="form-label">หมายเหตุ</label>
+                      <textarea name="notes" defaultValue={editRow.notes || ''} className="textarea" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="form-label">เกณฑ์อ้างอิง (referenceCriteria)</label>
+                      <input name="referenceCriteria" defaultValue={editRow.referenceCriteria || ''} className="input" />
+                    </div>
                   </div>
-                )} */}
-              </div>
-            ) : (
-              // No Results Found State
-              <div className="p-12 text-center">
-                <svg className="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="mt-2 text-md font-bold text-gray-900">ไม่พบผลการค้นหา</h3>
-                <p className="mt-1 text-md text-gray-500"> {/* ✅ Changed text-black-500 to text-gray-500 */}
-                  ไม่พบคำศัพท์ที่ตรงกับเงื่อนไขการค้นหาของคุณ
-                  {query && (
-                    <>
-                      {" \""}
-                      <span className="font-semibold">{query}</span>
-                      {"\""}
-                    </>
-                  )}
-                </p>
-              </div>
-            )}
+                  {saveError && <p className="mt-3 text-red-600">{saveError}</p>}
+                </div>
+                <div className="modal__footer">
+                  <button type="button" className="btn-ghost" onClick={closeEdit}>ยกเลิก</button>
+                  <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชันใหม่'}</button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </main>
+  </div>
   );
 }

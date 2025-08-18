@@ -214,32 +214,6 @@ export default function SearchDictionaryPage() {
             } - ระบบฐานข้อมูลคำศัพท์
         </title>
       </Head>
-      <header className="bg-blue-600 text-white p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <img
-            src="https://transliteration.orst.go.th/img/royin-logo2.c03c8949.png"
-            alt="สำนักงานราชบัณฑิตยสภา"
-            className="h-10 w-10 mr-2 bg-white"
-          />
-          <h1 className="text-xl font-bold">ระบบฐานข้อมูลคำศัพท์ของสำนักงานราชบัณฑิตยสภา</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Flag_of_the_United_Kingdom.svg/1280px-Flag_of_the_United_Kingdom.svg.png" alt="English Flag" className="h-6 w-6" />
-            <span>English</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Flag_of_Thailand.svg/1280px-Flag_of_Thailand.svg.png" alt="Thai Flag" className="h-6 w-6" />
-            <span>ภาษาไทย</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span>ขยาย</span>
-            <button>-</button>
-            <span>100%</span>
-            <button>+</button>
-          </div>
-        </div>
-      </header>
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-500 mb-4">

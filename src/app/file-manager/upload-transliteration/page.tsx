@@ -2,6 +2,13 @@
 
 import { useState, useRef, ChangeEvent, DragEvent } from 'react';
 import Link from 'next/link';
+import {
+  CloudArrowUpIcon,
+  TrashIcon,
+  DocumentArrowUpIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/solid';
 
 interface TransliterationEntry {
   id?: number;
@@ -114,72 +121,108 @@ export default function TransliterationUploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-xl mx-auto px-4">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">นำเข้าคำทับศัพท์</h1>
-          <p className="mt-1 text-md text-gray-600">
+    <div className="page">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <header className="page-header">
+          <h1 className="page-title flex items-center gap-3">
+            <DocumentArrowUpIcon className="h-7 w-7 text-[var(--brand-gold)]" aria-hidden="true" />
+            นำเข้าคำทับศัพท์
+          </h1>
+          <p className="page-subtitle">
             อัปโหลดไฟล์ Excel (.xlsx) ที่มีข้อมูลคำทับศัพท์ (original term, คำทับศัพท์ ฯลฯ)
           </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-md mb-8 p-8 text-center">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".xlsx"
-            className="hidden"
-            id="transliteration-file-upload"
-          />
-          <div
-            className="p-4 border-2 border-dashed border-gray-300 rounded cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <p className="text-lg font-medium text-gray-700 mb-1">
-              {selectedFile ? `เลือกแล้ว: ${selectedFile.name}` : 'ลาก & วางไฟล์ .xlsx ที่นี่ หรือคลิกเพื่อเลือก'}
-            </p>
-            <p className="text-black-500 text-sm">รองรับเฉพาะไฟล์ .xlsx (สูงสุด 200MB)</p>
-          </div>
-          {selectedFile && (
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-sm">{selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)</span>
-              <button onClick={removeFile} className="text-red-500 text-sm px-2 py-1 rounded hover:bg-red-100">ลบไฟล์</button>
+        </header>
+
+        {/* Card */}
+        <section className="card overflow-hidden">
+          <div className="card-body">
+            {/* Hidden native input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".xlsx"
+              className="sr-only"
+              id="transliteration-file-upload"
+            />
+
+            {/* Dropzone */}
+            <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInputRef.current?.click()}
+              className="rounded-lg border-2 border-dashed border-[var(--brand-border)] bg-white/70 hover:bg-white/90 transition p-8 text-center cursor-pointer monogram-bg"
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              aria-label="เลือกรายการไฟล์ .xlsx เพื่ออัปโหลด"
+            >
+              <CloudArrowUpIcon className="mx-auto h-10 w-10 text-[var(--brand-gold)]" aria-hidden="true" />
+              <p className="mt-3 font-semibold">
+                {selectedFile ? `เลือกแล้ว: ${selectedFile.name}` : 'ลาก & วางไฟล์ .xlsx ที่นี่ หรือคลิกเพื่อเลือก'}
+              </p>
+              <p className="text-sm opacity-80 mt-1">รองรับเฉพาะไฟล์ .xlsx (สูงสุด 200MB)</p>
             </div>
-          )}
-          <button
-            onClick={handleUpload}
-            disabled={uploading || !selectedFile}
-            className={`mt-4 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-md font-bold rounded-md shadow-sm text-white ${
-              uploading || !selectedFile ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {uploading ? 'กำลังอัปโหลด...' : 'อัปโหลดไฟล์คำทับศัพท์'}
-          </button>
-          {error && (
-            <div className="mt-4 text-red-600">{error}</div>
-          )}
-          {uploadResult && (
-            <div className="mt-4 text-green-700">
-              <div>{uploadResult.message}</div>
-              <div>เพิ่มใหม่: {uploadResult.created}, ข้าม: {uploadResult.skipped}</div>
-              {uploadResult.errors && uploadResult.errors.length > 0 && (
-                <details className="mt-2 text-left text-xs text-red-600">
-                  <summary>รายละเอียด error</summary>
-                  <ul>
-                    {uploadResult.errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="mt-6 flex justify-center">
-          <Link href={`/file-manager`}>
-            <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-md font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none">
-              กลับไปยังตัวจัดการไฟล์
+
+            {/* File chip + remove */}
+            {selectedFile && (
+              <div className="mt-4 flex items-center justify-between brand-chip">
+                <div className="flex items-center gap-2">
+                  <span className="chip-icon">.XLSX</span>
+                  <span className="text-sm">
+                    {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
+                  </span>
+                </div>
+                <button onClick={removeFile} className="btn-ghost btn-icon" title="ลบไฟล์">
+                  <TrashIcon className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
+            {/* Upload button */}
+            <button
+              onClick={handleUpload}
+              disabled={uploading || !selectedFile}
+              className="btn-primary w-full mt-4"
+            >
+              <CloudArrowUpIcon className="h-5 w-5" aria-hidden="true" />
+              {uploading ? 'กำลังอัปโหลด...' : 'อัปโหลดไฟล์คำทับศัพท์'}
             </button>
+
+            {/* Error / Result */}
+            {error && (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700 flex items-start gap-2">
+                <ExclamationTriangleIcon className="h-5 w-5 mt-0.5" aria-hidden="true" />
+                <span>{error}</span>
+              </div>
+            )}
+            {uploadResult && (
+              <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
+                <div className="flex items-center gap-2 font-semibold">
+                  <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
+                  <span>{uploadResult.message}</span>
+                </div>
+                <div className="mt-1 text-sm">
+                  เพิ่มใหม่: {uploadResult.created}, ข้าม: {uploadResult.skipped}
+                </div>
+                {uploadResult.errors && uploadResult.errors.length > 0 && (
+                  <details className="mt-2 text-left text-xs text-red-600">
+                    <summary>รายละเอียดข้อผิดพลาด</summary>
+                    <ul className="list-disc pl-5 mt-1">
+                      {uploadResult.errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Back link */}
+        <div className="mt-6 flex justify-center">
+          <Link href={`/file-manager`} className="btn-secondary">
+            กลับไปยังตัวจัดการไฟล์
           </Link>
         </div>
       </div>
