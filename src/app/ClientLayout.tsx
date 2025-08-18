@@ -94,7 +94,7 @@ export default function ClientLayout({
               <div className="flex items-center">
                 {isAuthenticated ? (
                   <div className="flex items-center space-x-4">
-                    <span className=" text-white/90 hidden md:inline">
+                    <span className="text-md text-white/90 hidden md:inline">
                       {payload?.firstName} {payload?.lastName}
                     </span>
                     <form action="/api/auth/logout" method="post">
@@ -163,7 +163,7 @@ export default function ClientLayout({
       {!isEditorPage && (
         <footer className="brand-footer">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-2 lg:px-8">
-            <p className="text-center ">
+            <p className="text-center text-md">
               © {new Date().getFullYear() + 543} ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
             </p>
           </div>

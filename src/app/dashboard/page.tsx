@@ -213,10 +213,10 @@ export default function DashboardPage() {
             </svg>
           </div>
           <h3 className="mt-4 text-lg font-medium text-red-800">เกิดข้อผิดพลาด</h3>
-          <p className="mt-2  text-red-700 break-words">{error}</p>
+          <p className="mt-2 text-md text-red-700 break-words">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent  font-bold rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-md font-bold rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
           >
             ลองใหม่อีกครั้ง
           </button>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">แดชบอร์ด</h1>
-          <p className="mt-1  text-gray-600">
+          <p className="mt-1 text-md text-gray-600">
             สวัสดี, {user.firstName} {user.lastName} • บทบาท: {user.role === "ADMIN" ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน"}
           </p>
         </div>
@@ -254,7 +254,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className=" font-bold text-black-500 truncate">คำศัพท์ทั้งหมด</dt>
+                    <dt className="text-md font-bold text-black-500 truncate">คำศัพท์ทั้งหมด</dt>
                     <dd className="flex items-baseline">
                       <div className="text-2xl font-semibold text-gray-900">{stats.totalVocabularyEntries}</div>
                     </dd>
@@ -276,7 +276,7 @@ export default function DashboardPage() {
                 <div className="ml-5 w-0 flex-1">
                   <Link href="/dictionaries">
                     <dl>
-                      <dt className=" font-bold text-black-500 truncate">พจนานุกรม</dt>
+                      <dt className="text-md font-bold text-black-500 truncate">พจนานุกรม</dt>
                       <dd className="flex items-baseline">
                         <div className="text-2xl font-semibold text-gray-900">{stats.totalDictionaries}</div>
                       </dd>
@@ -299,7 +299,7 @@ export default function DashboardPage() {
                 <div className="ml-5 w-0 flex-1">
                   <Link href="/encyclopedias">
                     <dl>
-                      <dt className=" font-bold text-black-500 truncate">สารานุกรม</dt>
+                      <dt className="text-md font-bold text-black-500 truncate">สารานุกรม</dt>
                       <dd className="flex items-baseline">
                         <div className="text-2xl font-semibold text-gray-900">{stats.totalEncyclopedias}</div>
                       </dd>
@@ -322,7 +322,7 @@ export default function DashboardPage() {
                 <div className="ml-5 w-0 flex-1">
                   <Link href="/taxonomies">
                     <dl>
-                      <dt className=" font-bold text-black-500 truncate">อนุกรมวิธาน</dt>
+                      <dt className="text-md font-bold text-black-500 truncate">อนุกรมวิธาน</dt>
                       <dd className="flex items-baseline">
                         <div className="text-2xl font-semibold text-gray-900">{stats.totalTaxonomies}</div>
                       </dd>
@@ -345,7 +345,7 @@ export default function DashboardPage() {
                 <div className="ml-5 w-0 flex-1">
                   <Link href="/gazetteer">
                     <dl>
-                      <dt className=" font-bold text-black-500 truncate">อักษรานุกรมภูมิศาสตร์</dt>
+                      <dt className="text-md font-bold text-black-500 truncate">อักษรานุกรมภูมิศาสตร์</dt>
                       <dd className="flex items-baseline">
                         <div className="text-2xl font-semibold text-gray-900">{stats.totalGazetteerEntries}</div>
                       </dd>
@@ -367,7 +367,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className=" font-bold text-black-500 truncate">พื้นที่จัดเก็บ</dt>
+                    <dt className="text-md font-bold text-black-500 truncate">พื้นที่จัดเก็บ</dt>
                     <dd className="flex items-baseline">
                       <div className="text-2xl font-semibold text-gray-900">{formatFileSize(stats.totalSize)}</div>
                     </dd>
@@ -389,7 +389,7 @@ export default function DashboardPage() {
                 <div className="ml-5 w-0 flex-1">
                   <Link href="/shared-with-me">
                     <dl>
-                      <dt className=" font-bold text-black-500 truncate">เอกสารที่แชร์</dt>
+                      <dt className="text-md font-bold text-black-500 truncate">เอกสารที่แชร์</dt>
                       <dd className="flex items-baseline">
                         <div className="text-2xl font-semibold text-gray-900">{stats.sharedDocuments}</div>
                       </dd>
@@ -412,7 +412,7 @@ export default function DashboardPage() {
                 <div className="flex space-x-4">
                   <button
                     onClick={() => handlePanelChange('recent')}
-                    className={`px-3 py-2  font-bold rounded-md ${
+                    className={`px-3 py-2 text-md font-bold rounded-md ${
                       activePanel === 'recent'
                         ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-500 hover:text-gray-700'
@@ -422,7 +422,7 @@ export default function DashboardPage() {
                   </button>
                   <button
                     onClick={() => handlePanelChange('all')}
-                    className={`px-3 py-2  font-bold rounded-md ${
+                    className={`px-3 py-2 text-md font-bold rounded-md ${
                       activePanel === 'all'
                         ? 'bg-purple-100 text-purple-700'
                         : 'text-gray-500 hover:text-gray-700'
@@ -444,11 +444,11 @@ export default function DashboardPage() {
                         <svg className="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
-                        <h3 className="mt-2  font-bold text-gray-900">ยังไม่มีเอกสาร</h3>
-                        <p className="mt-1  text-black-500">เริ่มต้นโดยการนำเข้าเอกสารใหม่</p>
+                        <h3 className="mt-2 text-md font-bold text-gray-900">ยังไม่มีเอกสาร</h3>
+                        <p className="mt-1 text-md text-black-500">เริ่มต้นโดยการนำเข้าเอกสารใหม่</p>
                         <div className="mt-6">
                           <Link href="/file-manager">
-                            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm  font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-md font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                               <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                               </svg>
@@ -465,25 +465,25 @@ export default function DashboardPage() {
                               <div className="flex-shrink-0">
                                 {doc.type.includes("pdf") ? (
                                   <div className="h-10 w-10 rounded-md bg-red-100 flex items-center justify-center">
-                                    <span className="text-red-800  font-medium">PDF</span>
+                                    <span className="text-red-800 text-md font-medium">PDF</span>
                                   </div>
                                 ) : doc.type.includes("word") || doc.type.includes("document") ? (
                                   <div className="h-10 w-10 rounded-md bg-blue-100 flex items-center justify-center">
-                                    <span className="text-blue-800  font-medium">DOC</span>
+                                    <span className="text-blue-800 text-md font-medium">DOC</span>
                                   </div>
                                 ) : doc.type.includes("excel") || doc.type.includes("sheet") ? (
                                   <div className="h-10 w-10 rounded-md bg-green-100 flex items-center justify-center">
-                                    <span className="text-green-800  font-medium">XLS</span>
+                                    <span className="text-green-800 text-md font-medium">XLS</span>
                                   </div>
                                 ) : (
                                   <div className="h-10 w-10 rounded-md bg-gray-100 flex items-center justify-center">
-                                    <span className="text-gray-800  font-medium">FILE</span>
+                                    <span className="text-gray-800 text-md font-medium">FILE</span>
                                   </div>
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className=" font-bold text-gray-900 truncate">{doc.name}</p>
-                                <p className=" text-black-500 truncate">
+                                <p className="text-md font-bold text-gray-900 truncate">{doc.name}</p>
+                                <p className="text-md text-black-500 truncate">
                                   {doc.type.split("/")[1]?.toUpperCase() || "FILE"} • {formatFileSize(doc.size)} • อัปเดตล่าสุด{" "}
                                   {new Date(doc.updatedAt).toLocaleDateString("th-TH")}
                                 </p>
@@ -493,7 +493,7 @@ export default function DashboardPage() {
                                   href={doc.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center shadow-sm  font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 px-3 py-1.5"
+                                  className="inline-flex items-center shadow-sm text-md font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 px-3 py-1.5"
                                 >
                                   ดูรายละเอียด
                                 </a>
@@ -513,11 +513,11 @@ export default function DashboardPage() {
                         <svg className="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                         </svg>
-                        <h3 className="mt-2  font-bold text-gray-900">ยังไม่มีพจนานุกรม</h3>
-                        <p className="mt-1  text-black-500">ข้อมูลพจนานุกรมจะแสดงที่นี่</p>
+                        <h3 className="mt-2 text-md font-bold text-gray-900">ยังไม่มีพจนานุกรม</h3>
+                        <p className="mt-1 text-md text-black-500">ข้อมูลพจนานุกรมจะแสดงที่นี่</p>
                         <div className="mt-6">
                           <Link href="/dictionaries">
-                            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm  font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-md font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                               <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                               </svg>
@@ -532,13 +532,13 @@ export default function DashboardPage() {
                          {groupedDictionaries.map((category) => (
                           <div key={category.name} className="border border-gray-200 rounded-md">
                             <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                              <h4 className=" font-bold text-gray-800">{category.name}</h4>
+                              <h4 className="text-md font-bold text-gray-800">{category.name}</h4>
                             </div>
                             <div className="p-4 space-y-4">
                               {category.subcategories.map((subcat) => (
                                  <div key={subcat.name || 'no-subcategory'}>
                                     {subcat.name && ( // Only show subcategory header if it exists
-                                       <h5 className=" font-semibold text-gray-700 mb-2">{subcat.name}</h5>
+                                       <h5 className="text-md font-semibold text-gray-700 mb-2">{subcat.name}</h5>
                                     )}
                                     <ul className="space-y-2 ml-4"> {/* Indent list items */}
                                       {subcat.dictionaries.map((dict) => (
@@ -546,7 +546,7 @@ export default function DashboardPage() {
                                           <svg className="h-5 w-5 text-purple-500 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                           </svg>
-                                          <span className="">
+                                          <span className="text-md">
                                             <Link href={`/dictionaries/${dict.id}`} className="text-blue-600 hover:underline">
                                               {dict.title}
                                             </Link>
@@ -587,8 +587,8 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div className="ml-4">
-                        <h4 className=" font-bold text-gray-900">นำเข้าเอกสาร</h4>
-                        <p className=" text-black-500">เพิ่มเอกสารใหม่</p>
+                        <h4 className="text-md font-bold text-gray-900">นำเข้าเอกสาร</h4>
+                        <p className="text-md text-black-500">เพิ่มเอกสารใหม่</p>
                       </div>
                     </div>
                   </Link>
@@ -600,8 +600,8 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div className="ml-4">
-                        <h4 className=" font-bold text-gray-900">ค้นหาเอกสาร</h4>
-                        <p className=" text-black-500">ค้นหาในคลังเอกสาร</p>
+                        <h4 className="text-md font-bold text-gray-900">ค้นหาเอกสาร</h4>
+                        <p className="text-md text-black-500">ค้นหาในคลังเอกสาร</p>
                       </div>
                     </div>
                   </Link>
@@ -613,8 +613,8 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div className="ml-4">
-                        <h4 className=" font-bold text-gray-900">พจนานุกรม</h4>
-                        <p className=" text-black-500">ดูพจนานุกรมทั้งหมด</p>
+                        <h4 className="text-md font-bold text-gray-900">พจนานุกรม</h4>
+                        <p className="text-md text-black-500">ดูพจนานุกรมทั้งหมด</p>
                       </div>
                     </div>
                   </Link>
@@ -627,8 +627,8 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div className="ml-4">
-                        <h4 className=" font-bold text-gray-900">การตั้งค่า</h4>
-                        <p className=" text-black-500">จัดการบัญชีของคุณ</p>
+                        <h4 className="text-md font-bold text-gray-900">การตั้งค่า</h4>
+                        <p className="text-md text-black-500">จัดการบัญชีของคุณ</p>
                       </div>
                     </div>
                   </Link>
@@ -644,43 +644,43 @@ export default function DashboardPage() {
               <div className="px-4 py-2 sm:px-4">
                 <div className="space-y-4">
                   <div className="flex justify-between">
-                    <span className=" text-black-500">สถานะระบบ</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full  font-medium bg-green-100 text-green-800">
+                    <span className="text-md text-black-500">สถานะระบบ</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-md font-medium bg-green-100 text-green-800">
                       ทำงานปกติ
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className=" text-black-500">เวอร์ชัน</span>
-                    <span className=" font-bold text-gray-900">1.0.0</span>
+                    <span className="text-md text-black-500">เวอร์ชัน</span>
+                    <span className="text-md font-bold text-gray-900">1.0.0</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className=" text-black-500">พื้นที่จัดเก็บทั้งหมด</span>
-                    <span className=" font-bold text-gray-900">{formatFileSize(stats.totalSize)} / 1,000 GB</span>
+                    <span className="text-md text-black-500">พื้นที่จัดเก็บทั้งหมด</span>
+                    <span className="text-md font-bold text-gray-900">{formatFileSize(stats.totalSize)} / 1,000 GB</span>
                   </div>
                   {/* Added Vocabulary Entry Count to System Info */}
                   <div className="flex justify-between">
-                    <span className=" text-black-500">จำนวนคำศัพท์ทั้งหมด</span>
-                    <span className=" font-bold text-gray-900">{stats.totalVocabularyEntries}</span>
+                    <span className="text-md text-black-500">จำนวนคำศัพท์ทั้งหมด</span>
+                    <span className="text-md font-bold text-gray-900">{stats.totalVocabularyEntries}</span>
                   </div>
                   {/* Added Dictionary Count to System Info */}
                   <div className="flex justify-between">
-                    <span className=" text-black-500">จำนวนพจนานุกรม</span>
-                    <span className=" font-bold text-gray-900">{stats.totalDictionaries}</span>
+                    <span className="text-md text-black-500">จำนวนพจนานุกรม</span>
+                    <span className="text-md font-bold text-gray-900">{stats.totalDictionaries}</span>
                   </div>
                   {/* Added Encyclopedia Count to System Info */}
                   <div className="flex justify-between">
-                    <span className=" text-black-500">จำนวนสารานุกรม</span>
-                    <span className=" font-bold text-gray-900">{stats.totalEncyclopedias}</span>
+                    <span className="text-md text-black-500">จำนวนสารานุกรม</span>
+                    <span className="text-md font-bold text-gray-900">{stats.totalEncyclopedias}</span>
                   </div>
                   {/* Added Taxonomy Count to System Info */}
                   <div className="flex justify-between">
-                    <span className=" text-black-500">จำนวนอนุกรมวิธาน</span>
-                    <span className=" font-bold text-gray-900">{stats.totalTaxonomies}</span>
+                    <span className="text-md text-black-500">จำนวนอนุกรมวิธาน</span>
+                    <span className="text-md font-bold text-gray-900">{stats.totalTaxonomies}</span>
                   </div>
                   {/* Added Gazetteer Entry Count to System Info */}
                   <div className="flex justify-between">
-                    <span className=" text-black-500">จำนวนรายการภูมิศาสตร์</span>
-                    <span className=" font-bold text-gray-900">{stats.totalGazetteerEntries}</span>
+                    <span className="text-md text-black-500">จำนวนรายการภูมิศาสตร์</span>
+                    <span className="text-md font-bold text-gray-900">{stats.totalGazetteerEntries}</span>
                   </div>
                 </div>
               </div>

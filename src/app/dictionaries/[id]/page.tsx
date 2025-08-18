@@ -280,7 +280,7 @@ export default function SearchDictionaryPage() {
               <select
                 value={languageFilter}
                 onChange={(e) => setLanguageFilter(e.target.value)}
-                className="bg-transparent border-none focus:ring-0 focus:outline-none  appearance-none pr-4 cursor-pointer"
+                className="bg-transparent border-none focus:ring-0 focus:outline-none text-md appearance-none pr-4 cursor-pointer"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' strokeLinecap='round' strokeLinejoin='round' strokeWidth='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
                   backgroundRepeat: 'no-repeat',
@@ -434,8 +434,8 @@ export default function SearchDictionaryPage() {
                 <svg className="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <h3 className="mt-2  font-bold text-gray-900">ไม่พบผลการค้นหา</h3>
-                <p className="mt-1  text-black-500">
+                <h3 className="mt-2 text-md font-bold text-gray-900">ไม่พบผลการค้นหา</h3>
+                <p className="mt-1 text-md text-black-500">
                   {query
                     ? `ไม่พบคำศัพท์ที่ตรงกับ "${query}"${isAllDictionaries ? '' : ` ในพจนานุกรมนี้`}`
                     : `ไม่พบคำศัพท์${isAllDictionaries ? '' : ` ในพจนานุกรมนี้`}`}

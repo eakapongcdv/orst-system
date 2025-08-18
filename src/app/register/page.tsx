@@ -61,7 +61,7 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-2 lg:px-8">
         <div className="max-w-md w-full text-center">
           <div className="rounded-md bg-green-50 p-4">
-            <div className=" text-green-700">
+            <div className="text-md text-green-700">
               Registration successful! Redirecting to login...
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function RegisterPage() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="rounded-md bg-red-50 p-4">
-              <div className=" text-red-700">
+              <div className="text-md text-red-700">
                 {error}
               </div>
             </div>
@@ -169,14 +169,14 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent  font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-md font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Register'}
             </button>
           </div>
         </form>
         <div className="text-center">
-          <p className=" text-gray-600">
+          <p className="text-md text-gray-600">
             Already have an account?{' '}
             <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
               Sign in

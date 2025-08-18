@@ -280,7 +280,7 @@ export default function EditEntryModal({ isOpen, onClose, entry, onUpdateSuccess
                     <div className="flex space-x-3">
                       <button
                         type="button"
-                        className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2  font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-md font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                         onClick={handleClose}
                       >
                         ยกเลิก
@@ -288,7 +288,7 @@ export default function EditEntryModal({ isOpen, onClose, entry, onUpdateSuccess
                       <button
                         type="submit"
                         form="edit-entry-form-modal"
-                        className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2  font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-md font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         disabled={saving}
                       >
                         {saving ? 'กำลังบันทึก...' : 'บันทึก'}
@@ -301,7 +301,7 @@ export default function EditEntryModal({ isOpen, onClose, entry, onUpdateSuccess
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="term_en" className="block  font-medium text-gray-700">
+                          <label htmlFor="term_en" className="block text-md font-medium text-gray-700">
                             คำศัพท์ (อังกฤษ)
                           </label>
                           <input
@@ -314,7 +314,7 @@ export default function EditEntryModal({ isOpen, onClose, entry, onUpdateSuccess
                           />
                         </div>
                         <div>
-                          <label htmlFor="term_th" className="block  font-medium text-gray-700">
+                          <label htmlFor="term_th" className="block text-md font-medium text-gray-700">
                             คำศัพท์ (ไทย)
                           </label>
                           <input
@@ -328,7 +328,7 @@ export default function EditEntryModal({ isOpen, onClose, entry, onUpdateSuccess
                         </div>
                       </div>
                       <div>
-                        <label htmlFor="definition_html" className="block  font-medium text-gray-700 mb-1">
+                        <label htmlFor="definition_html" className="block text-md font-medium text-gray-700 mb-1">
                           คำจำกัดความ (HTML)
                         </label>
                         <Editor

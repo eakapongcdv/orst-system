@@ -651,11 +651,11 @@ export default function FileManagerPage() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left  font-medium text-gray-500 uppercase tracking-wider">ชื่อ</th>
-                        <th scope="col" className="px-6 py-3 text-left  font-medium text-gray-500 uppercase tracking-wider">ขนาด</th>
-                        <th scope="col" className="px-6 py-3 text-left  font-medium text-gray-500 uppercase tracking-wider">เวอร์ชัน</th>
-                        <th scope="col" className="px-6 py-3 text-left  font-medium text-gray-500 uppercase tracking-wider">แก้ไขล่าสุด</th>
-                        <th scope="col" className="px-6 py-3 text-right  font-medium text-gray-500 uppercase tracking-wider">การกระทำ</th>
+                        <th scope="col" className="px-6 py-3 text-left text-md font-medium text-gray-500 uppercase tracking-wider">ชื่อ</th>
+                        <th scope="col" className="px-6 py-3 text-left text-md font-medium text-gray-500 uppercase tracking-wider">ขนาด</th>
+                        <th scope="col" className="px-6 py-3 text-left text-md font-medium text-gray-500 uppercase tracking-wider">เวอร์ชัน</th>
+                        <th scope="col" className="px-6 py-3 text-left text-md font-medium text-gray-500 uppercase tracking-wider">แก้ไขล่าสุด</th>
+                        <th scope="col" className="px-6 py-3 text-right text-md font-medium text-gray-500 uppercase tracking-wider">การกระทำ</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">

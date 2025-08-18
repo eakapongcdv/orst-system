@@ -359,7 +359,7 @@ export default function DictionariesPage() {
                             >
                               <div className="flex items-center gap-2 text-left">
                                 <span className="inline-flex items-center justify-center">{iconForSubcategoryName(subcategory)}</span>
-                                <span className="font-bold text-gray-800 ">
+                                <span className="font-bold text-gray-800 text-md">
                                   {subcategory === 'no_subcategory' || subcategory === 'ไม่มีกลุ่มย่อย' ? 'ทั่วไป' : subcategory}
                                 </span>
                                 <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
