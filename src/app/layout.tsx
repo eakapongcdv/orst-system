@@ -43,7 +43,7 @@ export default async function RootLayout({
   const isAuthenticated = !!payload;
 
   const navItems = [
-    { name: "ค้นหาคำศัพท์", href: "/dictionaries/0" },
+    { name: "ค้นหาคำศัพท์", href: "/dictionaries" },
     { name: "ค้นหาคำทับศัพท์", href: "/search-transliteration" },
     //{ name: "ค้นหาเอกสารวิชาการ", href: "/search" },
     { name: "คลังเอกสาร", href: "/file-manager" },
@@ -61,7 +61,7 @@ export default async function RootLayout({
         {/* Next.js will merge this with metadata defined above and any head elements from pages */}
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-texture use-bullet-thai`}
       >
         <ClientLayout 
           isAuthenticated={isAuthenticated} 

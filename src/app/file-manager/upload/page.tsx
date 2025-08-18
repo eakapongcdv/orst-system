@@ -282,7 +282,7 @@ export default function FileManagerUploadPage() {
       <div className="max-w-3xl mx-auto px-4">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">นำเข้าเอกสาร</h1>
-          <p className="mt-1 text-md text-gray-600">
+          <p className="mt-1  text-gray-600">
             อัปโหลดไฟล์ไปยังโฟลเดอร์ปัจจุบัน
             {folderId !== null && (
               <span className="ml-1 font-medium"> (ID: {folderId})</span>
@@ -324,7 +324,7 @@ export default function FileManagerUploadPage() {
               <p className="text-black-500 text-sm">
                 PDF, DOC, DOCX, XLS, XLSX, CSV (สูงสุด 200MB ต่อไฟล์)
               </p>
-              <p className="text-gray-400 text-md mt-2">
+              <p className="text-gray-400  mt-2">
                 {selectedFiles.length > 0 ? `เลือกแล้ว ${selectedFiles.length} ไฟล์` : 'ยังไม่ได้เลือกไฟล์'}
               </p>
             </div>
@@ -337,8 +337,8 @@ export default function FileManagerUploadPage() {
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                   <div className="ml-3">
-                    <h3 className="text-md font-bold">เกิดข้อผิดพลาด</h3>
-                    <div className="mt-1 text-md break-words">{error}</div>
+                    <h3 className=" font-bold">เกิดข้อผิดพลาด</h3>
+                    <div className="mt-1  break-words">{error}</div>
                   </div>
                 </div>
               </div>
@@ -352,7 +352,7 @@ export default function FileManagerUploadPage() {
                 <button
                   onClick={handleUpload}
                   disabled={uploading}
-                  className={`inline-flex items-center px-4 py-2 border border-transparent text-md font-bold rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                  className={`inline-flex items-center px-4 py-2 border border-transparent  font-bold rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                     uploading
                       ? 'bg-blue-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700'
@@ -391,7 +391,7 @@ export default function FileManagerUploadPage() {
                       )}
                     </div>
                     <div className="flex-grow min-w-0">
-                      <p className="text-md font-bold text-gray-900 truncate">{file.name}</p>
+                      <p className=" font-bold text-gray-900 truncate">{file.name}</p>
                       <p className="text-xs text-black-500 mt-1">
                         {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
                       </p>
@@ -453,11 +453,11 @@ export default function FileManagerUploadPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-2 py-3 text-left text-md font-medium text-black-500 uppercase tracking-wider">เอกสาร</th>
-                      <th scope="col" className="px-2 py-3 text-left text-md font-medium text-black-500 uppercase tracking-wider">ประเภท</th>
-                      <th scope="col" className="px-2 py-3 text-left text-md font-medium text-black-500 uppercase tracking-wider">ขนาด</th>
-                      <th scope="col" className="px-2 py-3 text-left text-md font-medium text-black-500 uppercase tracking-wider">อัปโหลดเมื่อ</th>
-                      <th scope="col" className="px-2 py-3 text-left text-md font-medium text-black-500 uppercase tracking-wider">การกระทำ</th>
+                      <th scope="col" className="px-2 py-3 text-left  font-medium text-black-500 uppercase tracking-wider">เอกสาร</th>
+                      <th scope="col" className="px-2 py-3 text-left  font-medium text-black-500 uppercase tracking-wider">ประเภท</th>
+                      <th scope="col" className="px-2 py-3 text-left  font-medium text-black-500 uppercase tracking-wider">ขนาด</th>
+                      <th scope="col" className="px-2 py-3 text-left  font-medium text-black-500 uppercase tracking-wider">อัปโหลดเมื่อ</th>
+                      <th scope="col" className="px-2 py-3 text-left  font-medium text-black-500 uppercase tracking-wider">การกระทำ</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -467,7 +467,7 @@ export default function FileManagerUploadPage() {
                           <div className="flex items-center">
                             <span className="text-xl mr-3">{getFileIcon(document.type)}</span>
                             <div>
-                              <div className="text-md font-bold text-gray-900">{document.name}</div>
+                              <div className=" font-bold text-gray-900">{document.name}</div>
                               {/* Show content preview in the list */}
                               {document.contentPreview && (
                                 <div className="text-xs text-gray-500 truncate max-w-xs mt-1">
@@ -477,16 +477,16 @@ export default function FileManagerUploadPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-md text-black-500">
+                        <td className="px-3 py-3 whitespace-nowrap  text-black-500">
                           {document.type.split('/')[1]?.toUpperCase() || 'FILE'}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-md text-black-500">
+                        <td className="px-3 py-3 whitespace-nowrap  text-black-500">
                           {formatFileSize(document.size)}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-md text-black-500">
+                        <td className="px-3 py-3 whitespace-nowrap  text-black-500">
                           {new Date(document.uploadedAt).toLocaleDateString('th-TH')}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-md font-bold">
+                        <td className="px-3 py-3 whitespace-nowrap  font-bold">
                           {/* Use the signed URL for opening/viewing */}
                           <a
                             href={"/view?ossKey=" + encodeURIComponent(document.url)} 
@@ -525,7 +525,7 @@ export default function FileManagerUploadPage() {
         {/* --- END MODIFIED Uploaded Documents List --- */}
         <div className="mt-6 flex justify-center">
           <Link href={`/file-manager${folderId !== null ? `?folderId=${folderId}` : ''}`}>
-            <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-md font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <button className="inline-flex items-center px-4 py-2 border border-gray-300  font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
               </svg>

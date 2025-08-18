@@ -118,7 +118,7 @@ export default function TransliterationUploadPage() {
       <div className="max-w-xl mx-auto px-4">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">นำเข้าคำทับศัพท์</h1>
-          <p className="mt-1 text-md text-gray-600">
+          <p className="mt-1  text-gray-600">
             อัปโหลดไฟล์ Excel (.xlsx) ที่มีข้อมูลคำทับศัพท์ (original term, คำทับศัพท์ ฯลฯ)
           </p>
         </div>
@@ -151,7 +151,7 @@ export default function TransliterationUploadPage() {
           <button
             onClick={handleUpload}
             disabled={uploading || !selectedFile}
-            className={`mt-4 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-md font-bold rounded-md shadow-sm text-white ${
+            className={`mt-4 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent  font-bold rounded-md shadow-sm text-white ${
               uploading || !selectedFile ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
@@ -177,7 +177,7 @@ export default function TransliterationUploadPage() {
         </div>
         <div className="mt-6 flex justify-center">
           <Link href={`/file-manager`}>
-            <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-md font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none">
+            <button className="inline-flex items-center px-4 py-2 border border-gray-300  font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none">
               กลับไปยังตัวจัดการไฟล์
             </button>
           </Link>

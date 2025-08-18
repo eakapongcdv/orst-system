@@ -48,14 +48,14 @@ export default function ForgotPasswordPage() {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Reset your password
           </h2>
-          <p className="mt-2 text-center text-md text-gray-600">
+          <p className="mt-2 text-center  text-gray-600">
             Enter your email address and we'll send you a link to reset your password.
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {(error || message) && (
             <div className={`rounded-md p-2 ${error ? 'bg-red-50' : 'bg-green-50'}`}>
-              <div className={`text-md ${error ? 'text-red-700' : 'text-green-700'}`}>
+              <div className={` ${error ? 'text-red-700' : 'text-green-700'}`}>
                 {error || message}
               </div>
             </div>
@@ -81,7 +81,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-md font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent  font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               {loading ? 'Sending...' : 'Send reset link'}
             </button>

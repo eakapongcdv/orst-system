@@ -139,7 +139,7 @@ export default function HtmlUploadPage() {
       <div className="max-w-2xl mx-auto px-4">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">นำเข้าคำศัพท์</h1>
-          <p className="mt-1 text-md text-gray-600">
+          <p className="mt-1  text-gray-600">
             อัปโหลดไฟล์
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function HtmlUploadPage() {
               <p className="text-black-500 text-sm">
                 รองรับ (สูงสุด 20MB)
               </p>
-              <p className="text-gray-400 text-md mt-2">
+              <p className="text-gray-400  mt-2">
                 {selectedFile
                   ? `เลือกแล้ว: ${selectedFile.name}`
                   : "ยังไม่ได้เลือกไฟล์"}
@@ -215,8 +215,8 @@ export default function HtmlUploadPage() {
                     />
                   </svg>
                   <div className="ml-3">
-                    <h3 className="text-md font-bold">เกิดข้อผิดพลาด</h3>
-                    <div className="mt-1 text-md break-words">{error}</div>
+                    <h3 className=" font-bold">เกิดข้อผิดพลาด</h3>
+                    <div className="mt-1  break-words">{error}</div>
                   </div>
                 </div>
               </div>
@@ -239,9 +239,9 @@ export default function HtmlUploadPage() {
                     />
                   </svg>
                   <div className="ml-3">
-                    <h3 className="text-md font-bold">อัปโหลดสำเร็จ!</h3>
-                    <div className="mt-1 text-md">{uploadResult.message}</div>
-                    <div className="mt-1 text-md">
+                    <h3 className=" font-bold">อัปโหลดสำเร็จ!</h3>
+                    <div className="mt-1 ">{uploadResult.message}</div>
+                    <div className="mt-1 ">
                       ไฟล์ที่อัปโหลด: <span className="font-semibold">{uploadResult.filename}</span>
                     </div>
                   </div>
@@ -256,7 +256,7 @@ export default function HtmlUploadPage() {
                 <div className="flex items-center">
                   <span className="text-xl mr-3">📰</span>
                   <div>
-                    <p className="text-md font-bold text-gray-900">{selectedFile.name}</p>
+                    <p className=" font-bold text-gray-900">{selectedFile.name}</p>
                     <p className="text-sm text-gray-500">
                       {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                     </p>
@@ -273,7 +273,7 @@ export default function HtmlUploadPage() {
                   <button
                     onClick={handleUpload}
                     disabled={uploading}
-                    className={`inline-flex items-center px-4 py-2 border border-transparent text-md font-bold rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                    className={`inline-flex items-center px-4 py-2 border border-transparent  font-bold rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                       uploading
                         ? "bg-blue-400 cursor-not-allowed"
                         : "bg-blue-600 hover:bg-blue-700"
@@ -323,7 +323,7 @@ export default function HtmlUploadPage() {
         {/* Navigation */}
         <div className="mt-6 flex justify-center">
           <Link href={`/file-manager${folderId !== null ? `?folderId=${folderId}` : ""}`}>
-            <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-md font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <button className="inline-flex items-center px-4 py-2 border border-gray-300  font-bold rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               <svg
                 className="-ml-1 mr-2 h-5 w-5"
                 xmlns="http://www.w3.org/2000/svg"

@@ -1,8 +1,20 @@
 // app/ClientLayout.tsx
+// app/ClientLayout.tsx
 'use client';
 
 import { usePathname } from 'next/navigation';
 import Link from "next/link";
+import {
+  BookOpenIcon,
+  LanguageIcon,
+  FolderOpenIcon,
+  ArrowUpTrayIcon,
+  Squares2X2Icon,
+  UserGroupIcon,
+  ArrowRightOnRectangleIcon,
+  ArrowLeftOnRectangleIcon,
+  UserPlusIcon
+} from '@heroicons/react/24/solid';
 
 export default function ClientLayout({ 
   isAuthenticated, 
@@ -22,12 +34,29 @@ export default function ClientLayout({
                        pathname?.startsWith('/view') || 
                        pathname?.startsWith('/search-vocabulary')|| 
                        pathname?.startsWith('/dictionaries/')  ;
+  // Detect dictionary routes for subnav highlight
+  const dictActive = pathname?.startsWith('/dictionaries');
+  const translitActive = pathname?.startsWith('/search-transliteration');
+
+  // Map Thai menu names to Heroicons components
+  const iconFor = (name: string) => {
+    switch (name) {
+      case 'ค้นหาคำศัพท์': return BookOpenIcon;
+      case 'ค้นหาคำทับศัพท์': return LanguageIcon;
+      case 'คลังเอกสาร': return FolderOpenIcon;
+      case 'นำเข้าคำศัพท์': return ArrowUpTrayIcon;
+      case 'นำเข้าคำทับศัพท์': return ArrowUpTrayIcon;
+      case 'แดชบอร์ด': return Squares2X2Icon;
+      case 'จัดการผู้ใช้': return UserGroupIcon;
+      default: return Squares2X2Icon;
+    }
+  };
 
   return (
     <>
       {/* Header - only show if not on editor page */}
       {!isEditorPage && (
-        <header className="brand-header sticky top-0 z-10">
+        <header className="brand-header sticky top-0 z-10 navbar">
           <div className="max-w-7xl mx-auto px-4 sm:px-2 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
@@ -43,16 +72,21 @@ export default function ClientLayout({
                   </div>
                 </Link>
                 {isAuthenticated && (
-                  <nav className="hidden md:ml-6 md:flex md:space-x-8">
-                    {navItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className="inline-flex items-center px-2 pt-1 border-b-2 border-transparent text-md font-bold text-white hover:text-white hover:border-white/50"
-                      >
-                        {item.name}
-                      </Link>
-                    ))}
+                  <nav className="hidden md:ml-6 md:flex md:space-x-6" aria-label="เมนูหลัก">
+                    {navItems.map((item) => {
+                      const active = pathname?.startsWith(item.href);
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className={`nav-link ${active ? 'nav-link--active' : ''}`}
+                          aria-current={active ? 'page' : undefined}
+                        >
+                          {(() => { const Icon = iconFor(item.name); return <Icon className="h-5 w-5" aria-hidden="true" />; })()}
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
                   </nav>
                 )}
               </div>
@@ -60,14 +94,16 @@ export default function ClientLayout({
               <div className="flex items-center">
                 {isAuthenticated ? (
                   <div className="flex items-center space-x-4">
-                    <span className="text-md text-white/90 hidden md:inline">
+                    <span className=" text-white/90 hidden md:inline">
                       {payload?.firstName} {payload?.lastName}
                     </span>
                     <form action="/api/auth/logout" method="post">
                       <button
                         type="submit"
-                        className="text-md font-bold text-white hover:text-white/80"
+                        aria-label="ออกจากระบบ"
+                        className="btn-primary btn--sm"
                       >
+                        <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
                         ออกจากระบบ
                       </button>
                     </form>
@@ -76,20 +112,44 @@ export default function ClientLayout({
                   <div className="flex space-x-4">
                     <Link
                       href="/login"
-                      className="text-md font-bold text-white hover:text-white/80"
+                      className="btn-primary btn--sm"
                     >
+                      <ArrowLeftOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
                       เข้าสู่ระบบ
                     </Link>
                     <Link
                       href="/register"
-                      className="text-md font-bold text-white hover:text-white/80"
+                      className="btn-secondary btn--sm"
                     >
+                      <UserPlusIcon className="h-5 w-5" aria-hidden="true" />
                       ลงทะเบียน
                     </Link>
                   </div>
                 )}
               </div>
             </div>
+            {isAuthenticated && (
+              <div className="py-2">
+                <nav aria-label="พจนานุกรม" className="flex flex-wrap gap-2 md:ml-40">
+                  <Link
+                    href="/dictionaries"
+                    aria-current={dictActive ? 'page' : undefined}
+                    className={`${dictActive ? 'btn-primary' : 'btn-secondary'} btn--sm`}
+                  >
+                    <BookOpenIcon className="h-5 w-5" aria-hidden="true" />
+                    พจนานุกรมเฉพาะสาขา
+                  </Link>
+                  <Link
+                    href="/search-transliteration"
+                    aria-current={translitActive ? 'page' : undefined}
+                    className={`${translitActive ? 'btn-primary' : 'btn-secondary'} btn--sm`}
+                  >
+                    <LanguageIcon className="h-5 w-5" aria-hidden="true" />
+                    คำทับศัพท์
+                  </Link>
+                </nav>
+              </div>
+            )}
           </div>
         </header>
       )}
@@ -103,7 +163,7 @@ export default function ClientLayout({
       {!isEditorPage && (
         <footer className="brand-footer">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-2 lg:px-8">
-            <p className="text-center text-md">
+            <p className="text-center ">
               © {new Date().getFullYear() + 543} ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
             </p>
           </div>
