@@ -239,8 +239,6 @@ html, body{
   -webkit-backdrop-filter: saturate(1.15) blur(6px);
   border-bottom: 4px solid var(--brand-gold);
   box-shadow: var(--shadow-elev-1);
-  isolation: isolate;         /* new stacking context for ::after */
-  overflow: hidden;
 
   /* Leather-like shading */
   background-color: var(--leather-base);
@@ -705,10 +703,10 @@ nav[aria-label="พจนานุกรม"]{
 .use-bullet-thai ul > li::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: .2rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  left: 0.5rem;
+  top: 1rem;
+  width: 1rem;
+  height: 1rem;
   background-image: var(--bullet-thai-svg);
   background-repeat: no-repeat;
   background-size: contain;
@@ -721,4 +719,135 @@ nav[aria-label="พจนานุกรม"]{
 }
 .use-bullet-thai ol > li::before {
   content: none !important;
+}
+
+/* =========================
+   App Page Scaffolding & UI Add-ons (new)
+   ========================= */
+
+/* Page wrappers */
+.page {
+  max-width: 80rem;              /* ~1280px */
+  margin-inline: auto;
+  padding: clamp(1rem, 2vw, 2rem);
+}
+.page--dashboard {
+  padding-top: clamp(0.5rem, 1vw, 1rem);
+  padding-bottom: clamp(1rem, 2vw, 2rem);
+  background: none;
+}
+
+/* Page header */
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: .75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--brand-border);
+}
+.page-title {
+  font-size: clamp(1.4rem, 1rem + 1.6vw, 2.2rem);
+  font-weight: 900;
+  letter-spacing: .01em;
+  color: var(--brand-ink);
+}
+.page-subtitle {
+  font-size: clamp(.9rem, .85rem + .2vw, 1rem);
+  color: var(--muted-ink);
+}
+
+/* Card composition helpers */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .85rem 1rem;
+  border-bottom: 1px solid var(--brand-border);
+  background: color-mix(in srgb, var(--brand-gold) 6%, #fff);
+}
+.card-body {
+  padding: 1rem;
+}
+
+/* Brand chip (pill) */
+.brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .6rem;
+  border: 1px solid color-mix(in srgb, var(--brand-gold) 65%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-gold) 12%, #fff);
+  color: #1f2937;
+  font-weight: 700;
+}
+.brand-chip .chip-icon { width: 1rem; height: 1rem; opacity: .9; }
+
+/* List tile (icon + text) */
+.list-tile {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  padding: .8rem 1rem;
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  transition: box-shadow .15s ease, transform .06s ease, background .15s ease;
+}
+.list-tile:hover { box-shadow: var(--shadow-elev-1); background: color-mix(in srgb, #fff 92%, var(--brand-gold) 8%); }
+.tile-icon { width: 1.4rem; height: 1.4rem; opacity: .95; }
+.tile-title { font-weight: 800; line-height: 1.15; }
+.tile-sub { color: var(--muted-ink); font-size: .9rem; }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: .2rem .5rem;
+  border-radius: .5rem;
+  font-size: .8rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.badge--success { background: color-mix(in srgb, #10B981 15%, #fff); color: #065F46; border-color: #A7F3D0; }
+.badge--warning { background: color-mix(in srgb, #F59E0B 20%, #fff); color: #92400E; border-color: #FDE68A; }
+.badge--danger  { background: color-mix(in srgb, #EF4444 18%, #fff); color: #7F1D1D; border-color: #FCA5A5; }
+.badge--info    { background: color-mix(in srgb, #3B82F6 18%, #fff); color: #1E3A8A; border-color: #BFDBFE; }
+.badge--neutral { background: color-mix(in srgb, var(--brand-gold) 14%, #fff); color: #3F3F46; border-color: color-mix(in srgb, var(--brand-gold) 45%, transparent); }
+
+/* Extra buttons */
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: transparent;
+  color: var(--brand-gold);
+  border: 1px solid color-mix(in srgb, var(--brand-gold) 65%, transparent);
+  border-radius: var(--radius-md);
+  padding: .55rem 1rem;
+  font-weight: 800;
+  transition: background .15s ease, color .15s ease;
+}
+.btn-ghost:hover { background: color-mix(in srgb, var(--brand-gold) 12%, #fff); color: #1f2937; }
+
+.btn-icon {
+  display: inline-grid; place-items: center;
+  width: 2.25rem; height: 2.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--brand-border);
+  background: #fff;
+  transition: transform .06s ease, box-shadow .15s ease, background .15s ease;
+}
+.btn-icon:hover { transform: translateY(-1px); box-shadow: var(--shadow-elev-1); background: color-mix(in srgb, #fff 92%, var(--brand-gold) 8%); }
+
+/* Grid utilities */
+.grid-2-md { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 768px){ .grid-2-md { grid-template-columns: 1fr 1fr; } }
+
+/* Monogram tiling utility */
+.monogram-bg {
+  background-image: url('/images/ci/background-motif.png');
+  background-repeat: repeat;
+  background-size: 90px 90px;
 }

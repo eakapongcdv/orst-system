@@ -29,11 +29,8 @@ export default function ClientLayout({
 }) {
   const pathname = usePathname();
   
-  // Check if we're on editor page
-  const isEditorPage = pathname?.startsWith('/editor') || 
-                       pathname?.startsWith('/view') || 
-                       pathname?.startsWith('/search-vocabulary')|| 
-                       pathname?.startsWith('/dictionaries/')  ;
+  // Check if we're on a real full-screen page (editor/view, not dictionary/search)
+  const isEditorPage = /^\/(editor|view)(?:\/|$)/.test(pathname ?? '');
   // Detect dictionary routes for subnav highlight
   const dictActive = pathname?.startsWith('/dictionaries');
   const translitActive = pathname?.startsWith('/search-transliteration');
@@ -45,7 +42,6 @@ export default function ClientLayout({
       case 'ค้นหาคำทับศัพท์': return LanguageIcon;
       case 'คลังเอกสาร': return FolderOpenIcon;
       case 'นำเข้าคำศัพท์': return ArrowUpTrayIcon;
-      case 'นำเข้าคำทับศัพท์': return ArrowUpTrayIcon;
       case 'แดชบอร์ด': return Squares2X2Icon;
       case 'จัดการผู้ใช้': return UserGroupIcon;
       default: return Squares2X2Icon;
@@ -56,7 +52,7 @@ export default function ClientLayout({
     <>
       {/* Header - only show if not on editor page */}
       {!isEditorPage && (
-        <header className="brand-header sticky top-0 z-10 navbar">
+        <header className="brand-header sticky  z-10 navbar">
           <div className="max-w-7xl mx-auto px-4 sm:px-2 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
@@ -130,7 +126,7 @@ export default function ClientLayout({
             </div>
             {isAuthenticated && (
               <div className="py-2">
-                <nav aria-label="พจนานุกรม" className="flex flex-wrap gap-2 md:ml-40">
+                <nav aria-label="พจนานุกรม" className="flex flex-wrap gap-2 justify-center">
                   <Link
                     href="/dictionaries"
                     aria-current={dictActive ? 'page' : undefined}
@@ -164,7 +160,7 @@ export default function ClientLayout({
         <footer className="brand-footer">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-2 lg:px-8">
             <p className="text-center text-md">
-              © {new Date().getFullYear() + 543} ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
+              © {new Date().getFullYear() + 543} A ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
             </p>
           </div>
         </footer>

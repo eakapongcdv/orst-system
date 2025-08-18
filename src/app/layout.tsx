@@ -46,9 +46,9 @@ export default async function RootLayout({
     { name: "ค้นหาคำศัพท์", href: "/dictionaries" },
     { name: "ค้นหาคำทับศัพท์", href: "/search-transliteration" },
     //{ name: "ค้นหาเอกสารวิชาการ", href: "/search" },
-    { name: "คลังเอกสาร", href: "/file-manager" },
-    { name: "นำเข้าคำศัพท์", href: "/file-manager/upload-dictionary" },
-    { name: "นำเข้าคำทับศัพท์", href: "/file-manager/upload-transliteration" },
+    //{ name: "คลังเอกสาร", href: "/file-manager" },
+    //{ name: "นำเข้าคำศัพท์", href: "/file-manager/upload-dictionary" },
+    { name: "นำเข้าคำศัพท์", href: "/file-manager/upload-transliteration" },
     { name: "แดชบอร์ด", href: "/dashboard" },
     { name: "จัดการผู้ใช้", href: "/users" },
   ];
