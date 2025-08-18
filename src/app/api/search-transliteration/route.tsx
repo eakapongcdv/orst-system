@@ -51,12 +51,12 @@ export async function GET(request: NextRequest) {
   const query = searchParams.get('q'); // Search keywords (can be multiple words)
   const languageFilter = searchParams.get('language'); // Language filter
   const pageParam = searchParams.get('page'); // Current page number
-  const limitParam = searchParams.get('limit'); // Items per page
+  const pageSizeParam = searchParams.get('pageSize') ?? searchParams.get('limit'); // Items per page (support both)
 
   // Validate and set defaults for pagination
   const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1; // Page must be at least 1
-  const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam, 10))) : 20; // Limit between 1-100, default 20
-  const skip = (page - 1) * limit; // Calculate number of items to skip
+  const pageSize = pageSizeParam ? Math.min(100, Math.max(1, parseInt(pageSizeParam, 10))) : 20; // 1-100, default 20
+  const skip = (page - 1) * pageSize; // Calculate number of items to skip
 
   // Split the query string into individual keywords, filtering out empty ones
   const keywords = query?.trim() ? query.trim().split(/\s+/).filter(kw => kw.length > 0) : [];
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     // ✅ FIXED: Changed prisma.vocabularyEntry to prisma.transliterationEntry
     results = await prisma.transliterationEntry.findMany({
       where: whereConditions, // Apply the combined filters
-      take: limit, // Limit number of results
+      take: pageSize, // Page size
       skip: skip, // Skip results for pagination
       orderBy: {
         id: 'desc', // Default sorting by ID descending (newest first)
@@ -190,14 +190,16 @@ export async function GET(request: NextRequest) {
       results: processedResults, // The main data array
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(totalResults / limit),
+        pageSize: pageSize,
+        totalPages: Math.ceil(totalResults / pageSize),
         totalResults: totalResults,
-        hasNextPage: page < Math.ceil(totalResults / limit),
+        hasNextPage: page < Math.ceil(totalResults / pageSize),
         hasPrevPage: page > 1,
       },
       isDefaultList: isDefaultList, // Indicates if it's an unfiltered list
       query: query || null, // Echo back the search query
       languageFilter: languageFilter || null, // Echo back the language filter
+      pageSize,
     };
 
     // Create the Next.js response object

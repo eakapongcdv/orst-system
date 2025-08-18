@@ -261,7 +261,7 @@ html, body{
   position:absolute; inset:0;
   z-index:0;                /* sit under nav content */
   pointer-events:none;
-  background-image: url('/images/ci/backgroud-motif.png'); /* monogram */
+  background-image: url('/images/ci/background-motif.png'); /* monogram */
   background-repeat: repeat;
   background-size: 90px 90px; /* LV-like density */
   opacity:.22;               /* gentle */
@@ -972,10 +972,31 @@ nav[aria-label="พจนานุกรม"]{
 /* Pagination */
 .pagination{ display:flex; align-items:center; justify-content:center; gap:.75rem; margin-top:1.25rem; }
 .pagination__list{ display:flex; gap:.25rem; }
-.pagination__item{ min-width:2rem; height:2rem; padding:0 .5rem; border-radius:10px; border:1px solid var(--brand-border); background:#fff; font-weight:800; }
+.pagination__item{
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--brand-border);
+  background:#fff;
+  font-weight:800;
+}
 .pagination__item:hover{ box-shadow: var(--shadow-elev-1); background: color-mix(in srgb, #fff 92%, var(--brand-gold) 8%); }
 .pagination__item.is-active{ background: var(--brand-gold); color:#1f2937; border-color: transparent; }
-.pagination__ellipsis{ display:inline-flex; align-items:center; justify-content:center; min-width:2rem; height:2rem; color:#6b7280; }
+.pagination__ellipsis{ display:inline-flex; align-items:center; justify-content:center; min-width:2rem; height:2.25rem; color:#6b7280; }
+
+.pagination__control{
+  display:inline-grid; place-items:center;
+  width:2.25rem; height:2.25rem; border-radius:10px;
+  border:1px solid var(--brand-border); background:#fff; font-weight:800;
+  transition: box-shadow .15s ease, background .15s ease;
+}
+.pagination__control:hover{ box-shadow: var(--shadow-elev-1); background: color-mix(in srgb, #fff 92%, var(--brand-gold) 8%); }
+.pagination__size{ display:flex; align-items:center; gap:.5rem; margin-left:.5rem; }
+.pagination__size label{ color:#6b7280; font-weight:700; font-size:.95rem; }
+.pagination__size .select{ height:2.25rem; padding:.25rem .6rem; border-radius:10px; }
 
 /* Responsive column container – aligns to:
    Mobile: full width
@@ -1128,6 +1149,22 @@ nav[aria-label="พจนานุกรม"]{
   border-radius: 0 16px 16px 0;
   box-shadow: none;
 }
+
+/* Neo look: crisper border, softer shadow, tighter radii */
+.searchbar-v--neo{
+  border-color: #e6e6e6;
+  box-shadow: 0 6px 18px rgba(0,0,0,.06), inset 0 0 0 1px rgba(255,255,255,.45);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfb 100%);
+}
+.searchbar-v--neo .lang-btn-v{
+  background: #f3f5f8;
+  border-color: #e6e6e6;
+}
+.searchbar-v--neo .searchbar-v__input{
+  border-top-color: var(--brand-gold);
+  border-bottom-color: var(--brand-gold);
+}
+.searchbar-v--neo .searchbar-v__submit{ box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
 
 /* =========================
    Modal (editor) styles

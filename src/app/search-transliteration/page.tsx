@@ -10,7 +10,6 @@ interface TransliterationSearchResult {
   romanization: string;
   originalScript1: string | null;
   originalScript2: string | null;
-  originalScript3?: string | null;
   language: string | null;                // ex. "ญี่ปุ่น", "ฝรั่งเศส", "พม่า"
   wordType: string | null;
   category: string | null;
@@ -76,7 +75,7 @@ function formatThaiDate(input?: string | null): string {
 // ★ ADD: การ์ดผลลัพธ์ (ใช้ class จาก globals.css: result-card, meta-chip ฯลฯ)
 function ResultCard({ data, onEdit }: { data: TransliterationSearchResult, onEdit: (row: TransliterationSearchResult) => void }) {
   const title =
-    (data.meaning || data.originalScript1 || data.originalScript2 || data.originalScript3 || data.otherFoundWords || data.romanization || '').trim();
+    (data.meaning || data.originalScript1 || data.originalScript2 || data.otherFoundWords || data.romanization || '').trim();
 
   const langLabel = data.language ? `ภาษา${data.language}` : '';
   const countryCode = data.language ? languageToCountryCode[data.language] : undefined;
@@ -144,6 +143,7 @@ export default function SearchTransliterationPage() {
   const [languageFilter, setLanguageFilter] = useState('all');
   const [results, setResults] = useState<TransliterationSearchResult[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -190,7 +190,7 @@ export default function SearchTransliterationPage() {
     { value: 'เวียดนาม', label: 'ภาษาเวียดนาม', code: 'VN' },
   ];
 
-  const fetchResults = async (page = 1) => {
+  const fetchResults = async (page = 1, size: number = pageSize) => {
     setLoading(true);
     setError(null);
     try {
@@ -198,6 +198,7 @@ export default function SearchTransliterationPage() {
       if (query.trim()) params.append('q', query.trim());
       if (languageFilter !== 'all') params.append('language', languageFilter);
       params.append('page', page.toString());
+      params.append('pageSize', String(size));
 
       const response = await fetch(`/api/search-transliteration?${params.toString()}`);
       if (!response.ok) {
@@ -221,8 +222,8 @@ export default function SearchTransliterationPage() {
     }
   };
 
-  const loadResults = async (page = 1) => {
-    await fetchResults(page);
+  const loadResults = async (page = 1, size: number = pageSize) => {
+    await fetchResults(page, size);
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -270,7 +271,7 @@ export default function SearchTransliterationPage() {
 
           {/* Search Bar – V layout (button | input | icons) */}
           <form onSubmit={handleSearch} className="mb-8" role="search" aria-label="ค้นหาคำทับศัพท์">
-            <div className="searchbar-v searchbar-v--tight">
+            <div className="searchbar-v searchbar-v--tight searchbar-v--neo">
               {/* Language button + panel */}
               <div className="searchbar-v__lang" ref={langRef}>
                 <button
@@ -380,7 +381,7 @@ export default function SearchTransliterationPage() {
               {/* Summary header */}
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold">ผลการค้นหาคำทับศัพท์</h2>
-                <span className="text-sm text-gray-600">{totalResults} รายการ</span>
+                <span className="text-sm text-gray-600">{totalResults} รายการ • {pagination?.currentPage ?? 1}/{pagination?.totalPages ?? 1} หน้า</span>
               </div>
 
               <section className="mx-auto max-w-5xl space-y-6">
@@ -395,9 +396,10 @@ export default function SearchTransliterationPage() {
               {pagination && pagination.totalPages > 1 && (
                 <nav className="pagination" role="navigation" aria-label="เลขหน้า">
                   <button
-                    className="btn-secondary btn--sm"
+                    className="pagination__control"
                     onClick={() => loadResults(pagination.prevPage || Math.max(1, (pagination.currentPage - 1)))}
                     disabled={!pagination.hasPrevPage}
+                    aria-label="ก่อนหน้า"
                   >
                     ←
                   </button>
@@ -421,12 +423,27 @@ export default function SearchTransliterationPage() {
                   </ul>
 
                   <button
-                    className="btn-secondary btn--sm"
+                    className="pagination__control"
                     onClick={() => loadResults(pagination.nextPage || Math.min(pagination.totalPages, (pagination.currentPage + 1)))}
                     disabled={!pagination.hasNextPage}
+                    aria-label="ถัดไป"
                   >
                     →
                   </button>
+
+                  <div className="pagination__size">
+                    <label htmlFor="pageSize">ต่อหน้า</label>
+                    <select
+                      id="pageSize"
+                      className="select"
+                      value={pageSize}
+                      onChange={(e) => { const s = parseInt(e.target.value, 10); setPageSize(s); loadResults(1, s); }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
                 </nav>
               )}
             </section>
@@ -451,7 +468,6 @@ export default function SearchTransliterationPage() {
                       romanization: (e.currentTarget as any).romanization.value,
                       originalScript1: (e.currentTarget as any).originalScript1.value,
                       originalScript2: (e.currentTarget as any).originalScript2.value,
-                      originalScript3: (e.currentTarget as any).originalScript3.value,
                       language: (e.currentTarget as any).language.value,
                       wordType: (e.currentTarget as any).wordType.value,
                       category: (e.currentTarget as any).category.value,
@@ -462,8 +478,8 @@ export default function SearchTransliterationPage() {
                       referenceCriteria: (e.currentTarget as any).referenceCriteria.value,
                       createNewVersion: true,
                     };
-                    const res = await fetch(`/api/transliteration/${editRow.id}/update`,{
-                      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload)
+                    const res = await fetch(`/api/transliteration/${editRow.id}`,{
+                      method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload)
                     });
                     if(!res.ok){ let m = 'บันทึกไม่สำเร็จ'; try{ const j = await res.json(); m = j.error || m; }catch{} throw new Error(m); }
                     await loadResults(pagination?.currentPage || 1);
@@ -506,10 +522,6 @@ export default function SearchTransliterationPage() {
                     <div>
                       <label className="form-label">ต้นฉบับ (สคริปต์ 2)</label>
                       <input name="originalScript2" defaultValue={editRow.originalScript2 || ''} className="input" />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="form-label">ต้นฉบับ (สคริปต์ 3)</label>
-                      <input name="originalScript3" defaultValue={editRow.originalScript3 || ''} className="input" />
                     </div>
 
                     <div className="col-span-2">
