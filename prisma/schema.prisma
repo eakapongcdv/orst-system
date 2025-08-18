@@ -24,18 +24,19 @@ model User {
   updatedAt DateTime @updatedAt
 
   // --- Password reset support fields ---
-  resetToken        String?   @db.VarChar(255)
-  resetTokenExpiry  DateTime?
+  resetToken       String?   @db.VarChar(255)
+  resetTokenExpiry DateTime?
 
   // Relations
-  documents        Document[]
-  documentVersions DocumentVersion[]
-  comments         Comment[]
-  uploadLogs       UploadLog[]
-  userGroups       UserGroup[]
-  permissions      Permission[]
-  folders          Folder[] // Folders owned by the user
-  sharedDocuments  DocumentShare[]   @relation("SharedDocuments") // Documents shared with this user
+  documents                   Document[]
+  documentVersions            DocumentVersion[]
+  comments                    Comment[]
+  uploadLogs                  UploadLog[]
+  userGroups                  UserGroup[]
+  permissions                 Permission[]
+  folders                     Folder[] // Folders owned by the user
+  sharedDocuments             DocumentShare[]               @relation("SharedDocuments") // Documents shared with this user
+  TransliterationEntryVersion TransliterationEntryVersion[]
 
   @@index([resetToken], map: "idx_user_reset_token")
 }
@@ -240,42 +241,42 @@ model SpecializedDictionary {
 // รายการคำศัพท์ในแต่ละพจนานุกรม
 // รายการคำศัพท์ในแต่ละพจนานุกรม
 model DictionaryEntry {
-  id                      Int                    @id @default(autoincrement())
+  id                      Int                      @id @default(autoincrement())
   specializedDictionaryId Int // FK
-  term_th                 String?                @db.Text
-  term_en                 String?                @db.Text
-  definition_html         String?                @db.Text
+  term_th                 String?                  @db.Text
+  term_en                 String?                  @db.Text
+  definition_html         String?                  @db.Text
   // --- Added version field ---
-  version                 Int                    @default(1) // Starts at version 1
+  version                 Int                      @default(1) // Starts at version 1
   // --- End added version field ---
-  related_transliteration TransliterationEntry[] @relation("EntryTranslit")
-  related_encyclopedia    EncyclopediaEntry[]    @relation("EntryEncyclo")
+  related_transliteration TransliterationEntry[]   @relation("EntryTranslit")
+  related_encyclopedia    EncyclopediaEntry[]      @relation("EntryEncyclo")
   // --- Added relation to version log ---
   versions                DictionaryEntryVersion[] // Relation to change log
   // --- End added relation ---
-  created_at              DateTime               @default(now())
-  updated_at              DateTime               @updatedAt
-  SpecializedDictionary   SpecializedDictionary  @relation(fields: [specializedDictionaryId], references: [id])
+  created_at              DateTime                 @default(now())
+  updated_at              DateTime                 @updatedAt
+  SpecializedDictionary   SpecializedDictionary    @relation(fields: [specializedDictionaryId], references: [id])
+  // --- End add index ---
+
   @@unique([specializedDictionaryId, term_th, term_en], name: "uniq_entry_th_en")
   @@index([term_th, term_en], name: "idx_entries_th_en")
   // --- Add index for versioning ---
   @@index([id, version], name: "idx_entry_id_version") // Useful for fetching specific versions
-  // --- End add index ---
 }
 
 // --- New model for DictionaryEntry version history ---
 model DictionaryEntryVersion {
-  id                      Int      @id @default(autoincrement())
-  dictionaryEntryId       Int      // FK to the main entry
-  version                 Int      // The version number this log represents
-  term_th                 String?  @db.Text // Snapshot of the term
-  term_en                 String?  @db.Text // Snapshot of the term
-  definition_html         String?  @db.Text // Snapshot of the definition
-  changed_at              DateTime @default(now()) // When the change occurred
-  changed_by_user_id      Int?     // Optional: FK to User who made the change (requires User model link)
+  id                 Int             @id @default(autoincrement())
+  dictionaryEntryId  Int // FK to the main entry
+  version            Int // The version number this log represents
+  term_th            String?         @db.Text // Snapshot of the term
+  term_en            String?         @db.Text // Snapshot of the term
+  definition_html    String?         @db.Text // Snapshot of the definition
+  changed_at         DateTime        @default(now()) // When the change occurred
+  changed_by_user_id Int? // Optional: FK to User who made the change (requires User model link)
   // changed_by              User?    @relation(fields: [changed_by_user_id], references: [id]) // Optional relation
-  DictionaryEntry         DictionaryEntry @relation(fields: [dictionaryEntryId], references: [id])
-
+  DictionaryEntry    DictionaryEntry @relation(fields: [dictionaryEntryId], references: [id])
 
   @@unique([dictionaryEntryId, version], name: "uniq_entry_version") // Ensure one log per entry version
   @@index([dictionaryEntryId], name: "idx_dict_entry_versions_entry_id")
@@ -301,9 +302,45 @@ model TransliterationEntry {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // --- Versioning ---
+  version  Int                           @default(1) // Starts at version 1 for rollback support
+  versions TransliterationEntryVersion[]
+
   // เพิ่ม relation ย้อนกลับ
   dictionaryEntry   DictionaryEntry? @relation("EntryTranslit", fields: [dictionaryEntryId], references: [id])
   dictionaryEntryId Int?
+}
+
+// --- Version history for TransliterationEntry ---
+model TransliterationEntryVersion {
+  id                     Int @id @default(autoincrement())
+  transliterationEntryId Int // FK to the main transliteration entry
+  version                Int // The version number this log represents
+
+  // Snapshot fields
+  romanization      String
+  originalScript1   String?
+  originalScript2   String?
+  language          String?
+  wordType          String?
+  category          String?
+  transliteration1  String?
+  transliteration2  String?
+  otherFoundWords   String?
+  meaning           String?
+  notes             String?
+  referenceCriteria String?
+  publicationDate   DateTime?
+
+  changed_at         DateTime @default(now())
+  changed_by_user_id Int?
+  changed_by         User?    @relation(fields: [changed_by_user_id], references: [id])
+
+  TransliterationEntry TransliterationEntry @relation(fields: [transliterationEntryId], references: [id])
+
+  @@unique([transliterationEntryId, version], name: "uniq_translit_version")
+  @@index([transliterationEntryId], name: "idx_translit_versions_entry_id")
+  @@index([changed_at], name: "idx_translit_versions_changed_at")
 }
 
 // หมวด 3: สารานุกรม

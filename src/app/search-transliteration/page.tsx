@@ -98,7 +98,11 @@ function ResultCard({ data, onEdit }: { data: TransliterationSearchResult, onEdi
       <div className="result-grid">
         <div className="result-flag-col">
           {FlagSvg ? (
-            <FlagSvg className="meta-flag meta-flag--lg" title={langLabel} />
+            <FlagSvg
+              className="meta-flag meta-flag--lg"
+              role="img"
+              aria-label={langLabel || undefined}
+            />
           ) : (
             <div className="meta-flag meta-flag--lg" aria-hidden="true">🌐</div>
           )}

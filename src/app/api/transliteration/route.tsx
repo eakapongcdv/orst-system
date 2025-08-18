@@ -22,7 +22,7 @@ const CreateSchema = z.object({
   category: z.string().optional().nullable(),
   referenceCriteria: z.string().optional().nullable(),
   publicationDate: z.string().datetime().optional(), // ISO string if provided
-}).strict(false); // เผื่อฟิลด์เสริมอื่น ๆ
+}).passthrough(); // อนุญาตฟิลด์เสริมอื่น ๆ (ไม่บังคับ strict)
 
 export async function POST(req: NextRequest) {
   try {
