@@ -10,17 +10,18 @@ const prisma = new PrismaClient();
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    // Support multiple query keys and allow explicit `0`
+    const idRaw =
+      searchParams.get('specializedDictionaryId');
 
-    // Build where condition if id is provided
-    const whereCondition = id ? { id: parseInt(id, 10) } : {};
-
-    // Validate ID parameter if provided
-    if (id) {
-      const idNum = parseInt(id, 10);
-      if (isNaN(idNum)) {
+    let whereCondition: { id?: number } = {};
+    if (idRaw !== null) {
+      const idNum = Number(idRaw);
+      // Validate: integer (can be 0), not NaN, finite
+      if (!Number.isFinite(idNum) || !Number.isInteger(idNum)) {
         return Response.json({ error: 'Invalid ID parameter' }, { status: 400 });
       }
+      whereCondition.id = idNum;
     }
 
     // Fetch dictionaries from the database, ordered by title, then category, then subcategory
@@ -46,27 +47,22 @@ export async function GET(request: NextRequest) {
       entryCount: dict._count.entries // Add a direct property for entry count
     }));
 
-    // If filtering by ID, return single dictionary
-    if (id) {
-      return Response.json(dictionariesWithCount);
-    }
-
     // Group dictionaries by category > subcategory > title
+    type DictItem = (typeof dictionariesWithCount)[number];
     const groupedDictionaries = dictionariesWithCount.reduce((acc, dict) => {
       const category = dict.category;
       const subcategory = dict.subcategory || 'no_subcategory';
-      
+
       if (!acc[category]) {
         acc[category] = {};
       }
-      
       if (!acc[category][subcategory]) {
         acc[category][subcategory] = [];
       }
-      
-      acc[category][subcategory].push(dict);
+
+      acc[category][subcategory].push(dict as DictItem);
       return acc;
-    }, {} as Record<string, Record<string, typeof dictionariesWithCount>>);
+    }, {} as Record<string, Record<string, DictItem[]>>);
 
     // Return the grouped dictionaries
     return Response.json(groupedDictionaries);

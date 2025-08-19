@@ -47,11 +47,69 @@ interface DictionaryEntryResult {
 }
 
 // Interface for the specific dictionary details (for breadcrumb)
+
 interface SpecializedDictionaryDetails {
   id: number;
   title: string;
   category: string;
   subcategory: string | null;
+}
+
+// Helper: extract a single dictionary by id from either an array result or grouped object result
+function extractDictionaryDetails(data: any, targetId: number): SpecializedDictionaryDetails | null {
+  if (!data) return null;
+
+  // Case 1: API returned an array of dictionaries
+  if (Array.isArray(data)) {
+    const found = data.find((d: any) => Number(d?.id) === targetId);
+    if (found) {
+      return {
+        id: Number(found.id),
+        title: String(found.title),
+        category: String(found.category),
+        subcategory: found.subcategory ?? null,
+      };
+    }
+    // If array has exactly 1 item and ids don't match, still allow using that record
+    if (data.length === 1) {
+      const only = data[0];
+      if (only) {
+        return {
+          id: Number(only.id),
+          title: String(only.title),
+          category: String(only.category),
+          subcategory: only.subcategory ?? null,
+        };
+      }
+    }
+    return null;
+  }
+
+  // Case 2: API returned a grouped object: { [category]: { [subcategoryKey]: Array<dict> } }
+  if (typeof data === 'object') {
+    for (const catKey of Object.keys(data)) {
+      const subObj = (data as any)[catKey];
+      if (subObj && typeof subObj === 'object') {
+        for (const subKey of Object.keys(subObj)) {
+          const arr = subObj[subKey];
+          if (Array.isArray(arr)) {
+            for (const item of arr) {
+              if (Number(item?.id) === targetId) {
+                return {
+                  id: Number(item.id),
+                  title: String(item.title),
+                  category: String(item.category),
+                  subcategory: item.subcategory ?? null,
+                };
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 export default function SearchDictionaryPage() {
@@ -60,7 +118,7 @@ export default function SearchDictionaryPage() {
   const searchParams = useSearchParams();
   const dictionaryIdParam = params.id;
   const dictionaryId = dictionaryIdParam === '0' || isNaN(Number(dictionaryIdParam)) ? 0 : Number(dictionaryIdParam);
-  const isAllDictionaries = dictionaryId === 0;
+  const isAllDictionaries = false;
   const initialQuery = searchParams.get('q') || '';
   const initialLanguageFilter = searchParams.get('language') || 'all';
   const [query, setQuery] = useState(initialQuery);
@@ -124,30 +182,51 @@ export default function SearchDictionaryPage() {
   };
 
   const fetchDictionaryDetails = async () => {
-    if (isAllDictionaries || dictionaryId === 0) {
-        setDictionaryDetails(null);
-        return;
+    if (isAllDictionaries) {
+      setDictionaryDetails(null);
+      return;
     }
     setDictLoading(true);
     setDictError(null);
     try {
-        const response = await fetch(`/api/dictionaries?id=${dictionaryId}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+      // Try the primary parameter first
+      let response = await fetch(`/api/dictionaries?specializedDictionaryId=${dictionaryId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      let data: any = await response.json();
+      let details = extractDictionaryDetails(data, dictionaryId);
+
+      // Fallback 1: try param name "id"
+      if (!details) {
+        response = await fetch(`/api/dictionaries?id=${dictionaryId}`);
+        if (response.ok) {
+          data = await response.json();
+          details = extractDictionaryDetails(data, dictionaryId) ?? details;
         }
-        const data = await response.json();
-        if (data.length > 0) {
-            setDictionaryDetails(data[0]);
-        } else {
-            setDictError('ไม่พบข้อมูลพจนานุกรมที่ระบุ');
-            setDictionaryDetails(null);
+      }
+
+      // Fallback 2: try param name "dictionaryId"
+      if (!details) {
+        response = await fetch(`/api/dictionaries?dictionaryId=${dictionaryId}`);
+        if (response.ok) {
+          data = await response.json();
+          details = extractDictionaryDetails(data, dictionaryId) ?? details;
         }
-    } catch (err) {
-        console.error("Fetch Dictionary Details error:", err);
-        setDictError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดข้อมูลพจนานุกรม');
+      }
+
+      if (details) {
+        setDictionaryDetails(details);
+      } else {
+        setDictError('ไม่พบข้อมูลพจนานุกรมที่ระบุ');
         setDictionaryDetails(null);
+      }
+    } catch (err) {
+      console.error("Fetch Dictionary Details error:", err);
+      setDictError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดข้อมูลพจนานุกรม');
+      setDictionaryDetails(null);
     } finally {
-        setDictLoading(false);
+      setDictLoading(false);
     }
   };
 
@@ -216,23 +295,44 @@ export default function SearchDictionaryPage() {
       </Head>
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Breadcrumb */}
-        <nav className="text-sm text-gray-500 mb-4">
-          <Link href="/" className="hover:underline">หน้าหลัก</Link>{' '}
-          <Link href="/dictionaries" className="hover:underline">พจนานุกรมเฉพาะสาขาวิชา</Link>{' '}
+        {/* Breadcrumb */}
+        <nav aria-label="breadcrumb" className="mb-4">
           {dictLoading ? (
-            <span>กำลังโหลดข้อมูล</span>
+            <span className="text-sm text-gray-500">กำลังโหลดข้อมูล…</span>
           ) : dictError ? (
-            <span className="text-red-500">ข้อผิดพลาด: {dictError}</span>
-          ) : dictionaryDetails ? (
-            <>
-              <span className="font-medium text-gray-700">{dictionaryDetails.title}</span>{' '}
-              <span className="font-medium text-gray-700">{dictionaryDetails.category}</span>
-              {dictionaryDetails.subcategory && (
-                <> <span className="font-medium text-gray-700">{dictionaryDetails.subcategory}</span></>
-              )}
-            </>
+            <span className="text-sm text-red-500">ข้อผิดพลาด: {dictError}</span>
           ) : (
-            <span>{isAllDictionaries ? 'ค้นหาทั้งหมด' : `กำลังโหลดข้อมูล`}</span>
+            <ol className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <li>
+                <Link href="/dictionaries" className="hover:underline">คลังพจนานุกรม</Link>
+              </li>
+
+              {dictionaryDetails ? (
+                <>
+                  <li className="text-gray-300">•</li>
+                  <li className="text-gray-700">{dictionaryDetails.category}</li>
+
+                  {dictionaryDetails.subcategory && (
+                    <>
+                      <li className="text-gray-300">•</li>
+                      <li className="text-gray-700">{dictionaryDetails.subcategory}</li>
+                    </>
+                  )}
+
+                  <li className="text-gray-300">•</li>
+                  <li className="font-extrabold" style={{ color: 'var(--brand-gold)' }} aria-current="page">
+                    {dictionaryDetails.title}
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="text-gray-300">•</li>
+                  <li className="font-extrabold" style={{ color: 'var(--brand-gold)' }} aria-current="page">
+                    {isAllDictionaries ? 'ค้นหาทั้งหมด' : 'กำลังโหลดข้อมูล'}
+                  </li>
+                </>
+              )}
+            </ol>
           )}
         </nav>
         <h2 className="text-3xl font-bold mb-4 text-center">

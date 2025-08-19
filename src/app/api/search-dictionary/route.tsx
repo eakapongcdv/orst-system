@@ -35,7 +35,29 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q'); // keywords
   const languageFilter = searchParams.get('language'); // 'th' | 'en' | 'all' | null
-  const dictionaryIdParam = searchParams.get('dictionaryId'); // New parameter
+  // --- New: Handle specializedDictionaryId (with backward-compatible aliases) ---
+  // Accept: specializedDictionaryId (preferred) | dictionaryId | id
+  const idParamRaw =
+    searchParams.get('specializedDictionaryId') ??
+    searchParams.get('dictionaryId') ??
+    searchParams.get('id');
+
+  let dictionaryId: number | null = null;
+  if (idParamRaw !== null && idParamRaw.trim() !== '') {
+    const parsed = Number(idParamRaw);
+    if (Number.isFinite(parsed) && Number.isInteger(parsed)) {
+      // NOTE: allow 0 as a valid id (e.g., special "general" dictionary)
+      dictionaryId = parsed;
+    }
+  }
+
+  let where: any = {};
+
+  // Apply dictionaryId filter if resolved (including 0)
+  if (dictionaryId !== null) {
+    where.specializedDictionaryId = dictionaryId;
+  }
+  // --- End: Handle specializedDictionaryId filter ---
   const pageParam = searchParams.get('page');
   const limitParam = searchParams.get('limit');
 
@@ -44,24 +66,6 @@ export async function GET(request: NextRequest) {
   const skip = (page - 1) * limit;
 
   const keywords = query?.trim() ? query.trim().split(/\s+/).filter(kw => kw.length > 0) : [];
-  let where: any = {};
-
-  // --- New: Handle dictionaryId filter ---
-  let dictionaryId: number | null = null;
-  if (dictionaryIdParam !== null && dictionaryIdParam !== '0') {
-    const parsedId = parseInt(dictionaryIdParam, 10);
-    if (!isNaN(parsedId)) {
-      dictionaryId = parsedId;
-    }
-    // If dictionaryIdParam is '0' or invalid, dictionaryId remains null -> no filter by dictionary
-  }
-  // If dictionaryIdParam is null (not provided), dictionaryId remains null -> no filter by dictionary
-
-  // Apply dictionaryId filter if valid
-  if (dictionaryId !== null) {
-    where.specializedDictionaryId = dictionaryId;
-  }
-  // --- End: Handle dictionaryId filter ---
 
   // Language filter (filter by which field to search)
   if (languageFilter && languageFilter.trim() !== '' && languageFilter.trim() !== 'all') {
@@ -93,7 +97,8 @@ export async function GET(request: NextRequest) {
       orderBy: { term_en: 'asc' }, // sort พจนานุกรมไทย
       // --- Include SpecializedDictionary info for the frontend when showing all dictionaries ---
       include: {
-        SpecializedDictionary: dictionaryId === null // Only include if not already filtered by a specific dictionary
+        // Only include parent dictionary info when not filtering by a specific specializedDictionaryId
+        SpecializedDictionary: dictionaryId === null
       }
       // --- End Include ---
     });
