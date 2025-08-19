@@ -793,7 +793,7 @@ export default function SearchTransliterationPage() {
           position: fixed;
           inset: 0;
           background: rgba(10, 67, 118, 0.35);
-          backdrop-filter: blur(2px);
+          backdrop-filter: blur(5px) saturate(1.15);
           display: flex;
           align-items: center;
           justify-content: center;

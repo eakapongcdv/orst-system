@@ -29,11 +29,18 @@ interface DictionaryEntryResult {
 
 // Interface for the specific dictionary details (for breadcrumb)
 
+
 interface SpecializedDictionaryDetails {
   id: number;
   title: string;
   category: string;
   subcategory: string | null;
+}
+
+interface PopularQueryItem {
+  queryOriginal: string;
+  queryNormalized: string;
+  count: number;
 }
 
 
@@ -123,7 +130,190 @@ function renderMarkOnly(input: string | null): string {
 
   return s;
 }
+
 // --- End helper ---
+
+// === Thai alphabet filter (for dictionaryId === 0) ===
+const THAI_CONSONANTS: string[] = [
+  'ก','ข','ฃ','ค','ฅ','ฆ','ง','จ','ฉ','ช','ซ','ฌ','ญ','ฎ','ฏ','ฐ','ฑ','ฒ','ณ',
+  'ด','ต','ถ','ท','ธ','น','บ','ป','ผ','ฝ','พ','ฟ','ภ','ม','ย','ร','ล','ว','ศ','ษ','ส','ห','ฬ','อ','ฮ'
+];
+
+function getThaiInitial(s?: string | null): string {
+  if (!s) return '';
+  const t = String(s).trim();
+  return t ? t[0] : '';
+}
+
+// === Result Row Components (split by dictionary type) ===
+interface ResultRowProps {
+  entry: DictionaryEntryResult;
+  isSelected: boolean;
+  selectMode: boolean;
+  selectedIds: number[];
+  isAllDictionaries: boolean;
+  onToggleSelect: (id: number) => void;
+  onOpen: (entry: DictionaryEntryResult) => void;
+}
+
+/** Generic shared row content */
+function ResultRowBase({
+  entry,
+  isSelected,
+  selectMode,
+  selectedIds,
+  isAllDictionaries,
+  onToggleSelect,
+  onOpen,
+  rowClassName = '',
+}: ResultRowProps & { rowClassName?: string }) {
+  return (
+    <div
+      id={`entry-${entry.id}`}
+      className={`entry-row mb-4 p-3 rounded transition-colors duration-150 relative cursor-pointer ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : 'border border-transparent hover:border-gray-300'} ${selectMode ? 'has-select' : ''} ${rowClassName}`}
+      onClick={() => {
+        if (selectMode) {
+          onToggleSelect(entry.id);
+        } else {
+          onOpen(entry);
+        }
+      }}
+    >
+      {selectMode && (
+        <input
+          type="checkbox"
+          className="select-checkbox"
+          checked={selectedIds.includes(entry.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.stopPropagation();
+            onToggleSelect(entry.id);
+          }}
+          aria-label="เลือกแถวนี้"
+        />
+      )}
+
+      {/* Breadcrumb for individual entry (if showing all dictionaries) */}
+      {isAllDictionaries && entry.SpecializedDictionary && (
+        <div className="text-xs text-gray-500 mb-1 text-right">
+          {entry.SpecializedDictionary.title} | {entry.SpecializedDictionary.category}
+          {entry.SpecializedDictionary.subcategory && ` | ${entry.SpecializedDictionary.subcategory}`}
+        </div>
+      )}
+
+      <div style={{ marginLeft: 30, textIndent: -30 }}>
+        <b>
+          <span
+            className="dict-accent"
+            style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK", sans-serif' }}
+            dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_en || '') }}
+          />
+          &nbsp;&nbsp;
+          <span
+            className="dict-accent"
+            style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK", sans-serif' }}
+            dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_th || '') }}
+          />
+        </b>
+      </div>
+
+      {entry.definition_html && (
+        <div
+          style={{ marginLeft: 43 }}
+          className="mt-1"
+          dangerouslySetInnerHTML={{ __html: entry.definition_html }}
+        />
+      )}
+
+      {/* Version and Updated Info */}
+      <div className="row-meta text-xs text-gray-500">
+        เวอร์ชัน ({entry.version}) : แก้ไขล่าสุดเมื่อ {new Date(entry.updated_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+      </div>
+    </div>
+  );
+}
+
+/** Row for dictionaryId === 0 (ราชบัณฑิตยสภา) – title and definition in two columns */
+function DictionaryResultRow({
+  entry,
+  isSelected,
+  selectMode,
+  selectedIds,
+  isAllDictionaries,
+  onToggleSelect,
+  onOpen,
+}: ResultRowProps) {
+  return (
+    <div
+      id={`entry-${entry.id}`}
+      className={`entry-row mb-4 p-3 rounded transition-colors duration-150 relative cursor-pointer ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : 'border border-transparent hover:border-gray-300'} ${selectMode ? 'has-select' : ''} entry-row--dict`}
+      onClick={() => {
+        if (selectMode) {
+          onToggleSelect(entry.id);
+        } else {
+          onOpen(entry);
+        }
+      }}
+    >
+      {selectMode && (
+        <input
+          type="checkbox"
+          className="select-checkbox"
+          checked={selectedIds.includes(entry.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => { e.stopPropagation(); onToggleSelect(entry.id); }}
+          aria-label="เลือกแถวนี้"
+        />
+      )}
+
+      {/* Breadcrumb for individual entry (if showing all dictionaries) */}
+      {isAllDictionaries && entry.SpecializedDictionary && (
+        <div className="text-xs text-gray-500 mb-1 text-right">
+          {entry.SpecializedDictionary.title} | {entry.SpecializedDictionary.category}
+          {entry.SpecializedDictionary.subcategory && ` | ${entry.SpecializedDictionary.subcategory}`}
+        </div>
+      )}
+
+      {/* Title | Definition in two columns */}
+      <div className="dict-row-grid">
+        <div className="dict-row-head">
+          <div style={{ marginLeft: 30, textIndent: -30 }}>
+            <b>
+              <span
+                className="dict-accent"
+                style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK", sans-serif' }}
+                dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_th || '') }}
+              />
+            </b>
+          </div>
+        </div>
+        {entry.definition_html && (
+          <div
+            className="dict-row-def"
+            // keep original HTML for definition; it may contain markup/marks
+            dangerouslySetInnerHTML={{ __html: entry.definition_html }}
+          />
+        )}
+      </div>
+
+      {/* Version and Updated Info - Meta block, right aligned, spaced below */}
+      <div className="row-meta text-xs text-gray-500">
+        เวอร์ชัน ({entry.version}) : แก้ไขล่าสุดเมื่อ {new Date(entry.updated_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+      </div>
+    </div>
+  );
+}
+
+/** Row for dictionaryId === 3 (เล่มพิเศษ/เคมี) */
+function SpecializedDictionaryResultRow(props: ResultRowProps) {
+  return (
+    <ResultRowBase
+      {...props}
+      rowClassName="entry-row--spec"
+    />
+  );
+}
+// === End Result Row Components ===
 
 export default function SearchDictionaryPage() {
   const params = useParams();
@@ -138,6 +328,7 @@ export default function SearchDictionaryPage() {
   const [query, setQuery] = useState(initialQuery);
   const [languageFilter, setLanguageFilter] = useState(initialLanguageFilter);
   const [results, setResults] = useState<DictionaryEntryResult[]>([]);
+  const [popular, setPopular] = useState<PopularQueryItem[]>([]);
   const [pagination, setPagination] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,22 +352,35 @@ export default function SearchDictionaryPage() {
   const [selectedEntry, setSelectedEntry] = useState<DictionaryEntryResult | null>(null);
   // --- Sidebar: สารบัญ/ค้นหา/เลื่อนบน ---
   const [sidebarQuery, setSidebarQuery] = useState('');
+  // Thai alphabet filter (for ราชบัณฑิตยสภา, id=0)
+  const [alphaFilter, setAlphaFilter] = useState<string>('');
   
-  // จัดกลุ่มสารบัญ: ตัวอักษร ➜ คำแต่ละตัว
+  // Results filtered by Thai alphabet (only for dictionaryId === 0)
+  const filteredResults = useMemo(() => {
+    if (dictionaryId === 0 && alphaFilter) {
+      return results.filter((e) => getThaiInitial(e.term_th) === alphaFilter);
+    }
+    return results;
+  }, [results, dictionaryId, alphaFilter]);
+
+  // จัดกลุ่มสารบัญ: ตัวอักษร ➜ คำแต่ละตัว (ใช้ filteredResults และ Thai-first-letter สำหรับ dictionaryId 0)
   const sidebarGroups = useMemo(() => {
     const map: Record<string, { id: number; label: string; anchor: string }[]> = {};
-    results.forEach((entry) => {
-      const letter = (entry.term_en?.[0] || entry.term_th?.[0] || '').toUpperCase() || '#';
-      const label = (entry.term_en || entry.term_th || '').trim();
+    filteredResults.forEach((entry) => {
+      const letter =
+        dictionaryId === 0
+          ? (getThaiInitial(entry.term_th) || '#')
+          : ((entry.term_en?.[0] || entry.term_th?.[0] || '#').toUpperCase());
+      const label = (entry.term_th || entry.term_en || '').trim();
       if (!label) return;
       if (!map[letter]) map[letter] = [];
       map[letter].push({ id: entry.id, label, anchor: `entry-${entry.id}` });
     });
     Object.keys(map).forEach((k) => map[k].sort((a, b) => a.label.localeCompare(b.label, 'th')));
     return Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => a.localeCompare(b, 'th'))
       .map(([letter, items]) => ({ letter, items }));
-  }, [results]);
+  }, [filteredResults, dictionaryId]);
 
   const filteredSidebarGroups = useMemo(() => {
     const q = sidebarQuery.trim().toLowerCase();
@@ -236,6 +440,7 @@ export default function SearchDictionaryPage() {
         throw new Error(errorMsg);
       }
       const data = await response.json();
+      setPopular(data.popular || []);
       setResults(data.results || []);
       setPagination(data.pagination || null);
       setPage(data.pagination?.page ?? pageArg);
@@ -417,7 +622,6 @@ export default function SearchDictionaryPage() {
         <section className="a4-page">
         <div className="a4-zoom-wrap" style={{ ['--reader-zoom' as any]: zoom }}>
         {/* Breadcrumb */}
-        {/* Breadcrumb */}
         <nav aria-label="breadcrumb" className="mb-4">
           {dictLoading ? (
             <span className="text-sm text-gray-500">กำลังโหลดข้อมูล…</span>
@@ -470,6 +674,33 @@ export default function SearchDictionaryPage() {
                )
           }
         </h2>
+        {/* Thai alphabet filter (ก-ฮ) – only for ราชบัณฑิตยสภา (id=0) */}
+        {dictionaryId === 0 && (
+          <div className="alphabet-bar" role="toolbar" aria-label="กรองตามพยัญชนะ">
+            <button
+              type="button"
+              className={`alpha-btn ${alphaFilter === '' ? 'is-active' : ''}`}
+              onClick={() => { setAlphaFilter(''); try{ window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {} }}
+              title="ทั้งหมด"
+              aria-pressed={alphaFilter === ''}
+            >
+              ทั้งหมด
+            </button>
+            {THAI_CONSONANTS.map((ch) => (
+              <button
+                key={ch}
+                type="button"
+                className={`alpha-btn ${alphaFilter === ch ? 'is-active' : ''}`}
+                onClick={() => { setAlphaFilter(ch); try{ window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {} }}
+                title={`ตัวอักษร ${ch}`}
+                aria-pressed={alphaFilter === ch}
+              >
+                {ch}
+              </button>
+            ))}
+          </div>
+        )}
+
         <form onSubmit={handleSearch} className="mb-8">
           <div className="flex items-center border border-gray-300 rounded-full px-4 py-1 shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow duration-200 ease-in-out max-w-3xl mx-auto">
             <div className="relative mr-2">
@@ -522,121 +753,103 @@ export default function SearchDictionaryPage() {
             </button>
           </div>
         </form>
+        {/* Popular search queries */}
+        {popular && popular.length > 0 && (
+          <div className="popular-queries" role="list" aria-label="คำค้นหายอดนิยม">
+            <div className="popular-title">คำค้นหายอดนิยม</div>
+            <div className="popular-chips">
+              {popular.map((p) => (
+                <button
+                  key={p.queryNormalized}
+                  type="button"
+                  className="popular-chip"
+                  role="listitem"
+                  onClick={() => {
+                    setQuery(p.queryOriginal);
+                    fetchResults(1, pageSize);
+                  }}
+                  title={`${p.queryOriginal} • ${p.count} ครั้ง`}
+                  aria-label={`${p.queryOriginal} ถูกค้นหา ${p.count} ครั้ง`}
+                >
+                  <span className="popular-chip__text">{p.queryOriginal}</span>
+                  <span className="popular-chip__count">{p.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loading && !error && (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-4"></div>
             <p className="text-gray-600">กำลังโหลดข้อมูล</p>
           </div>
         )}
+
         {!loading && !error && (
           <div>
-            {results.length > 0 ? (
+            {filteredResults.length > 0 ? (
               <div>
                 {Object.entries(
-                  results.reduce((acc, entry) => {
-                    const key = (entry.term_en?.[0] || entry.term_th?.[0] || '').toUpperCase();
+                  filteredResults.reduce((acc, entry) => {
+                    const key = dictionaryId === 0
+                      ? (getThaiInitial(entry.term_th) || '#')
+                      : ((entry.term_en?.[0] || entry.term_th?.[0] || '#').toUpperCase());
                     if (!acc[key]) acc[key] = [];
                     acc[key].push(entry);
                     return acc;
-                  }, {} as Record<string, typeof results>)
+                  }, {} as Record<string, typeof filteredResults>)
                 )
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([letter, group]) => (
-                  <section key={letter} id={`section-${letter}`} className="mb-8">
-                    <div className="flex items-center mb-2">
-                      <span
-                        className="font-bold dict-accent"
-                        style={{
-                          fontSize: '2rem',
-                          fontFamily: 'Tahoma, sans-serif'
-                        }}
-                      >
-                        {letter}
-                      </span>
-                      <span
-                        className="ml-4 font-bold"
-                        style={{
-                          fontSize: '1.3rem',
-                          color: '#B3186D',
-                          fontFamily: '"TH SarabunPSK", sans-serif'
-                        }}
-                      >
-                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                      </span>
-                    </div>
-                    {group.map((entry) => (
-                      <div
-                        id={`entry-${entry.id}`}
-                        key={entry.id}
-                        className={`entry-row mb-4 p-3 rounded transition-colors duration-150 relative cursor-pointer
-                                   ${selectedRowId === entry.id ? 'border-2 border-blue-500 bg-blue-50' : 'border border-transparent hover:border-gray-300'}
-                                   ${selectMode ? 'has-select' : ''}`}
-                        onClick={() => {
-                          if (selectMode) {
-                            setSelectedIds(prev => prev.includes(entry.id) ? prev.filter(id => id !== entry.id) : [...prev, entry.id]);
-                          } else {
-                            openEditModal(entry);
-                          }
-                        }}
-                      >
-                        {selectMode && (
-                          <input
-                            type="checkbox"
-                            className="select-checkbox"
-                            checked={selectedIds.includes(entry.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setSelectedIds(prev => e.target.checked ? Array.from(new Set([...prev, entry.id])) : prev.filter(id => id !== entry.id));
-                            }}
-                            aria-label="เลือกแถวนี้"
-                          />
-                        )}
-                        {/* Breadcrumb for individual entry (if showing all dictionaries) */}
-                        {isAllDictionaries && entry.SpecializedDictionary && (
-                          <div className="text-xs text-gray-500 mb-1 text-right">
-                            {entry.SpecializedDictionary.title} | {entry.SpecializedDictionary.category}
-                            {entry.SpecializedDictionary.subcategory && ` | ${entry.SpecializedDictionary.subcategory}`}
-                          </div>
-                        )}
-                        <div style={{ marginLeft: 30, textIndent: -30 }}>
-                          <b>
-                            <span
-                              className="dict-accent"
-                              style={{
-                                fontSize: '1.3rem',
-                                fontFamily: '"TH SarabunPSK", sans-serif'
-                              }}
-                              dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_en || '') }}
-                            />
-                            &nbsp;&nbsp;
-                            <span
-                              className="dict-accent"
-                              style={{
-                                fontSize: '1.3rem',
-                                fontFamily: '"TH SarabunPSK", sans-serif'
-                              }}
-                              dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_th || '') }}
-                            />
-                          </b>
-                        </div>
-                        {entry.definition_html && (
-                          <div
-                            style={{ marginLeft: 43 }}
-                            className="mt-1"
-                            dangerouslySetInnerHTML={{ __html: entry.definition_html }}
-                          />
-                        )}
-                        {/* Version and Updated Info - Bottom Right */}
-                        {/* --- Updated display to include version and time --- */}
-                        <div className="absolute bottom-1 right-2 text-xs text-gray-500">
-                          เวอร์ชัน ({entry.version}) : แก้ไขล่าสุดเมื่อ {new Date(entry.updated_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
-                        </div>
-                        {/* --- End updated display --- */}
+                  .sort(([a], [b]) => a.localeCompare(b, 'th'))
+                  .map(([letter, group]) => (
+                    <section key={letter} id={`section-${letter}`} className="mb-8">
+                      <div className="flex items-center mb-2">
+                        <span
+                          className="font-bold dict-accent"
+                          style={{
+                            fontSize: '2rem',
+                            fontFamily: 'Tahoma, sans-serif'
+                          }}
+                        >
+                          {letter}
+                        </span>
+                        <span
+                          className="ml-4 font-bold"
+                          style={{
+                            fontSize: '1.3rem',
+                            color: '#B3186D',
+                            fontFamily: '"TH SarabunPSK", sans-serif'
+                          }}
+                        >
+                          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </span>
                       </div>
-                    ))}
-                  </section>
-                ))}
+                      {group.map((entry) => (
+                        (() => {
+                          const RowComponent = entry.specializedDictionaryId === 0
+                            ? DictionaryResultRow
+                            : SpecializedDictionaryResultRow;
+
+                          return (
+                            <RowComponent
+                              key={entry.id}
+                              entry={entry}
+                              isSelected={selectedRowId === entry.id}
+                              selectMode={selectMode}
+                              selectedIds={selectedIds}
+                              isAllDictionaries={isAllDictionaries}
+                              onToggleSelect={(id) => {
+                                setSelectedIds((prev) =>
+                                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                                );
+                              }}
+                              onOpen={openEditModal}
+                            />
+                          );
+                        })()
+                      ))}
+                    </section>
+                  ))}
               </div>
             ) : (
               <div className="p-12 text-center">
@@ -730,6 +943,61 @@ export default function SearchDictionaryPage() {
       />
       {/* --- End new EditEntryModal component --- */}
       <style jsx global>{`
+        /* Thai alphabet toolbar */
+        .alphabet-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          justify-content: center;
+          margin: 6px 0 12px;
+        }
+        .alpha-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 9999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #dcdcdc;
+          background: #fff;
+          cursor: pointer;
+          font-weight: 800;
+          line-height: 1;
+          transition: background .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .alpha-btn:hover { background: #fafafa; }
+        .alpha-btn.is-active {
+          background: color-mix(in oklab, var(--dict-color) 12%, #fff);
+          border-color: var(--dict-color);
+          color: var(--dict-color);
+          box-shadow: 0 0 0 3px color-mix(in oklab, var(--dict-color) 22%, transparent);
+        }
+        /* === Layout tweaks for dictionaryId === 0 rows === */
+        .entry-row--dict .dict-row-grid {
+          display: grid;
+          grid-template-columns: max-content 1fr;
+          column-gap: 36px;
+          align-items: baseline; /* keep definition baseline-aligned with the title */
+        }
+        .entry-row--dict .dict-row-def {
+          /* ensure definition text flows nicely */
+          min-width: 0;
+        }
+        /* Space meta about ~2 lines below the content and right aligned */
+        .entry-row .row-meta {
+          margin-top: 2em; /* about two lines */
+          text-align: right;
+        }
+        /* Stack columns on small screens */
+        @media (max-width: 640px) {
+          .entry-row--dict .dict-row-grid {
+            grid-template-columns: 1fr;
+            row-gap: 4px;
+          }
+          .entry-row--dict .dict-row-def {
+            margin-left: 30px; /* align with hanging indent */
+          }
+        }
         /* Dictionary color templates */
         .dict-theme-0 { --dict-color: #0a4376; }
         .dict-theme-3 { --dict-color: #B3186D; }
@@ -953,6 +1221,111 @@ export default function SearchDictionaryPage() {
         @media (max-width: 1024px) {
           .reader-aside { display: none; }
         }
+        /* ===== Modal (Edit) – blur overlay & polished card ===== */
+        :root {
+          --modal-overlay-base: rgba(255,255,255,0.35);
+          --modal-overlay-tint: color-mix(in oklab, var(--dict-color, #0a4376) 10%, rgba(12,18,14,0.12));
+        }
+        /* Overlay/Backdrop: replace dark overlay with a subtle blur + tint */
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: grid;
+          place-items: center;
+          padding: clamp(12px, 3vw, 28px);
+          background:
+            radial-gradient(1200px 800px at 10% -10%, rgba(255,255,255,0.45), transparent 55%),
+            radial-gradient(1200px 800px at 110% 30%, rgba(255,255,255,0.35), transparent 55%),
+            var(--modal-overlay-base);
+          backdrop-filter: blur(5px) saturate(1.15);
+          -webkit-backdrop-filter: blur(5px) saturate(1.15);
+        }
+        /* Force-override any inline black overlay some implementations add */
+        .modal-backdrop[style] { background: var(--modal-overlay-base) !important; }
+
+        /* Modal panel: clean card look */
+        .modal {
+          width: min(880px, 96vw);
+          max-height: min(86svh, 860px);
+          overflow: auto;
+          border-radius: 14px;
+          border: 1px solid #e6e6e6;
+          background: #ffffff;
+          box-shadow: 0 24px 64px rgba(0,0,0,.12), 0 6px 18px rgba(0,0,0,.08);
+        }
+        .modal__header {
+          position: sticky; top: 0;
+          display: flex; align-items: center; gap: 10px;
+          padding: 12px 14px;
+          background: linear-gradient(180deg, #fbfbfb, #f6f7f9);
+          border-bottom: 1px solid #ececec;
+          z-index: 1;
+        }
+        .modal__title { font-weight: 800; font-size: 1rem; color: #0f172a; }
+        .modal__body { padding: 16px; }
+        .modal__footer {
+          position: sticky; bottom: 0;
+          display: flex; justify-content: flex-end; gap: 8px;
+          padding: 12px 14px;
+          background: #fafafa;
+          border-top: 1px solid #ececec;
+        }
+        /* Icon button used inside header */
+        .btn-icon {
+          width: 32px; height: 32px;
+          display: inline-flex; align-items: center; justify-content: center;
+          border-radius: 8px; border: 1px solid #dcdcdc; background: #fafafa;
+        }
+        .btn-icon:hover { background: #f3f3f3; }
+      /* Popular queries under search bar */
+      .popular-queries {
+        max-width: 840px;
+        margin: -4px auto 10px;
+        padding: 0 4px;
+      }
+      .popular-queries .popular-title {
+        font-size: .9rem;
+        color: #6b7280;
+        margin: 2px 6px 6px;
+        font-weight: 700;
+      }
+      .popular-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .popular-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #e5e7eb;
+        background: #fff;
+        border-radius: 9999px;
+        padding: 6px 10px;
+        font-size: .9rem;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+      }
+      .popular-chip:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        box-shadow: 0 0 0 3px color-mix(in oklab, var(--dict-color) 18%, transparent);
+      }
+      .popular-chip__text { font-weight: 700; }
+      .popular-chip__count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        font-variant-numeric: tabular-nums;
+        border-radius: 9999px;
+        background: color-mix(in oklab, var(--dict-color) 12%, #f1f5f9);
+        color: var(--dict-color);
+        border: 1px solid color-mix(in oklab, var(--dict-color) 30%, #e5e7eb);
+      }
       `}</style>
     </div>
   );

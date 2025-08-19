@@ -195,7 +195,10 @@ export default function EditEntryModal({ isOpen, onClose, entry, onUpdateSuccess
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-60" />
+          <div
+            className="fixed inset-0 bg-white/30 backdrop-blur-md"
+            style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+          />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
