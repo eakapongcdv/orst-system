@@ -576,11 +576,18 @@ export default function SearchTransliterationPage() {
     
         {editOpen && editRow && (
           <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="แก้ไขคำทับศัพท์">
-            <div className="modal">
+            <div className="modal modal--lg">
               <div className="modal__header">
-                <h3 className="modal__title">แก้ไขข้อมูลคำทับศัพท์ (ID: {editRow.id})</h3>
-                {/* Version dropdown */}
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="modal__titles">
+                  <h3 className="modal__title">แก้ไขคำทับศัพท์</h3>
+                  <p className="modal__subtitle">
+                    ID: {editRow.id}
+                    {editRow.language ? <><span className="dot">•</span>ภาษา{editRow.language}</> : null}
+                    {editRow.wordType ? <><span className="dot">•</span>{editRow.wordType}</> : null}
+                  </p>
+                </div>
+
+                <div className="modal__actions">
                   <label className="form-label" htmlFor="versionSelect">เวอร์ชัน</label>
                   <select
                     id="versionSelect"
@@ -607,11 +614,16 @@ export default function SearchTransliterationPage() {
                         </option>
                       );
                     })}
-                    </select>
-                  <button className="btn-icon" aria-label="ปิด" onClick={closeEdit}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/></svg>
-                </button>
+                  </select>
+
+                  <button className="btn-icon btn-icon--ghost" aria-label="ปิด" onClick={closeEdit}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
+
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -643,62 +655,88 @@ export default function SearchTransliterationPage() {
                 }}
               >
                 <div className="modal__body">
-                  <div className="form-grid">
-                    <div>
-                      <label className="form-label">ภาษา</label>
-                      <input name="language" value={editForm.language} onChange={e=>setEditForm(p=>({...p, language:e.target.value}))} className="input" />
-                    </div>
-                    <div>
-                      <label className="form-label">ชนิดคำ/Word Type</label>
-                      <input name="wordType" value={editForm.wordType} onChange={e=>setEditForm(p=>({...p, wordType:e.target.value}))} className="input" />
-                    </div>
-                    <div>
-                      <label className="form-label">Romanization</label>
-                      <input name="romanization" value={editForm.romanization} onChange={e=>setEditForm(p=>({...p, romanization:e.target.value}))} className="input" />
-                    </div>
-                    <div>
-                      <label className="form-label">คำทับศัพท์ 1</label>
-                      <input name="transliteration1" value={editForm.transliteration1} onChange={e=>setEditForm(p=>({...p, transliteration1:e.target.value}))} className="input" />
-                    </div>
-                    <div>
-                      <label className="form-label">คำทับศัพท์ 2</label>
-                      <input name="transliteration2" value={editForm.transliteration2} onChange={e=>setEditForm(p=>({...p, transliteration2:e.target.value}))} className="input" />
-                    </div>
-                    <div>
-                      <label className="form-label">หมวดหมู่</label>
-                      <input name="category" value={editForm.category} onChange={e=>setEditForm(p=>({...p, category:e.target.value}))} className="input" />
-                    </div>
-
-                    <div>
-                      <label className="form-label">ต้นฉบับ (สคริปต์ 1)</label>
-                      <input name="originalScript1" value={editForm.originalScript1} onChange={e=>setEditForm(p=>({...p, originalScript1:e.target.value}))} className="input" />
-                    </div>
-                    <div>
-                      <label className="form-label">ต้นฉบับ (สคริปต์ 2)</label>
-                      <input name="originalScript2" value={editForm.originalScript2} onChange={e=>setEditForm(p=>({...p, originalScript2:e.target.value}))} className="input" />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="form-label">ความหมาย</label>
-                      <textarea name="meaning" value={editForm.meaning} onChange={e=>setEditForm(p=>({...p, meaning:e.target.value}))} className="textarea" />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="form-label">หมายเหตุ</label>
-                      <textarea name="notes" value={editForm.notes} onChange={e=>setEditForm(p=>({...p, notes:e.target.value}))} className="textarea" />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="form-label">เกณฑ์อ้างอิง (referenceCriteria)</label>
-                      <input name="referenceCriteria" value={editForm.referenceCriteria} onChange={e=>setEditForm(p=>({...p, referenceCriteria:e.target.value}))} className="input" />
+                  {/* Section: ภาษาและหมวดหมู่ */}
+                  <div className="form-section">
+                    <h4 className="form-section__title">ภาษาและหมวดหมู่</h4>
+                    <div className="form-grid">
+                      <div>
+                        <label className="form-label">ภาษา</label>
+                        <input name="language" value={editForm.language} onChange={e=>setEditForm(p=>({...p, language:e.target.value}))} className="input" />
+                      </div>
+                      <div>
+                        <label className="form-label">ชนิดคำ (Word Type)</label>
+                        <input name="wordType" value={editForm.wordType} onChange={e=>setEditForm(p=>({...p, wordType:e.target.value}))} className="input" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="form-label">หมวดหมู่</label>
+                        <input name="category" value={editForm.category} onChange={e=>setEditForm(p=>({...p, category:e.target.value}))} className="input" />
+                      </div>
                     </div>
                   </div>
+
+                  {/* Section: การทับศัพท์ */}
+                  <div className="form-section">
+                    <h4 className="form-section__title">การทับศัพท์</h4>
+                    <div className="form-grid">
+                      <div>
+                        <label className="form-label">Romanization</label>
+                        <input name="romanization" value={editForm.romanization} onChange={e=>setEditForm(p=>({...p, romanization:e.target.value}))} className="input" />
+                      </div>
+                      <div>
+                        <label className="form-label">คำทับศัพท์ 1</label>
+                        <input name="transliteration1" value={editForm.transliteration1} onChange={e=>setEditForm(p=>({...p, transliteration1:e.target.value}))} className="input" />
+                      </div>
+                      <div>
+                        <label className="form-label">คำทับศัพท์ 2</label>
+                        <input name="transliteration2" value={editForm.transliteration2} onChange={e=>setEditForm(p=>({...p, transliteration2:e.target.value}))} className="input" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="form-label">เกณฑ์อ้างอิง (referenceCriteria)</label>
+                        <input name="referenceCriteria" value={editForm.referenceCriteria} onChange={e=>setEditForm(p=>({...p, referenceCriteria:e.target.value}))} className="input" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section: ต้นฉบับ (สคริปต์) */}
+                  <div className="form-section">
+                    <h4 className="form-section__title">ต้นฉบับ (สคริปต์)</h4>
+                    <div className="form-grid">
+                      <div>
+                        <label className="form-label">ต้นฉบับ (สคริปต์ 1)</label>
+                        <input name="originalScript1" value={editForm.originalScript1} onChange={e=>setEditForm(p=>({...p, originalScript1:e.target.value}))} className="input" />
+                      </div>
+                      <div>
+                        <label className="form-label">ต้นฉบับ (สคริปต์ 2)</label>
+                        <input name="originalScript2" value={editForm.originalScript2} onChange={e=>setEditForm(p=>({...p, originalScript2:e.target.value}))} className="input" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section: รายละเอียด */}
+                  <div className="form-section">
+                    <h4 className="form-section__title">รายละเอียด</h4>
+                    <div className="form-grid">
+                      <div className="col-span-2">
+                        <label className="form-label">ความหมาย</label>
+                        <textarea name="meaning" value={editForm.meaning} onChange={e=>setEditForm(p=>({...p, meaning:e.target.value}))} className="textarea" rows={2} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="form-label">หมายเหตุ</label>
+                        <textarea name="notes" value={editForm.notes} onChange={e=>setEditForm(p=>({...p, notes:e.target.value}))} className="textarea" rows={2} />
+                      </div>
+                    </div>
+                  </div>
+
                   {saveError && <p className="mt-3 text-red-600">{saveError}</p>}
                 </div>
+
                 <div className="modal__footer">
+                  <button type="button" className="btn-secondary" onClick={closeEdit}>ยกเลิก</button>
                   <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชันใหม่'}</button>
                 </div>
               </form>
             </div>
-          </div> </div>
+          </div>
         )}
           </section>
         </div>{/* end grid (aside + sheet) */}
@@ -748,6 +786,110 @@ export default function SearchTransliterationPage() {
           min-width: 42px;
           text-align: center;
           font-variant-numeric: tabular-nums;
+        }
+
+        /* ---- Modal enhanced styling ---- */
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(10, 67, 118, 0.35);
+          backdrop-filter: blur(2px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          z-index: 60;
+        }
+        .modal {
+          width: min(100%, 920px);
+          max-height: 90vh;
+          background: #fff;
+          border: 1px solid #e6e6e6;
+          border-radius: 16px;
+          box-shadow: 0 10px 30px rgba(0,0,0,.15);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .modal--lg { width: min(100%, 980px); }
+        .modal__header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 18px;
+          border-bottom: 1px solid #efefef;
+          background: linear-gradient(180deg, #fafafa, #fff);
+        }
+        .modal__titles {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .modal__title {
+          margin: 0;
+          font-size: 1.125rem;
+          font-weight: 800;
+          color: #0a4376;
+        }
+        .modal__subtitle {
+          margin: 0;
+          font-size: .85rem;
+          color: #667084;
+        }
+        .modal__subtitle .dot {
+          display: inline-block;
+          margin: 0 .5ch;
+          color: #c0c4cc;
+        }
+        .modal__actions {
+          margin-left: auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .btn-icon--ghost {
+          background: transparent !important;
+          border-color: transparent !important;
+        }
+        .modal__body {
+          padding: 16px 18px;
+          overflow: auto;
+          flex: 1;
+          background: #fff;
+        }
+        .modal__footer {
+          padding: 12px 18px;
+          border-top: 1px solid #efefef;
+          background: #fafafa;
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+
+        /* ---- Form sections ---- */
+        .form-section { 
+          margin-bottom: 18px; 
+          padding-bottom: 8px; 
+          border-bottom: 1px dashed #eee; 
+        }
+        .form-section__title {
+          margin: 0 0 10px 0;
+          font-weight: 700;
+          font-size: .95rem;
+          color: #0a4376;
+        }
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        .form-grid .col-span-2 { grid-column: 1 / -1; }
+        @media (min-width: 768px) {
+          .form-grid { grid-template-columns: 1fr 1fr; }
+        }
+        /* Compact inputs */
+        .input, .textarea, .select, .form-select {
+          width: 100%;
         }
       `}</style>
     </div>
