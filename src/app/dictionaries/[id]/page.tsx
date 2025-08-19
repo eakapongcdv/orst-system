@@ -8,25 +8,6 @@ import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import EditEntryModal from './components/EditEntryModal';
 // --- End Import modal component ---
 
-// Map language names to country codes for flags (if needed)
-const languageToCountryCode: Record<string, string> = {
-  'อาหรับ': 'SA',
-  'พม่า': 'MM',
-  'จีน': 'CN',
-  'อังกฤษ': 'GB',
-  'ฝรั่งเศส': 'FR',
-  'เยอรมัน': 'DE',
-  'ฮินดี': 'IN',
-  'อินโดนีเซีย': 'ID',
-  'อิตาลี': 'IT',
-  'ญี่ปุ่น': 'JP',
-  'เกาหลี': 'KR',
-  'มลายู': 'MY',
-  'รัสเซีย': 'RU',
-  'สเปน': 'ES',
-  'เวียดนาม': 'VN',
-};
-
 // Interface for DictionaryEntry results from the API
 interface DictionaryEntryResult {
   id: number;
@@ -393,11 +374,11 @@ export default function SearchDictionaryPage() {
               id="toc-search"
               type="search"
               className="aside-search"
-              placeholder="ค้นหาในสารบัญ…"
+              placeholder="ค้นหาในสารบัญ"
               value={sidebarQuery}
               onChange={(e) => setSidebarQuery(e.target.value)}
               autoComplete="off"
-              aria-label="ค้นหาในสารบัญคำศัพท์"
+              aria-label="ค้นหาในสารบัญ"
             />
             <button
               type="button"
@@ -476,7 +457,7 @@ export default function SearchDictionaryPage() {
             </ol>
           )}
         </nav>
-        <h2 className="text-3xl font-bold mb-4 text-center">
+        <h2 className="text-2xl font-bold mb-6 text-center">
           {isAllDictionaries
             ? 'ค้นหาคำศัพท์ทั้งหมด'
             : (dictLoading
@@ -490,7 +471,7 @@ export default function SearchDictionaryPage() {
           }
         </h2>
         <form onSubmit={handleSearch} className="mb-8">
-          <div className="flex items-center border border-gray-300 rounded-full px-4 py-3 shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow duration-200 ease-in-out max-w-3xl mx-auto">
+          <div className="flex items-center border border-gray-300 rounded-full px-4 py-1 shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow duration-200 ease-in-out max-w-3xl mx-auto">
             <div className="relative mr-2">
               <select
                 value={languageFilter}

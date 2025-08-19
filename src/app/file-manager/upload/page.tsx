@@ -385,7 +385,7 @@ export default function FileManagerUploadPage() {
                           className="h-20 w-20 object-cover rounded"
                         />
                       ) : (
-                        <div className="h-20 w-20 flex items-center justify-center text-3xl">
+                        <div className="h-20 w-20 flex items-center justify-center text-2xl">
                           {getFileIcon(file.type)}
                         </div>
                       )}

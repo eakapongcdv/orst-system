@@ -1,9 +1,10 @@
 // app/search-transliteration/page.tsx
 "use client";
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import * as FlagIcons from 'country-flag-icons/react/3x2';
-import type { ComponentType, SVGProps } from 'react';
+import type { ComponentType, SVGProps, ChangeEvent } from 'react';
 
 // === Types ===
 interface TransliterationSearchResult {
@@ -149,7 +150,7 @@ function ResultCard({ data, onEdit, anchorId }: { data: TransliterationSearchRes
   const handleOpen = () => onEdit(data);
 
   return (
-    <article id={anchorId} className="result-card mx-auto max-w-5xl" role="button" tabIndex={0}
+    <article id={anchorId} className="result-card w-full" role="button" tabIndex={0}
       onClick={handleOpen}
       onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handleOpen(); } }}>
       {/* หัวเรื่องพร้อมอัญประกาศ + (notes) ต่อท้าย */}
@@ -225,6 +226,9 @@ export default function SearchTransliterationPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // ==== Bottom toolbar (zoom) ====
+  const [zoom, setZoom] = useState(1);
+
   // ==== Sidebar (TOC) states ====
   const [tocQuery, setTocQuery] = useState("");
 
@@ -260,45 +264,10 @@ export default function SearchTransliterationPage() {
     else window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // Language dropdown state & ref
-  const [langOpen, setLangOpen] = useState(false);
-  const langRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     loadResults();
   }, []);
-
-  // Close lang panel on outside click
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (!langRef.current) return;
-      if (!langRef.current.contains(e.target as Node)) setLangOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
-
-  // Language options for dropdown
-  const LANG_OPTIONS: { value: string; label: string; code?: string }[] = [
-    { value: 'all', label: 'ทุกภาษา' },
-    { value: 'อาหรับ', label: 'ภาษาอาหรับ', code: 'SA' },
-    { value: 'พม่า', label: 'ภาษาพม่า', code: 'MM' },
-    { value: 'จีน', label: 'ภาษาจีน', code: 'CN' },
-    { value: 'อังกฤษ', label: 'ภาษาอังกฤษ', code: 'GB' },
-    { value: 'ฝรั่งเศส', label: 'ภาษาฝรั่งเศส', code: 'FR' },
-    { value: 'เยอรมัน', label: 'ภาษายูรมน', code: 'DE' },
-    { value: 'ฮินดี', label: 'ภาษาฮินดี', code: 'IN' },
-    { value: 'อินโดนีเซีย', label: 'ภาษาอินโดนีเซีย', code: 'ID' },
-    { value: 'อิตาลี', label: 'ภาษาอิตาลี', code: 'IT' },
-    { value: 'ญี่ปุ่น', label: 'ภาษาญี่ปุ่น', code: 'JP' },
-    { value: 'เกาหลี', label: 'ภาษาเกาหลี', code: 'KR' },
-    { value: 'มลายู', label: 'ภาษามลายู', code: 'MY' },
-    { value: 'รัสเซีย', label: 'ภาษารัสเซีย', code: 'RU' },
-    { value: 'สเปน', label: 'ภาษาสเปน', code: 'ES' },
-    { value: 'เวียดนาม', label: 'ภาษาเวียดนาม', code: 'VN' },
-  ];
 
   const fetchResults = async (page = 1, size: number = pageSize) => {
     setLoading(true);
@@ -340,6 +309,25 @@ export default function SearchTransliterationPage() {
     e.preventDefault();
     await loadResults(1);
   };
+
+  // --- Toolbar handlers (same behavior as dictionaries page) ---
+  const changePage = (p: number) => {
+    const cur = pagination?.currentPage ?? 1;
+    const max = pagination?.totalPages ?? 1;
+    const next = Math.min(Math.max(1, p), max);
+    if (next !== cur) {
+      loadResults(next, pageSize);
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
+    }
+  };
+  const handlePageSizeChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const size = parseInt(e.target.value, 10) || 10;
+    setPageSize(size);
+    loadResults(1, size);
+  };
+  const zoomOut = () => setZoom(z => Math.max(0.8, +(z - 0.1).toFixed(2)));
+  const zoomIn  = () => setZoom(z => Math.min(1.5, +(z + 0.1).toFixed(2)));
+  // --- End toolbar handlers ---
 
   // === Open modal & load versions ===
   const openEdit = async (row: TransliterationSearchResult) => {
@@ -397,12 +385,12 @@ export default function SearchTransliterationPage() {
         <meta charSet="UTF-8" />
         <title>ระบบฐานข้อมูลคำทับศัพท์ - สำนักงานราชบัณฑิตยสภา</title>
       </Head>
-      <main className="a4-container">
+      <main className="px-4 md:px-6 lg:px-8 py-6">
         <div id="top" />
         <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "16px", alignItems: "start" }}>
           {/* Left sidebar (TOC) - hidden on small screens via CSS */}
           <aside className="reader-aside">
-            <div className="aside-title">สารบัญ</div>
+            <div className="aside-title">สารบัญคำศัพท์</div>
             <div className="aside-actions">
               <input
                 className="aside-search"
@@ -426,97 +414,70 @@ export default function SearchTransliterationPage() {
           </aside>
 
           {/* Right column: A4 page content (with border like dictionaries page) */}
-          <section className="a4-page">
+          <section className="w-full bg-white/95 border border-border rounded-xl p-6 shadow-sm">
+          <div className="a4-zoom-wrap" style={{ ['--reader-zoom' as any]: zoom }}>
+          {/* Breadcrumb */}
+          <nav aria-label="breadcrumb" className="mb-4">
+            <ol className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <li>
+                <Link href="/dictionaries" className="hover:underline">คลังคำทับศัพท์</Link>
+              </li>
+              <li className="text-gray-300">•</li>
+              <li className="font-extrabold" style={{ color: 'var(--brand-gold)' }} aria-current="page">
+                ค้นหาคำทับศัพท์
+              </li>
+            </ol>
+          </nav>
           {/* Title */}
-          <h1 className="section-title text-center mb-6">ค้นหาคำทับศัพท์</h1>
-
-          {/* Search Bar – V layout (button | input | icons) */}
+          <h1 className="text-2xl font-bold mb-6 text-center">ค้นหาคำทับศัพท์</h1>
+          {/* Search Bar – rounded style */}
           <form onSubmit={handleSearch} className="mb-8" role="search" aria-label="ค้นหาคำทับศัพท์">
-            <div className="searchbar-v searchbar-v--tight searchbar-v--neo">
-              {/* Language button + panel */}
-              <div className="searchbar-v__lang" ref={langRef}>
-                <button
-                  type="button"
-                  className="lang-btn-v"
-                  aria-haspopup="listbox"
-                  aria-expanded={langOpen}
-                  onClick={() => setLangOpen(v => !v)}
+            <div className="flex items-center border border-gray-300 rounded-full px-4 py-1 shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow duration-200 ease-in-out max-w-3xl mx-auto">
+              <div className="relative mr-2">
+                <select
+                  value={languageFilter}
+                  onChange={(e) => setLanguageFilter(e.target.value)}
+                  className="bg-transparent border-none focus:ring-0 focus:outline-none text-md appearance-none pr-4 cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' strokeLinecap='round' strokeLinejoin='round' strokeWidth='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundSize: '16px 16px',
+                  }}
                 >
-                  {(() => {
-                    const active = LANG_OPTIONS.find(o => o.value === languageFilter);
-                    const code = active?.code;
-                    const ActiveFlag = code ? (FlagIcons as any)[code] : undefined;
-                    return (
-                      <>
-                        {ActiveFlag ? <ActiveFlag className="flag" aria-hidden="true" /> : <span className="flag" aria-hidden="true">🌐</span>}
-                        <span>{active?.label || 'ทุกภาษา'}</span>
-                        <svg className="caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z" clipRule="evenodd" />
-                        </svg>
-                      </>
-                    );
-                  })()}
-                </button>
-
-                {langOpen && (
-                  <div className="searchbar__panel" role="listbox" aria-label="เลือกภาษา">
-                    {LANG_OPTIONS.map(opt => {
-                      const code = opt.code;
-                      const OptFlag = code ? (FlagIcons as any)[code] : undefined;
-                      const active = languageFilter === opt.value;
-                      return (
-                        <div
-                          key={opt.value}
-                          role="option"
-                          aria-selected={active}
-                          className={`lang-option ${active ? 'is-active' : ''}`}
-                          onClick={() => { setLanguageFilter(opt.value); setLangOpen(false); }}
-                        >
-                          {OptFlag ? <OptFlag className="flag" aria-hidden="true" /> : <span className="flag" aria-hidden="true">🌐</span>}
-                          <span>{opt.label}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                  <option value="all">ทุกภาษา</option>
+                  <option value="อาหรับ">อาหรับ</option>
+                  <option value="พม่า">พม่า</option>
+                  <option value="จีน">จีน</option>
+                  <option value="อังกฤษ">อังกฤษ</option>
+                  <option value="ฝรั่งเศส">ฝรั่งเศส</option>
+                  <option value="เยอรมัน">เยอรมัน</option>
+                  <option value="ฮินดี">ฮินดี</option>
+                  <option value="อินโดนีเซีย">อินโดนีเซีย</option>
+                  <option value="อิตาลี">อิตาลี</option>
+                  <option value="ญี่ปุ่น">ญี่ปุ่น</option>
+                  <option value="เกาหลี">เกาหลี</option>
+                  <option value="มลายู">มลายู</option>
+                  <option value="รัสเซีย">รัสเซีย</option>
+                  <option value="สเปน">สเปน</option>
+                  <option value="เวียดนาม">เวียดนาม</option>
+                </select>
               </div>
-
-              {/* Input (wrapped so we can place clear icon inside without gaps) */}
-              <div className="searchbar-v__inputwrap">
-                <input
-                  ref={inputRef}
-                  id="search"
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="ระบุคำทับศัพท์"
-                  autoFocus
-                  autoComplete="off"
-                  aria-label="ช่องค้นหาคำทับศัพท์"
-                  className="searchbar-v__input"
-                />
-                {query && (
-                  <button
-                    type="button"
-                    aria-label="ล้างคำค้นหา"
-                    className="searchbar-v__clear"
-                    onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
-                      <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-
-              {/* Submit button as the last column (no internal gap) */}
+              <div className="h-6 border-l border-gray-300 mr-3"></div>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ระบุคำทับศัพท์"
+                className="flex-grow border-none focus:ring-0 focus:outline-none text-base"
+                aria-label="ช่องค้นหาคำทับศัพท์"
+              />
               <button
                 type="submit"
-                className="searchbar-v__submit"
+                className="ml-2 p-1 text-gray-500 hover:text-blue-500 focus:outline-none"
                 aria-label="ค้นหา"
-                disabled={!query.trim()}
               >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
                   <path fillRule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z" clipRule="evenodd" />
                 </svg>
               </button>
@@ -545,7 +506,7 @@ export default function SearchTransliterationPage() {
                 <span className="text-sm text-gray-600">{totalResults} รายการ • {pagination?.currentPage ?? 1}/{pagination?.totalPages ?? 1} หน้า</span>
               </div>
 
-              <section className="mx-auto max-w-5xl space-y-6">
+              <section className="w-full space-y-6">
                 {results.length === 0 ? (
                   <div className="brand-card p-6 text-center text-gray-600">ไม่พบผลการค้นหา</div>
                 ) : (
@@ -556,61 +517,62 @@ export default function SearchTransliterationPage() {
               </section>
 
               {/* Pagination */}
-              {pagination && pagination.totalPages > 1 && (
-                <nav className="pagination" role="navigation" aria-label="เลขหน้า">
-                  <button
-                    className="pagination__control"
-                    onClick={() => loadResults(pagination.prevPage || Math.max(1, (pagination.currentPage - 1)))}
-                    disabled={!pagination.hasPrevPage}
-                    aria-label="ก่อนหน้า"
-                  >
-                    ←
-                  </button>
-
-                  <ul className="pagination__list" role="list">
-                    {pageNumbers.map((p, idx) => (
-                      <li key={`${p}-${idx}`}>
-                        {p === '…' ? (
-                          <span className="pagination__ellipsis">…</span>
-                        ) : (
-                          <button
-                            onClick={() => loadResults(p as number)}
-                            className={`pagination__item ${p === pagination.currentPage ? 'is-active' : ''}`}
-                            aria-current={p === pagination.currentPage ? 'page' : undefined}
-                          >
-                            {p}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    className="pagination__control"
-                    onClick={() => loadResults(pagination.nextPage || Math.min(pagination.totalPages, (pagination.currentPage + 1)))}
-                    disabled={!pagination.hasNextPage}
-                    aria-label="ถัดไป"
-                  >
-                    →
-                  </button>
-
-                  <div className="pagination__size">
-                    <label htmlFor="pageSize">ต่อหน้า</label>
-                    <select
-                      id="pageSize"
-                      className="select"
-                      value={pageSize}
-                      onChange={(e) => { const s = parseInt(e.target.value, 10); setPageSize(s); loadResults(1, s); }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-                </nav>
-              )}
+              {/* Pagination replaced by bottom toolbar */}
             </section>
           )}
+          {/* Bottom Toolbar */}
+          </div>
+          <div className="a4-toolbar" role="toolbar" aria-label="เครื่องมือผลการค้นหา">
+            <div className="toolbar-section toolbar-section--left">
+              <button type="button" className="btn-icon" onClick={zoomOut} title="ย่อ (-)">
+                <span aria-hidden="true">−</span>
+              </button>
+              <span className="zoom-value">{Math.round(zoom * 100)}%</span>
+              <button type="button" className="btn-icon" onClick={zoomIn} title="ขยาย (+)">
+                <span aria-hidden="true">+</span>
+              </button>
+            </div>
+
+            <div className="toolbar-section toolbar-section--pager">
+              <button
+                type="button"
+                className="btn-secondary btn--sm"
+                onClick={() => changePage((pagination?.currentPage ?? 1) - 1)}
+                disabled={!pagination?.hasPrevPage}
+                title="หน้าก่อนหน้า"
+              >
+                ก่อนหน้า
+              </button>
+              <span className="mx-2 text-sm text-gray-600">
+                หน้า {pagination?.currentPage ?? 1} / {pagination?.totalPages ?? '—'}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary btn--sm"
+                onClick={() => changePage((pagination?.currentPage ?? 1) + 1)}
+                disabled={!pagination?.hasNextPage}
+                title="หน้าถัดไป"
+              >
+                ถัดไป
+              </button>
+            </div>
+
+            <div className="toolbar-section toolbar-section--right">
+              <label className="ml-4 text-sm text-gray-700">
+                แสดงต่อหน้า
+                <select
+                  className="ml-2 form-select form-select--sm"
+                  value={pageSize}
+                  onChange={handlePageSizeChange}
+                  aria-label="จำนวนรายการต่อหน้า"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+            </div>
+          </div>
     
         {editOpen && editRow && (
           <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="แก้ไขคำทับศัพท์">
@@ -736,11 +698,58 @@ export default function SearchTransliterationPage() {
                 </div>
               </form>
             </div>
-          </div>
+          </div> </div>
         )}
           </section>
         </div>{/* end grid (aside + sheet) */}
       </main>
+      <style jsx global>{`
+        .a4-zoom-wrap {
+          transform: scale(var(--reader-zoom, 1));
+          transform-origin: top center;
+          transition: transform 160ms ease;
+        }
+        .a4-toolbar {
+          position: sticky;
+          bottom: 0;
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          margin-top: 10px;
+          background: #fff;
+          border-top: 1px solid #e6e6e6;
+          border-radius: 0 0 12px 12px;
+          box-shadow: 0 -2px 8px rgba(0,0,0,0.03);
+        }
+        .a4-toolbar .toolbar-section {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .a4-toolbar .toolbar-section--left { justify-self: start; }
+        .a4-toolbar .toolbar-section--pager { justify-self: center; }
+        .a4-toolbar .toolbar-section--right { justify-self: end; }
+        .a4-toolbar .btn-icon {
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #dcdcdc;
+          border-radius: 8px;
+          background: #fafafa;
+          cursor: pointer;
+        }
+        .a4-toolbar .btn-icon:hover { background: #f3f3f3; }
+        .a4-toolbar .zoom-value {
+          min-width: 42px;
+          text-align: center;
+          font-variant-numeric: tabular-nums;
+        }
+      `}</style>
     </div>
   );
 }

@@ -893,7 +893,7 @@ nav[aria-label="พจนานุกรม"]{
 /* Result card (match sample image) */
 .result-card{ background:#fff; border:1px solid var(--brand-border); border-radius:16px; box-shadow: var(--shadow-elev-1); padding:1.25rem; }
 .result-card__title{
-  font-size: clamp(1.4rem, 1.2rem + 1.4vw, 1.5rem); font-weight:900; line-height:1.15; color:#111827; margin-bottom:1rem;
+  font-size: clamp(1.2rem, 1.2rem + 1.2vw, 1.2rem); font-weight:900; line-height:1.15; color:#111827; margin-bottom:1rem;
 }
 .result-card__title::before{ content: "\201C"; margin-right:.25rem; color:#111; }
 .result-card__title::after{ content: "\201D"; margin-left:.1rem; color:#111; }

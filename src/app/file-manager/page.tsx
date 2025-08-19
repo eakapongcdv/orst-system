@@ -859,7 +859,7 @@ export default function FileManagerPage() {
                           className="block w-full h-full focus:outline-none"
                         >
                           <div className="flex items-center p-4">
-                            <div className={`flex-shrink-0 flex items-center justify-center h-16 w-16 text-3xl rounded-lg ${iconInfo.bgColor} ${iconInfo.color}`}>
+                            <div className={`flex-shrink-0 flex items-center justify-center h-16 w-16 text-2xl rounded-lg ${iconInfo.bgColor} ${iconInfo.color}`}>
                               {iconInfo.icon}
                             </div>
                             <div className="ml-4">
@@ -890,7 +890,7 @@ export default function FileManagerPage() {
                             </div>
                           ) : (
                             <div className="flex items-center p-4">
-                              <div className={`flex-shrink-0 flex items-center justify-center h-16 w-16 text-3xl rounded-lg ${iconInfo.bgColor} ${iconInfo.color}`}>
+                              <div className={`flex-shrink-0 flex items-center justify-center h-16 w-16 text-2xl rounded-lg ${iconInfo.bgColor} ${iconInfo.color}`}>
                                 {iconInfo.icon}
                               </div>
                               <div className="ml-4">
