@@ -124,28 +124,6 @@ export default function ClientLayout({
                 )}
               </div>
             </div>
-            {isAuthenticated && (
-              <div className="py-2">
-                <nav aria-label="พจนานุกรม" className="flex flex-wrap gap-2 justify-center">
-                  <Link
-                    href="/dictionaries"
-                    aria-current={dictActive ? 'page' : undefined}
-                    className={`${dictActive ? 'btn-primary' : 'btn-secondary'} btn--sm`}
-                  >
-                    <BookOpenIcon className="h-5 w-5" aria-hidden="true" />
-                    พจนานุกรมเฉพาะสาขา
-                  </Link>
-                  <Link
-                    href="/search-transliteration"
-                    aria-current={translitActive ? 'page' : undefined}
-                    className={`${translitActive ? 'btn-primary' : 'btn-secondary'} btn--sm`}
-                  >
-                    <LanguageIcon className="h-5 w-5" aria-hidden="true" />
-                    คำทับศัพท์
-                  </Link>
-                </nav>
-              </div>
-            )}
           </div>
         </header>
       )}

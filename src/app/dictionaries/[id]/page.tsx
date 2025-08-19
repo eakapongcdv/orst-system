@@ -1,6 +1,6 @@
-// app/dictionaries/[id]/page.tsx (Updated version)
+// app/dictionaries/[id]/page.tsx
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
@@ -163,6 +163,13 @@ export default function SearchDictionaryPage() {
   const [dictionaryDetails, setDictionaryDetails] = useState<SpecializedDictionaryDetails | null>(null);
   const [dictLoading, setDictLoading] = useState(false);
   const [dictError, setDictError] = useState<string | null>(null);
+  // --- Paging / Zoom / Selection ---
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [zoom, setZoom] = useState(1);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // --- End Paging / Zoom / Selection ---
 
   // --- State for Selected Row ---
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
@@ -171,10 +178,55 @@ export default function SearchDictionaryPage() {
   // --- Modal State (Simplified) ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<DictionaryEntryResult | null>(null);
+  // --- Sidebar: สารบัญ/ค้นหา/เลื่อนบน ---
+  const [sidebarQuery, setSidebarQuery] = useState('');
+  
+  // จัดกลุ่มสารบัญ: ตัวอักษร ➜ คำแต่ละตัว
+  const sidebarGroups = useMemo(() => {
+    const map: Record<string, { id: number; label: string; anchor: string }[]> = {};
+    results.forEach((entry) => {
+      const letter = (entry.term_en?.[0] || entry.term_th?.[0] || '').toUpperCase() || '#';
+      const label = (entry.term_en || entry.term_th || '').trim();
+      if (!label) return;
+      if (!map[letter]) map[letter] = [];
+      map[letter].push({ id: entry.id, label, anchor: `entry-${entry.id}` });
+    });
+    Object.keys(map).forEach((k) => map[k].sort((a, b) => a.label.localeCompare(b.label, 'th')));
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([letter, items]) => ({ letter, items }));
+  }, [results]);
+
+  const filteredSidebarGroups = useMemo(() => {
+    const q = sidebarQuery.trim().toLowerCase();
+    if (!q) return sidebarGroups;
+    return sidebarGroups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((it) => it.label.toLowerCase().includes(q) || g.letter.toLowerCase().includes(q)),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [sidebarGroups, sidebarQuery]);
+  
+  // เลื่อนกลับด้านบน
+  const scrollPageTop = useCallback(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  }, []);
+  
+  // เลื่อนไปยังหัวข้อ (anchor) ที่เลือก
+  const scrollToAnchor = useCallback((anchorId: string) => {
+    const el = document.getElementById(anchorId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+  // --- End Sidebar ---
   // Removed editFormData, editorContent, saving, saveError, version states - managed by the modal component
   // --- End Simplified Modal State ---
 
-  const fetchResults = async (page = 1) => {
+  const fetchResults = async (pageArg = 1, sizeArg = pageSize) => {
     setLoading(true);
     setError(null);
     try {
@@ -188,7 +240,8 @@ export default function SearchDictionaryPage() {
       if (languageFilter !== 'all') {
         params.append('language', languageFilter);
       }
-      params.append('page', page.toString());
+      params.append('page', pageArg.toString());
+      params.append('pageSize', sizeArg.toString());
       const apiUrl = `/api/search-dictionary?${params.toString()}`;
       const response = await fetch(apiUrl);
       if (!response.ok) {
@@ -197,13 +250,15 @@ export default function SearchDictionaryPage() {
           const errorData = await response.json();
           errorMsg = errorData.error || errorMsg;
         } catch (e) {
-          // Ignore JSON parse error for error message
+          // ignore
         }
         throw new Error(errorMsg);
       }
       const data = await response.json();
       setResults(data.results || []);
       setPagination(data.pagination || null);
+      setPage(data.pagination?.page ?? pageArg);
+      setPageSize(data.pagination?.pageSize ?? sizeArg);
     } catch (err) {
       console.error("Search Dictionary error:", err);
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการค้นหาคำศัพท์ กรุณาลองใหม่อีกครั้ง');
@@ -213,6 +268,23 @@ export default function SearchDictionaryPage() {
       setLoading(false);
     }
   };
+  // --- Toolbar handlers ---
+  const changePage = (p: number) => {
+    if (!Number.isFinite(p) || p < 1) return;
+    const max = pagination?.totalPages ?? Number.POSITIVE_INFINITY;
+    const next = Math.min(p, max);
+    fetchResults(next, pageSize);
+    // Scroll top of the page
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
+  };
+  const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const size = parseInt(e.target.value, 10) || 10;
+    setPageSize(size);
+    fetchResults(1, size);
+  };
+  const zoomOut = () => setZoom(z => Math.max(0.8, +(z - 0.1).toFixed(2)));
+  const zoomIn  = () => setZoom(z => Math.min(1.5, +(z + 0.1).toFixed(2)));
+  // --- End Toolbar handlers ---
 
   const fetchDictionaryDetails = async () => {
     if (isAllDictionaries) {
@@ -249,7 +321,10 @@ export default function SearchDictionaryPage() {
     const newParams = new URLSearchParams();
     if (query.trim()) newParams.set('q', query.trim());
     if (languageFilter !== 'all') newParams.set('language', languageFilter);
+    newParams.set('pageSize', String(pageSize));
     router.push(`/dictionaries/${dictionaryId}?${newParams.toString()}`);
+    // Fetch immediately to reflect changes
+    fetchResults(1, pageSize);
   };
 
   // --- Simplified Modal Functions ---
@@ -287,7 +362,7 @@ export default function SearchDictionaryPage() {
   useEffect(() => {
     setQuery(initialQuery);
     setLanguageFilter(initialLanguageFilter);
-    fetchResults(1);
+    fetchResults(1, pageSize);
   }, [dictionaryIdParam, initialQuery, initialLanguageFilter]);
 
   useEffect(() => {
@@ -295,7 +370,7 @@ export default function SearchDictionaryPage() {
   }, [dictionaryId]);
 
   return (
-    <div className={`min-h-screen bg-gray-50 ${themeClass}`}>
+    <div className={`reader-stage reader-stage--full ${themeClass}`}>
       <Head>
         <meta charSet="UTF-8" />
         <title>
@@ -307,7 +382,59 @@ export default function SearchDictionaryPage() {
             } - ระบบฐานข้อมูลคำศัพท์
         </title>
       </Head>
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="a4-container">
+        {/* Sidebar: สารบัญเฉพาะหัวข้อ */}
+        <aside className="reader-aside" aria-label="สารบัญคำศัพท์ (เฉพาะหัวข้อ)">
+          <div className="aside-title">สารบัญคำศัพท์</div>
+
+          <div className="aside-actions">
+            <label htmlFor="toc-search" className="sr-only">ค้นหาในสารบัญ</label>
+            <input
+              id="toc-search"
+              type="search"
+              className="aside-search"
+              placeholder="ค้นหาในสารบัญ…"
+              value={sidebarQuery}
+              onChange={(e) => setSidebarQuery(e.target.value)}
+              autoComplete="off"
+              aria-label="ค้นหาในสารบัญคำศัพท์"
+            />
+            <button
+              type="button"
+              className="aside-top-btn"
+              onClick={scrollPageTop}
+              title="เลื่อนกลับด้านบน"
+              aria-label="เลื่อนกลับด้านบน"
+            >
+              ↑
+            </button>
+          </div>
+
+          <ul className="aside-list toc-groups">
+            {filteredSidebarGroups.map((group) => (
+              <li key={group.letter} className="toc-group">
+                <div className="toc-letter">{group.letter}</div>
+                <ul className="toc-items">
+                  {group.items.map((it) => (
+                    <li key={it.id} className="toc-item">
+                      <button
+                        type="button"
+                        className="aside-link toc-link"
+                        onClick={() => scrollToAnchor(it.anchor)}
+                        title={`ไปยังคำว่า ${it.label}`}
+                        aria-label={`ไปยังคำว่า ${it.label}`}
+                      >
+                        {it.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </aside>
+        <section className="a4-page">
+        <div className="a4-zoom-wrap" style={{ ['--reader-zoom' as any]: zoom }}>
         {/* Breadcrumb */}
         {/* Breadcrumb */}
         <nav aria-label="breadcrumb" className="mb-4">
@@ -434,7 +561,7 @@ export default function SearchDictionaryPage() {
                 )
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([letter, group]) => (
-                  <section key={letter} className="mb-8">
+                  <section key={letter} id={`section-${letter}`} className="mb-8">
                     <div className="flex items-center mb-2">
                       <span
                         className="font-bold dict-accent"
@@ -458,16 +585,32 @@ export default function SearchDictionaryPage() {
                     </div>
                     {group.map((entry) => (
                       <div
+                        id={`entry-${entry.id}`}
                         key={entry.id}
-                        // --- Apply base border and selected style ---
-                        className={`mb-4 p-3 rounded transition-colors duration-150 relative cursor-pointer
-                                   ${selectedRowId === entry.id
-                                      ? 'border-2 border-blue-500 bg-blue-50' // Selected style
-                                      : 'border border-transparent hover:border-gray-300' // Base + hover style
-                                   }`}
-                        // ---
-                        onClick={() => openEditModal(entry)} // Open modal on click
+                        className={`entry-row mb-4 p-3 rounded transition-colors duration-150 relative cursor-pointer
+                                   ${selectedRowId === entry.id ? 'border-2 border-blue-500 bg-blue-50' : 'border border-transparent hover:border-gray-300'}
+                                   ${selectMode ? 'has-select' : ''}`}
+                        onClick={() => {
+                          if (selectMode) {
+                            setSelectedIds(prev => prev.includes(entry.id) ? prev.filter(id => id !== entry.id) : [...prev, entry.id]);
+                          } else {
+                            openEditModal(entry);
+                          }
+                        }}
                       >
+                        {selectMode && (
+                          <input
+                            type="checkbox"
+                            className="select-checkbox"
+                            checked={selectedIds.includes(entry.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedIds(prev => e.target.checked ? Array.from(new Set([...prev, entry.id])) : prev.filter(id => id !== entry.id));
+                            }}
+                            aria-label="เลือกแถวนี้"
+                          />
+                        )}
                         {/* Breadcrumb for individual entry (if showing all dictionaries) */}
                         {isAllDictionaries && entry.SpecializedDictionary && (
                           <div className="text-xs text-gray-500 mb-1 text-right">
@@ -535,6 +678,66 @@ export default function SearchDictionaryPage() {
             <span className="block sm:inline">{error}</span>
           </div>
         )}
+        </div>
+        {/* Bottom Toolbar */}
+        <div className="a4-toolbar" role="toolbar" aria-label="เครื่องมือผลการค้นหา">
+          <div className="toolbar-section">
+            <button type="button" className="btn-icon" onClick={zoomOut} title="ย่อ (-)">
+              <span aria-hidden="true">−</span>
+            </button>
+            <span className="zoom-value">{Math.round(zoom * 100)}%</span>
+            <button type="button" className="btn-icon" onClick={zoomIn} title="ขยาย (+)">
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div className="toolbar-section">
+            <button
+              type="button"
+              className="btn-secondary btn--sm"
+              onClick={() => changePage((pagination?.page ?? page) - 1)}
+              disabled={(pagination?.page ?? page) <= 1}
+              title="หน้าก่อนหน้า"
+            >
+              ก่อนหน้า
+            </button>
+            <span className="mx-2 text-sm text-gray-600">
+              หน้า {pagination?.page ?? page} / {pagination?.totalPages ?? '—'}
+            </span>
+            <button
+              type="button"
+              className="btn-secondary btn--sm"
+              onClick={() => changePage((pagination?.page ?? page) + 1)}
+              disabled={pagination ? (pagination.page >= (pagination.totalPages ?? 1)) : false}
+              title="หน้าถัดไป"
+            >
+              ถัดไป
+            </button>
+            <label className="ml-4 text-sm text-gray-700">
+              แสดงต่อหน้า
+              <select
+                className="ml-2 form-select form-select--sm"
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                aria-label="จำนวนรายการต่อหน้า"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="toolbar-section">
+            <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectMode}
+                onChange={(e) => setSelectMode(e.target.checked)}
+              />
+              พร้อมเลือก
+            </label>
+          </div>
+        </div>
+        </section>
       </main>
 
       {/* --- Use the new EditEntryModal component --- */}
@@ -559,6 +762,215 @@ export default function SearchDictionaryPage() {
           background: color-mix(in oklab, var(--dict-color) 20%, #fff);
           padding: 0 .15em;
           border-radius: 2px;
+        }
+        /* --- A4 reader stage styles --- */
+        .reader-stage {
+          min-height: 100svh;
+          /* subtle textured stage behind the page */
+          background:
+            radial-gradient(1200px 600px at 10% -10%, rgba(255,255,255,0.45), transparent 60%),
+            radial-gradient(1200px 600px at 110% 30%, rgba(255,255,255,0.35), transparent 60%),
+            linear-gradient(180deg, #eef2f3 0%, #e6ebee 100%);
+          padding: clamp(12px, 3vw, 32px);
+        }
+        .a4-container {
+          max-width: 100%;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 260px 1fr;
+          align-items: start;
+          gap: clamp(12px, 2vw, 28px);
+        }
+        .a4-page {
+          background: #ffffff;
+          width: 100%;
+          max-width: none;
+          border-radius: 12px;
+          box-shadow:
+            0 12px 24px rgba(0,0,0,0.08),
+            0 2px 6px rgba(0,0,0,0.06);
+          padding: clamp(16px, 2.5vw, 32px);
+          border: 1px solid #e6e6e6;
+        }
+        /* Zoom wrapper for page content */
+        .a4-zoom-wrap {
+          transform: scale(var(--reader-zoom, 1));
+          transform-origin: top center;
+          transition: transform 160ms ease;
+        }
+
+        /* Sticky bottom toolbar inside the page */
+        .a4-toolbar {
+          position: sticky;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 10px 12px;
+          margin-top: 10px;
+          background: #fff;
+          border-top: 1px solid #e6e6e6;
+          border-radius: 0 0 12px 12px;
+          box-shadow: 0 -2px 8px rgba(0,0,0,0.03);
+        }
+        .a4-toolbar .toolbar-section {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .a4-toolbar .btn-icon {
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #dcdcdc;
+          border-radius: 8px;
+          background: #fafafa;
+        }
+        .a4-toolbar .btn-icon:hover { background: #f3f3f3; }
+        .a4-toolbar .zoom-value { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+
+        /* Selection checkbox inside rows */
+        .entry-row.has-select { padding-left: 2.25rem; }
+        .entry-row .select-checkbox {
+          position: absolute;
+          left: 0.5rem;
+          top: 0.75rem;
+          width: 18px;
+          height: 18px;
+        }
+        /* Tighter content rhythm inside the sheet */
+        .a4-page h2 { margin-top: 0.2rem; margin-bottom: 1rem; }
+        .a4-page nav[aria-label="breadcrumb"] { margin-bottom: 0.75rem; }
+        .a4-page form { margin-bottom: 1rem; }
+        .a4-page section { padding-bottom: 0.75rem; margin-bottom: 0.75rem; border-bottom: 1px dashed #e9edf0; }
+        .a4-page section:last-of-type { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+        /* Search bar fits the page edge-to-edge */
+        .a4-page form .flex {
+          border-radius: 9999px;
+          background: #fff;
+        }
+        /* Responsive fallback for smaller screens: use nearly full width */
+        @media (max-width: 1024px) {
+          .a4-container { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+          .a4-page { width: 100%; border-radius: 10px; padding: 14px; }
+        }
+        /* A11y utility */
+        .sr-only {
+          position: absolute !important;
+          width: 1px !important;
+          height: 1px !important;
+          padding: 0 !important;
+          margin: -1px !important;
+          overflow: hidden !important;
+          clip: rect(0, 0, 0, 0) !important;
+          white-space: nowrap !important;
+          border: 0 !important;
+        }
+
+        /* Sidebar (ซ้ายมือ) */
+        .reader-aside {
+          position: sticky;
+          top: 90px; /* ใต้ header */
+          align-self: flex-start;
+          width: 260px;
+          max-height: calc(100svh - 110px);
+          overflow: auto;
+          background: #ffffff;
+          border: 1px solid #e6e6e6;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,.04);
+          padding: 10px 10px 12px;
+        }
+        /* TOC nested list */
+        .toc-groups { list-style: none; margin: 0; padding: 0; }
+        .toc-group + .toc-group { margin-top: 6px; }
+        .toc-letter {
+          font-weight: 900;
+          color: var(--dict-color);
+          padding: 6px 8px;
+          margin: 4px 2px 4px;
+        }
+        .toc-items { list-style: none; margin: 0 0 6px 0; padding: 0 0 0 6px; }
+        .toc-item + .toc-item { margin-top: 2px; }
+        .toc-link { display:block; width:100%; text-align:left; padding:6px 8px; border-radius:8px; border:1px solid transparent; background:transparent; cursor:pointer; font-weight:700; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .toc-link:hover { background:#f9fafb; border-color:#eef2f4; }
+
+        .reader-aside .aside-title {
+          font-weight: 800;
+          margin: 4px 4px 10px;
+          color: var(--dict-color);
+        }
+
+        /* แผงค้นหา + ปุ่มกลับบน */
+        .reader-aside .aside-actions {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        .reader-aside .aside-search {
+          width: 100%;
+          height: 34px;
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 1px solid #e5e7eb;
+          font-size: .9rem;
+          outline: none;
+          background: #fff;
+        }
+        .reader-aside .aside-search:focus {
+          border-color: color-mix(in oklab, var(--dict-color) 35%, #e5e7eb);
+          box-shadow: 0 0 0 3px color-mix(in oklab, var(--dict-color) 20%, transparent);
+        }
+        .reader-aside .aside-top-btn {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          border: 1px solid #e5e7eb;
+          background: #fafafa;
+          cursor: pointer;
+          font-weight: 700;
+          line-height: 1;
+        }
+        .reader-aside .aside-top-btn:hover {
+          background: #f3f4f6;
+          border-color: #d1d5db;
+        }
+
+        /* รายการสารบัญ */
+        .reader-aside .aside-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+        .reader-aside .aside-list li + li {
+          margin-top: 4px;
+        }
+        .reader-aside .aside-link {
+          width: 100%;
+          text-align: left;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid transparent;
+          background: transparent;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .reader-aside .aside-link:hover {
+          background: #f9fafb;
+          border-color: #eef2f4;
+        }
+
+        /* ซ่อน sidebar บนจอเล็ก */
+        @media (max-width: 1024px) {
+          .reader-aside { display: none; }
         }
       `}</style>
     </div>

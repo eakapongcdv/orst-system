@@ -59,11 +59,12 @@ export async function GET(request: NextRequest) {
   }
   // --- End: Handle specializedDictionaryId filter ---
   const pageParam = searchParams.get('page');
-  const limitParam = searchParams.get('limit');
+  // Accept ?pageSize= (preferred) or legacy ?limit=
+  const pageSizeParam = searchParams.get('pageSize') ?? searchParams.get('limit');
 
   const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
-  const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam, 10))) : 10000;
-  const skip = (page - 1) * limit;
+  const pageSize = pageSizeParam ? Math.min(100, Math.max(1, parseInt(pageSizeParam, 10))) : 20;
+  const skip = (page - 1) * pageSize;
 
   const keywords = query?.trim() ? query.trim().split(/\s+/).filter(kw => kw.length > 0) : [];
 
@@ -89,12 +90,24 @@ export async function GET(request: NextRequest) {
 
   const isDefaultList = !(query?.trim() || (languageFilter && languageFilter.trim() !== 'all'));
 
+  // Build dynamic orderBy for stable grouping
+  let orderBy: any = undefined;
+  if (keywords.length === 0) {
+    if (languageFilter === 'th') {
+      orderBy = [{ term_th: 'asc' }, { term_en: 'asc' }];
+    } else if (languageFilter === 'en') {
+      orderBy = [{ term_en: 'asc' }, { term_th: 'asc' }];
+    } else {
+      orderBy = [{ term_th: 'asc' }, { term_en: 'asc' }];
+    }
+  }
+
   try {
     let results: any[] = await prisma.dictionaryEntry.findMany({
       where,
-      take: limit,
+      take: pageSize,
       skip,
-      orderBy: { term_en: 'asc' }, // sort พจนานุกรมไทย
+      orderBy: orderBy as any,
       // --- Include SpecializedDictionary info for the frontend when showing all dictionaries ---
       include: {
         // Only include parent dictionary info when not filtering by a specific specializedDictionaryId
@@ -136,13 +149,15 @@ export async function GET(request: NextRequest) {
       formattedUpdatedAt: entry.updated_at ? new Date(entry.updated_at).toISOString().split('T')[0] : null,
     }));
 
+    const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
     const responseBody = {
       results: processedResults,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalResults / limit),
+        page,
+        pageSize,
+        totalPages,
         totalResults,
-        hasNextPage: page < Math.ceil(totalResults / limit),
+        hasNextPage: page < totalPages,
         hasPrevPage: page > 1,
       },
       isDefaultList,

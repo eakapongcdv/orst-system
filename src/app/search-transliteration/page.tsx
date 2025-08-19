@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import * as FlagIcons from 'country-flag-icons/react/3x2';
+import type { ComponentType, SVGProps } from 'react';
 
 // === Types ===
 interface TransliterationSearchResult {
@@ -136,19 +137,19 @@ function formatThaiDate(input?: string | null): string {
 }
 
 // ★ ADD: การ์ดผลลัพธ์ (ใช้ class จาก globals.css: result-card, meta-chip ฯลฯ)
-function ResultCard({ data, onEdit }: { data: TransliterationSearchResult, onEdit: (row: TransliterationSearchResult) => void }) {
+function ResultCard({ data, onEdit, anchorId }: { data: TransliterationSearchResult, onEdit: (row: TransliterationSearchResult) => void, anchorId?: string }) {
   const title =
     (data.meaning || data.originalScript1 || data.originalScript2 || data.otherFoundWords || data.romanization || '').trim();
 
   const langLabel = data.language ? `ภาษา${data.language}` : '';
   const countryCode = data.language ? languageToCountryCode[data.language] : undefined;
-  const FlagSvg: React.ComponentType<React.SVGProps<SVGSVGElement>> | undefined =
+  const FlagSvg: ComponentType<SVGProps<SVGSVGElement>> | undefined =
     countryCode ? (FlagIcons as any)[countryCode] : undefined;
 
   const handleOpen = () => onEdit(data);
 
   return (
-    <article className="result-card mx-auto max-w-5xl" role="button" tabIndex={0}
+    <article id={anchorId} className="result-card mx-auto max-w-5xl" role="button" tabIndex={0}
       onClick={handleOpen}
       onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handleOpen(); } }}>
       {/* หัวเรื่องพร้อมอัญประกาศ + (notes) ต่อท้าย */}
@@ -223,6 +224,41 @@ export default function SearchTransliterationPage() {
   const [editForm, setEditForm] = useState<EditFormState>(mapFromEntry({}));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // ==== Sidebar (TOC) states ====
+  const [tocQuery, setTocQuery] = useState("");
+
+  // Build TOC items from results
+  const tocItems = useMemo(() => {
+    const strip = (html: string) => html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    return results.map((row) => {
+      const rawTitle = (row.meaning || row.originalScript1 || row.originalScript2 || row.otherFoundWords || row.romanization || "").trim();
+      const label = strip(rawTitle) || `ID ${row.id}`;
+      return { id: row.id, anchorId: `tl-${row.id}`, label };
+    });
+  }, [results]);
+
+  const filteredToc = useMemo(() => {
+    const q = tocQuery.trim();
+    if (!q) return tocItems;
+    try {
+      const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      return tocItems.filter((it) => re.test(it.label));
+    } catch {
+      return tocItems;
+    }
+  }, [tocItems, tocQuery]);
+
+  const scrollToAnchor = (aid: string) => {
+    const el = document.getElementById(aid);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const scrollToTop = () => {
+    const topEl = document.getElementById("top");
+    if (topEl) topEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -356,13 +392,41 @@ export default function SearchTransliterationPage() {
   const totalResults = pagination?.total ?? results.length;
 
   return (
-    <div className="a4-shell bg-brand-pattern-light">
+    <div className="reader-stage reader-stage--full">
       <Head>
         <meta charSet="UTF-8" />
         <title>ระบบฐานข้อมูลคำทับศัพท์ - สำนักงานราชบัณฑิตยสภา</title>
       </Head>
-      <main className="a4-container py-8">
-        <div className="a4-sheet">
+      <main className="a4-container">
+        <div id="top" />
+        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "16px", alignItems: "start" }}>
+          {/* Left sidebar (TOC) - hidden on small screens via CSS */}
+          <aside className="reader-aside">
+            <div className="aside-title">สารบัญ</div>
+            <div className="aside-actions">
+              <input
+                className="aside-search"
+                type="search"
+                placeholder="ค้นหาในสารบัญ"
+                value={tocQuery}
+                onChange={(e) => setTocQuery(e.target.value)}
+                aria-label="ค้นหาในสารบัญ"
+              />
+              <button type="button" className="aside-top-btn" title="เลื่อนกลับด้านบน" aria-label="เลื่อนกลับด้านบน" onClick={scrollToTop}>↑</button>
+            </div>
+            <ul className="aside-list">
+              {filteredToc.map((it) => (
+                <li key={it.anchorId}>
+                  <button type="button" className="aside-link" onClick={() => scrollToAnchor(it.anchorId)}>
+                    {it.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+
+          {/* Right column: A4 page content (with border like dictionaries page) */}
+          <section className="a4-page">
           {/* Title */}
           <h1 className="section-title text-center mb-6">ค้นหาคำทับศัพท์</h1>
 
@@ -485,7 +549,9 @@ export default function SearchTransliterationPage() {
                 {results.length === 0 ? (
                   <div className="brand-card p-6 text-center text-gray-600">ไม่พบผลการค้นหา</div>
                 ) : (
-                  results.map((row: TransliterationSearchResult) => <ResultCard key={row.id} data={row} onEdit={openEdit} />)
+                  results.map((row: TransliterationSearchResult) => (
+                    <ResultCard key={row.id} anchorId={`tl-${row.id}`} data={row} onEdit={openEdit} />
+                  ))
                 )}
               </section>
 
@@ -545,7 +611,7 @@ export default function SearchTransliterationPage() {
               )}
             </section>
           )}
-        {/* Modal for editing */}
+    
         {editOpen && editRow && (
           <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="แก้ไขคำทับศัพท์">
             <div className="modal">
@@ -579,9 +645,8 @@ export default function SearchTransliterationPage() {
                         </option>
                       );
                     })}
-                  </select>
-                </div>
-                <button className="btn-icon" aria-label="ปิด" onClick={closeEdit}>
+                    </select>
+                  <button className="btn-icon" aria-label="ปิด" onClick={closeEdit}>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/></svg>
                 </button>
               </div>
@@ -673,8 +738,9 @@ export default function SearchTransliterationPage() {
             </div>
           </div>
         )}
-      </div>
-    </main>
-  </div>
+          </section>
+        </div>{/* end grid (aside + sheet) */}
+      </main>
+    </div>
   );
 }

@@ -1181,3 +1181,106 @@ nav[aria-label="พจนานุกรม"]{
 .input, .textarea, .select{ width:100%; border:1px solid var(--brand-border); border-radius:10px; padding:.55rem .75rem; font-size:1rem; background:#fff; }
 .textarea{ min-height: 90px; }
 .input:focus, .textarea:focus, .select:focus{ outline:none; border-color: var(--brand-gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-gold) 20%, transparent); }
+
+
+        .sr-only {
+          position: absolute !important;
+          width: 1px !important;
+          height: 1px !important;
+          padding: 0 !important;
+          margin: -1px !important;
+          overflow: hidden !important;
+          clip: rect(0, 0, 0, 0) !important;
+          white-space: nowrap !important;
+          border: 0 !important;
+        }
+        
+        /* Sidebar (ซ้ายมือ) */
+        .reader-aside {
+          position: sticky;
+          top: 90px; /* ใต้ header */
+          align-self: flex-start;
+          width: 220px;
+          max-height: calc(100svh - 110px);
+          overflow: auto;
+          background: #ffffff;
+          border: 1px solid #e6e6e6;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,.04);
+          padding: 10px 10px 12px;
+        }
+        
+        .reader-aside .aside-title {
+          font-weight: 800;
+          margin: 4px 4px 10px;
+          color: var(--dict-color);
+        }
+        
+        /* แผงค้นหา + ปุ่มกลับบน */
+        .reader-aside .aside-actions {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        .reader-aside .aside-search {
+          width: 100%;
+          height: 34px;
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 1px solid #e5e7eb;
+          font-size: .9rem;
+          outline: none;
+          background: #fff;
+        }
+        .reader-aside .aside-search:focus {
+          border-color: color-mix(in oklab, var(--dict-color) 35%, #e5e7eb);
+          box-shadow: 0 0 0 3px color-mix(in oklab, var(--dict-color) 20%, transparent);
+        }
+        .reader-aside .aside-top-btn {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          border: 1px solid #e5e7eb;
+          background: #fafafa;
+          cursor: pointer;
+          font-weight: 700;
+          line-height: 1;
+        }
+        .reader-aside .aside-top-btn:hover {
+          background: #f3f4f6;
+          border-color: #d1d5db;
+        }
+        
+        /* รายการสารบัญ */
+        .reader-aside .aside-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+        .reader-aside .aside-list li + li {
+          margin-top: 4px;
+        }
+        .reader-aside .aside-link {
+          width: 100%;
+          text-align: left;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid transparent;
+          background: transparent;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .reader-aside .aside-link:hover {
+          background: #f9fafb;
+          border-color: #eef2f4;
+        }
+        
+        /* ซ่อน sidebar บนจอเล็ก */
+        @media (max-width: 1024px) {
+          .reader-aside { display: none; }
+        }
+/* ===== Full-screen reader helper ===== */
+.reader-stage--full .a4-page{ width:100% !important; max-width:none !important; }
+.reader-stage--full .a4-container{ max-width:100% !important; }
