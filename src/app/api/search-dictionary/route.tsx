@@ -31,6 +31,11 @@ function calculateRelevanceScore(text: string | null, keywords: string[]): numbe
   return score;
 }
 
+// Normalize query for uniqueness (lowercase, trim, collapse spaces)
+function normalizeQuery(q: string) {
+  return q.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q'); // keywords
@@ -101,6 +106,8 @@ export async function GET(request: NextRequest) {
       orderBy = [{ term_th: 'asc' }, { term_en: 'asc' }];
     }
   }
+  // Build include spec only when we need parent dictionary info (omit otherwise)
+  const includeSpec = dictionaryId === null ? { SpecializedDictionary: true } : undefined;
 
   try {
     let results: any[] = await prisma.dictionaryEntry.findMany({
@@ -108,12 +115,7 @@ export async function GET(request: NextRequest) {
       take: pageSize,
       skip,
       orderBy: orderBy as any,
-      // --- Include SpecializedDictionary info for the frontend when showing all dictionaries ---
-      include: {
-        // Only include parent dictionary info when not filtering by a specific specializedDictionaryId
-        SpecializedDictionary: dictionaryId === null
-      }
-      // --- End Include ---
+      include: includeSpec,
     });
 
     const totalResults = await prisma.dictionaryEntry.count({ where });
@@ -150,6 +152,49 @@ export async function GET(request: NextRequest) {
     }));
 
     const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
+
+    // --- Popular searches: upsert current query and fetch top for this dictionary ---
+    let popular: Array<{ queryOriginal: string; queryNormalized: string; count: number }> = [];
+    try {
+      if (dictionaryId !== null) {
+        if (query && query.trim() !== '') {
+          const norm = normalizeQuery(query);
+          await prisma.popularSearch.upsert({
+            where: {
+              specializedDictionaryId_queryNormalized: {
+                specializedDictionaryId: dictionaryId,
+                queryNormalized: norm,
+              },
+            },
+            update: {
+              count: { increment: 1 },
+              queryOriginal: query,
+              lastSearchedAt: new Date(),
+            },
+            create: {
+              specializedDictionaryId: dictionaryId,
+              queryNormalized: norm,
+              queryOriginal: query,
+              count: 1,
+              lastSearchedAt: new Date(),
+            },
+          });
+        }
+
+        // Fetch top N popular queries for this dictionary
+        const top = await prisma.popularSearch.findMany({
+          where: { specializedDictionaryId: dictionaryId },
+          orderBy: [{ count: 'desc' }, { lastSearchedAt: 'desc' }],
+          take: 12,
+          select: { queryOriginal: true, queryNormalized: true, count: true },
+        });
+        popular = top;
+      }
+    } catch (popErr) {
+      // Non-fatal: log and continue
+      console.warn('PopularSearch upsert/fetch warning:', popErr);
+    }
+
     const responseBody = {
       results: processedResults,
       pagination: {
@@ -163,6 +208,7 @@ export async function GET(request: NextRequest) {
       isDefaultList,
       query: query || null,
       languageFilter: languageFilter || null,
+      popular,
     };
 
     const response = NextResponse.json(responseBody);

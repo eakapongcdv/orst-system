@@ -46,6 +46,44 @@
 }
 /* --- End TH Sarabun New Font Definitions --- */
 
+/* --- TH Sarabun New Font Definitions --- */
+/* Regular */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Italic */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew\ Italic.ttf') format('truetype'); /* Note the escaped space */
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Bold */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew\ Bold.ttf') format('truetype'); /* Note the escaped space */
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold Italic */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew\ BoldItalic.ttf') format('truetype'); /* Note the escaped space */
+  font-weight: bold;
+  font-style: italic;
+  font-display: swap;
+}
+/* --- End TH Sarabun New Font Definitions --- */
+
 
 :root {
   --background: #ffffff;

@@ -380,6 +380,7 @@ model Taxonomy {
 }
 
 // หมวด 5: อักษรานุกรมภูมิศาสตร์ไทย
+
 model GazetteerEntry {
   id            Int      @id @default(autoincrement())
   place_name_th String // ชื่อสถานที่ (ไทย)
@@ -390,4 +391,24 @@ model GazetteerEntry {
   description   String? // รายละเอียด
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
+}
+
+/**
+ * Popular search queries per specializedDictionaryId
+ * - `queryNormalized` is a lowercased/trimmed version used for uniqueness.
+ * - We keep `queryOriginal` to display the exact text the user typed most recently.
+ */
+model PopularSearch {
+  id                       Int      @id @default(autoincrement())
+  specializedDictionaryId  Int
+  queryNormalized          String
+  queryOriginal            String
+  count                    Int      @default(1)
+  lastSearchedAt           DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([specializedDictionaryId, queryNormalized])
+  @@index([specializedDictionaryId, count])
+  @@index([lastSearchedAt])
 }
