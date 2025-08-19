@@ -43,6 +43,44 @@
 }
 /* --- End TH Sarabun New Font Definitions --- */
 
+/* --- TH Sarabun New Font Definitions --- */
+/* Regular */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Italic */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew\ Italic.ttf') format('truetype'); /* Note the escaped space */
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Bold */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew\ Bold.ttf') format('truetype'); /* Note the escaped space */
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold Italic */
+@font-face {
+  font-family: 'TH Sarabun PSK';
+  src: url('/fonts/THSarabunNew\ BoldItalic.ttf') format('truetype'); /* Note the escaped space */
+  font-weight: bold;
+  font-style: italic;
+  font-display: swap;
+}
+/* --- End TH Sarabun New Font Definitions --- */
+
 /* --- TH Sarabun New (alias family for CI) --- */
 /* Regular */
 @font-face {
@@ -99,7 +137,7 @@
   /* Typography */
   /* Base font scale */
   --base-font-size: 20px; /* default base size = 20px (1rem) */
-  --font-sans: 'TH Sarabun New', 'TH SarabunPSK', 'Leelawadee UI', 'Tahoma', sans-serif;
+  --font-sans: 'TH Sarabun New', 'TH SarabunPSK' ,'TH Sarabun PSK', 'Leelawadee UI', 'Tahoma', sans-serif;
 
   /* Radii & shadow */
   /* Leather cover palette */
@@ -1284,3 +1322,85 @@ nav[aria-label="พจนานุกรม"]{
 /* ===== Full-screen reader helper ===== */
 .reader-stage--full .a4-page{ width:100% !important; max-width:none !important; }
 .reader-stage--full .a4-container{ max-width:100% !important; }
+
+/* === Reader layout improvements (shared) === */
+.a4-container{
+  display: grid;
+  grid-template-columns: var(--aside-w, 260px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.reader-aside{
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  max-height: 100svh;
+  overflow: hidden;
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-elev-1);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+.reader-aside .aside-header{
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .6rem .75rem; border-bottom: 1px solid var(--brand-border);
+}
+.reader-aside .aside-title{ font-weight: 900; letter-spacing: .01em; }
+.reader-aside .aside-collapse-btn{
+  display:inline-grid; place-items:center; width:2rem; height:2rem;
+  border:1px solid var(--brand-border); border-radius:10px; background:#fff;
+}
+.reader-aside .aside-actions{
+  display:flex; align-items:center; gap:.5rem;
+  padding: .5rem .75rem; border-bottom:1px solid var(--brand-border);
+}
+.reader-aside .aside-search{
+  flex:1; min-width: 0; border:1px solid var(--brand-border);
+  border-radius:10px; padding:.4rem .6rem;
+}
+.reader-aside .aside-top-btn{
+  display:inline-grid; place-items:center; width:2rem; height:2rem;
+  border:1px solid var(--brand-border); border-radius:10px; background:#fff;
+}
+.reader-aside .aside-scroll{ overflow:auto; padding:.5rem .5rem 1rem; }
+.reader-aside .toc-group{ margin-bottom:.5rem; }
+.reader-aside .toc-letter{ font-weight:800; color:#111827; margin:.25rem .25rem; }
+.reader-aside .toc-items{ list-style:none; padding-left:.25rem; margin:0; }
+.reader-aside .toc-item{ margin:.1rem 0; }
+.reader-aside .aside-link{
+  display:block; width:100%; text-align:left; background:transparent; border:0; padding:.25rem .4rem; border-radius:8px;
+}
+.reader-aside .aside-link:hover{ background: color-mix(in srgb, var(--brand-gold) 10%, #fff); }
+
+.reader-aside.is-collapsed{ width: 56px; grid-template-rows: auto 0 1fr; }
+.reader-aside.is-collapsed .aside-title{ display:none; }
+.reader-aside.is-collapsed .aside-actions{ display:none; }
+.reader-aside.is-collapsed .aside-scroll{ padding:.5rem 0; }
+.reader-aside.is-collapsed .toc-letter{ text-align:center; }
+.reader-aside.is-collapsed .aside-link{ display:none; }
+
+/* scale font via --reader-font */
+.a4-page, .reader-aside { font-size: calc(1rem * var(--reader-font, 1)); }
+.a4-zoom-wrap{ transform: none !important; }
+
+/* Popular queries center */
+.popular-queries{
+  margin: .75rem auto 1rem;
+  text-align: center;
+}
+.popular-queries .popular-title{
+  font-weight: 800; margin-bottom: .35rem; color: var(--muted-ink);
+}
+.popular-queries .popular-chips{
+  display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center;
+}
+.popular-queries .popular-chip{
+  display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem;
+  border:1px solid var(--brand-border); border-radius:999px; background:#fff; box-shadow: var(--shadow-elev-1);
+}
+.popular-queries .popular-chip:hover{ background: color-mix(in srgb, var(--brand-gold) 12%, #fff); }
+.popular-queries .popular-chip .popular-chip__count{
+  display:inline-block; min-width:1.25rem; padding:.05rem .35rem; border-radius:999px; background: color-mix(in srgb, var(--brand-gold) 20%, #fff);
+}

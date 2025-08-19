@@ -89,7 +89,7 @@
   --background: #ffffff;
   --foreground: #171717;
   /* --- Override Tailwind's default sans font --- */
-  --font-sans: 'TH Sarabun New', /* Fallbacks */ 'Leelawadee UI', 'Tahoma', sans-serif;
+  --font-sans: 'TH Sarabun New', 'TH SarabunPSK' ,'TH Sarabun PSK', 'Leelawadee UI', sans-serif;
   /* --- End Override --- */
 }
 

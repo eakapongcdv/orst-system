@@ -226,11 +226,17 @@ export default function SearchTransliterationPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // ==== Bottom toolbar (zoom) ====
-  const [zoom, setZoom] = useState(1);
+  // ==== Bottom toolbar (font size) ====
+  const [fontScale, setFontScale] = useState(1);
 
   // ==== Sidebar (TOC) states ====
   const [tocQuery, setTocQuery] = useState("");
+
+  // ==== Sidebar toggle & font scale ====
+  const [asideOpen, setAsideOpen] = useState(true);
+
+  // Popular searches
+  const [popular, setPopular] = useState<{ term: string; count: number }[]>([]);
 
   // Build TOC items from results
   const tocItems = useMemo(() => {
@@ -265,8 +271,52 @@ export default function SearchTransliterationPage() {
   };
 
 
+  // --- Popular search helpers (API with localStorage fallback) ---
+  const POP_KEY = 'tl_popular_terms';
+  const readLocalPopular = (): Record<string, number> => {
+    try { return JSON.parse(localStorage.getItem(POP_KEY) || '{}'); } catch { return {}; }
+  };
+  const writeLocalPopular = (obj: Record<string, number>) => {
+    try { localStorage.setItem(POP_KEY, JSON.stringify(obj)); } catch {}
+  };
+  const loadPopular = async () => {
+    // Try API first
+    try {
+      const r = await fetch('/api/search-transliteration/popular', { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        const arr: { term: string; count: number }[] =
+          Array.isArray(j?.popular) ? j.popular :
+          Array.isArray(j) ? j :
+          [];
+        if (arr.length) { setPopular(arr.slice(0, 10)); return; }
+      }
+    } catch {}
+    // Fallback to local
+    const obj = readLocalPopular();
+    const arr = Object.entries(obj).map(([term, count]) => ({ term, count: Number(count) }))
+      .sort((a,b) => b.count - a.count)
+      .slice(0, 10);
+    setPopular(arr);
+  };
+  const trackSearch = async (term: string) => {
+    const q = term.trim();
+    if (!q) return;
+    try {
+      await fetch('/api/search-transliteration/popular', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term: q })
+      });
+    } catch {}
+    const obj = readLocalPopular();
+    obj[q] = (obj[q] || 0) + 1;
+    writeLocalPopular(obj);
+  };
+
   useEffect(() => {
     loadResults();
+    try { loadPopular(); } catch {}
   }, []);
 
   const fetchResults = async (page = 1, size: number = pageSize) => {
@@ -308,6 +358,8 @@ export default function SearchTransliterationPage() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     await loadResults(1);
+    trackSearch(query);
+    loadPopular();
   };
 
   // --- Toolbar handlers (same behavior as dictionaries page) ---
@@ -325,8 +377,9 @@ export default function SearchTransliterationPage() {
     setPageSize(size);
     loadResults(1, size);
   };
-  const zoomOut = () => setZoom(z => Math.max(0.8, +(z - 0.1).toFixed(2)));
-  const zoomIn  = () => setZoom(z => Math.min(1.5, +(z + 0.1).toFixed(2)));
+  const fontDown = () => setFontScale(s => Math.max(0.9, +(s - 0.1).toFixed(2)));
+  const fontUp   = () => setFontScale(s => Math.min(1.4, +(s + 0.1).toFixed(2)));
+  const fontReset = () => setFontScale(1);
   // --- End toolbar handlers ---
 
   // === Open modal & load versions ===
@@ -387,35 +440,55 @@ export default function SearchTransliterationPage() {
       </Head>
       <main className="px-4 md:px-6 lg:px-8 py-6">
         <div id="top" />
-        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "16px", alignItems: "start" }}>
+        <div
+          className="reader-layout"
+          style={{
+            ['--aside-w' as any]: asideOpen ? '260px' : '48px',
+            ['--reader-font-scale' as any]: fontScale,
+          }}
+        >
           {/* Left sidebar (TOC) - hidden on small screens via CSS */}
-          <aside className="reader-aside">
-            <div className="aside-title">สารบัญคำศัพท์</div>
-            <div className="aside-actions">
-              <input
-                className="aside-search"
-                type="search"
-                placeholder="ค้นหาในสารบัญ"
-                value={tocQuery}
-                onChange={(e) => setTocQuery(e.target.value)}
-                aria-label="ค้นหาในสารบัญ"
-              />
-              <button type="button" className="aside-top-btn" title="เลื่อนกลับด้านบน" aria-label="เลื่อนกลับด้านบน" onClick={scrollToTop}>↑</button>
+          <aside className={`reader-aside ${asideOpen ? 'is-open' : 'is-collapsed'}`}>
+            <div className="aside-header">
+              <div className="aside-title">สารบัญคำศัพท์</div>
+              <button
+                type="button"
+                className="aside-toggle"
+                aria-label={asideOpen ? 'พับแถบสารบัญ' : 'ขยายแถบสารบัญ'}
+                aria-expanded={asideOpen}
+                onClick={() => setAsideOpen(o => !o)}
+                title={asideOpen ? 'พับ' : 'ขยาย'}
+              >
+                {asideOpen ? '«' : '»'}
+              </button>
             </div>
-            <ul className="aside-list">
-              {filteredToc.map((it) => (
-                <li key={it.anchorId}>
-                  <button type="button" className="aside-link" onClick={() => scrollToAnchor(it.anchorId)}>
-                    {it.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="aside-body">
+              <div className="aside-actions">
+                <input
+                  className="aside-search"
+                  type="search"
+                  placeholder="ค้นหาในสารบัญ"
+                  value={tocQuery}
+                  onChange={(e) => setTocQuery(e.target.value)}
+                  aria-label="ค้นหาในสารบัญ"
+                />
+                <button type="button" className="aside-top-btn" title="เลื่อนกลับด้านบน" aria-label="เลื่อนกลับด้านบน" onClick={scrollToTop}>↑</button>
+              </div>
+              <ul className="aside-list">
+                {filteredToc.map((it) => (
+                  <li key={it.anchorId}>
+                    <button type="button" className="aside-link" onClick={() => scrollToAnchor(it.anchorId)}>
+                      {it.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </aside>
 
           {/* Right column: A4 page content (with border like dictionaries page) */}
           <section className="w-full bg-white/95 border border-border rounded-xl p-6 shadow-sm">
-          <div className="a4-zoom-wrap" style={{ ['--reader-zoom' as any]: zoom }}>
+          <div className="content-scale">
           {/* Breadcrumb */}
           <nav aria-label="breadcrumb" className="mb-4">
             <ol className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
@@ -483,6 +556,25 @@ export default function SearchTransliterationPage() {
               </button>
             </div>
           </form>
+          {/* Popular searches */}
+          {popular.length > 0 && (
+            <div className="popular-wrap">
+              <div className="popular-title">คำค้นหายอดนิยม</div>
+              <div className="popular-list">
+                {popular.map((p) => (
+                  <button
+                    key={p.term}
+                    type="button"
+                    className="popular-chip"
+                    onClick={() => { setQuery(p.term); loadResults(1); }}
+                    title={`${p.term} (${p.count})`}
+                  >
+                    {p.term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* State messages */}
           {loading && !error && (
@@ -523,45 +615,115 @@ export default function SearchTransliterationPage() {
           {/* Bottom Toolbar */}
           </div>
           <div className="a4-toolbar" role="toolbar" aria-label="เครื่องมือผลการค้นหา">
+            {/* Left: font size controls */}
             <div className="toolbar-section toolbar-section--left">
-              <button type="button" className="btn-icon" onClick={zoomOut} title="ย่อ (-)">
-                <span aria-hidden="true">−</span>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={fontDown}
+                title="ลดขนาดตัวอักษร"
+                aria-label="ลดขนาดตัวอักษร"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M5 12.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H5.75a.75.75 0 0 1-.75-.75z"></path>
+                </svg>
               </button>
-              <span className="zoom-value">{Math.round(zoom * 100)}%</span>
-              <button type="button" className="btn-icon" onClick={zoomIn} title="ขยาย (+)">
-                <span aria-hidden="true">+</span>
+
+              <span className="zoom-badge" aria-live="polite">{Math.round(fontScale * 100)}%</span>
+
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={fontUp}
+                title="เพิ่มขนาดตัวอักษร"
+                aria-label="เพิ่มขนาดตัวอักษร"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M11.25 5a.75.75 0 0 1 1.5 0v5.25H18a.75.75 0 0 1 0 1.5h-5.25V17a.75.75 0 0 1-1.5 0v-5.25H6a.75.75 0 0 1 0-1.5h5.25V5Z"></path>
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                className="btn-icon btn-icon--ghost"
+                onClick={fontReset}
+                title="รีเซ็ตขนาดตัวอักษร (100%)"
+                aria-label="รีเซ็ตขนาดตัวอักษร"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M12 4.5a7.5 7.5 0 1 0 6.59 11.13.75.75 0 1 1 1.29.74A9 9 0 1 1 12 3v1.5Zm0 0a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75v6a.75.75 0 0 1-1.5 0V5.56l-3.97 3.97a.75.75 0 1 1-1.06-1.06L16.19 4.5H12Z" clipRule="evenodd"/>
+                </svg>
               </button>
             </div>
 
+            {/* Middle: pager */}
             <div className="toolbar-section toolbar-section--pager">
               <button
                 type="button"
-                className="btn-secondary btn--sm"
+                className="btn-icon"
+                onClick={() => changePage(1)}
+                disabled={!pagination?.hasPrevPage}
+                title="หน้าแรก"
+                aria-label="หน้าแรก"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M16.47 12.53a.75.75 0 0 1 0-1.06l4.22-4.22a.75.75 0 0 1 1.28.53v8.44a.75.75 0 0 1-1.28.53l-4.22-4.22Z"></path>
+                  <path d="M11.47 12.53a.75.75 0 0 1 0-1.06l6.22-6.22a.75.75 0 0 1 1.28.53v12.38a.75.75 0 0 1-1.28.53l-6.22-6.22Z"></path>
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="btn-icon"
                 onClick={() => changePage((pagination?.currentPage ?? 1) - 1)}
                 disabled={!pagination?.hasPrevPage}
                 title="หน้าก่อนหน้า"
+                aria-label="หน้าก่อนหน้า"
               >
-                ก่อนหน้า
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M15.78 5.72a.75.75 0 0 1 0 1.06L10.56 12l5.22 5.22a.75.75 0 0 1-1.06 1.06l-5.75-5.75a.75.75 0 0 1 0-1.06l5.75-5.75a.75.75 0 0 1 1.06 0Z"></path>
+                </svg>
               </button>
-              <span className="mx-2 text-sm text-gray-600">
-                หน้า {pagination?.currentPage ?? 1} / {pagination?.totalPages ?? '—'}
+
+              <span className="page-indicator" aria-live="polite">
+                {pagination?.currentPage ?? 1} / {pagination?.totalPages ?? '—'}
               </span>
+
               <button
                 type="button"
-                className="btn-secondary btn--sm"
+                className="btn-icon"
                 onClick={() => changePage((pagination?.currentPage ?? 1) + 1)}
                 disabled={!pagination?.hasNextPage}
                 title="หน้าถัดไป"
+                aria-label="หน้าถัดไป"
               >
-                ถัดไป
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M8.22 18.28a.75.75 0 0 1 0-1.06L13.44 12 8.22 6.78a.75.75 0 1 1 1.06-1.06l5.75 5.75a.75.75 0 0 1 0 1.06l-5.75 5.75a.75.75 0 0 1-1.06 0Z"></path>
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => changePage(pagination?.totalPages || 1)}
+                disabled={!pagination?.hasNextPage}
+                title="หน้าสุดท้าย"
+                aria-label="หน้าสุดท้าย"
+              >
+                
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M7.53 11.47a.75.75 0 0 1 0 1.06l-4.22 4.22a.75.75 0 0 1-1.28-.53V7.78a.75.75 0 0 1 1.28-.53l4.22 4.22Z"></path>
+                  <path d="M12.53 11.47a.75.75 0 0 1 0 1.06l-6.22 6.22a.75.75 0 0 1-1.28-.53V5.78a.75.75 0 0 1 1.28-.53l6.22 6.22Z"></path>
+                </svg>
               </button>
             </div>
 
+            {/* Right: page size */}
             <div className="toolbar-section toolbar-section--right">
-              <label className="ml-4 text-sm text-gray-700">
-                แสดงต่อหน้า
+              <div className="select-wrap" title="จำนวนรายการต่อหน้า">
+                <svg className="select-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+                  <path d="M4 6.75A.75.75 0 0 1 4.75 6h14.5a.75.75 0 0 1 0 1.5H4.75A.75.75 0 0 1 4 6.75Zm0 5A.75.75 0 0 1 4.75 11h10.5a.75.75 0 0 1 0 1.5H4.75A.75.75 0 0 1 4 11.75Zm0 5A.75.75 0 0 1 4.75 16h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 4 16.75Z"></path>
+                </svg>
                 <select
-                  className="ml-2 form-select form-select--sm"
+                  className="select-compact"
                   value={pageSize}
                   onChange={handlePageSizeChange}
                   aria-label="จำนวนรายการต่อหน้า"
@@ -570,7 +732,7 @@ export default function SearchTransliterationPage() {
                   <option value={20}>20</option>
                   <option value={50}>50</option>
                 </select>
-              </label>
+              </div>
             </div>
           </div>
     
@@ -742,24 +904,92 @@ export default function SearchTransliterationPage() {
         </div>{/* end grid (aside + sheet) */}
       </main>
       <style jsx global>{`
-        .a4-zoom-wrap {
-          transform: scale(var(--reader-zoom, 1));
-          transform-origin: top center;
-          transition: transform 160ms ease;
+        .content-scale,
+        .reader-aside{
+          font-size: calc(1rem * var(--reader-font-scale, 1));
+          line-height: 1.6;
         }
+        .content-scale .result-card__title{ font-size: 1.15em; }
+        /* Responsive reader layout with collapsible aside */
+        .reader-layout{
+          display: grid;
+          grid-template-columns: var(--aside-w, 260px) 1fr;
+          gap: 16px;
+          align-items: start;
+        }
+        @media (max-width: 1024px){
+          .reader-layout{ grid-template-columns: 1fr; }
+          .reader-aside{ display: none; }
+        }
+        .reader-aside{
+          position: sticky;
+          top: 10px;
+          align-self: start;
+          height: calc(100vh - 20px);
+          border: 1px solid var(--brand-border);
+          border-radius: 12px;
+          background: #fff;
+          padding: 10px;
+          overflow: hidden;
+        }
+        .reader-aside .aside-header{
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 8px; margin-bottom: 8px;
+        }
+        .reader-aside .aside-title{ font-weight: 800; color: #0a4376; }
+        .reader-aside .aside-toggle{
+          width: 28px; height: 28px; border: 1px solid var(--brand-border);
+          border-radius: 8px; background: #fafafa; cursor: pointer;
+        }
+        .reader-aside .aside-actions{ display:flex; gap:8px; }
+        .reader-aside .aside-search{
+          flex:1; border:1px solid var(--brand-border); border-radius:10px; padding:.4rem .6rem;
+        }
+        .reader-aside .aside-top-btn{
+          width:32px; height:32px; border:1px solid var(--brand-border); border-radius:8px; background:#fff;
+        }
+        .reader-aside .aside-list{
+          margin-top:8px; overflow:auto; height: calc(100% - 84px); padding-right:4px;
+        }
+        .reader-aside .aside-link{
+          display:block; width:100%; text-align:left; padding:.35rem .5rem; border-radius:8px; border:1px solid transparent;
+        }
+        .reader-aside .aside-link:hover{ background:#f9fafb; border-color: var(--brand-border); }
+
+        .reader-aside.is-collapsed{ width: 48px !important; padding: 8px; }
+        .reader-aside.is-collapsed .aside-title,
+        .reader-aside.is-collapsed .aside-body{ display:none; }
+
+        /* Popular searches under search bar */
+        .popular-wrap{
+          display:flex; flex-direction:column; align-items:center; gap:.5rem;
+          margin-top:-.5rem; margin-bottom:1rem;
+        }
+        .popular-title{ font-size:.9rem; color: var(--muted-ink); font-weight:700; }
+        .popular-list{ display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; }
+        .popular-chip{
+          font-size: .9rem;
+          padding:.3rem .6rem; border-radius:999px; border:1px solid var(--brand-border);
+          background:#fff; box-shadow: 0 1px 0 rgba(0,0,0,.02); cursor:pointer;
+        }
+        .popular-chip:hover{ background: color-mix(in srgb, var(--brand-gold) 10%, #fff); }
         .a4-toolbar {
           position: sticky;
           bottom: 0;
+          z-index: 20;
           display: grid;
           grid-template-columns: 1fr auto 1fr;
           align-items: center;
           gap: 12px;
           padding: 10px 12px;
           margin-top: 10px;
-          background: #fff;
-          border-top: 1px solid #e6e6e6;
-          border-radius: 0 0 12px 12px;
-          box-shadow: 0 -2px 8px rgba(0,0,0,0.03);
+          background: color-mix(in srgb, #fff 86%, rgba(255,255,255,.35));
+          backdrop-filter: saturate(1.15) blur(8px);
+          -webkit-backdrop-filter: saturate(1.15) blur(8px);
+          border: 1px solid var(--brand-border);
+          border-top: 3px solid var(--brand-gold);
+          border-radius: 12px;
+          box-shadow: 0 -6px 18px rgba(0,0,0,0.06);
         }
         .a4-toolbar .toolbar-section {
           display: flex;
@@ -770,22 +1000,86 @@ export default function SearchTransliterationPage() {
         .a4-toolbar .toolbar-section--left { justify-self: start; }
         .a4-toolbar .toolbar-section--pager { justify-self: center; }
         .a4-toolbar .toolbar-section--right { justify-self: end; }
-        .a4-toolbar .btn-icon {
-          width: 32px;
-          height: 32px;
+
+        /* Icon button */
+        .a4-toolbar .btn-icon{
+          width: 36px;
+          height: 36px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid #dcdcdc;
-          border-radius: 8px;
-          background: #fafafa;
+          border: 1px solid color-mix(in srgb, var(--brand-gold) 35%, #dcdcdc);
+          border-radius: 10px;
+          background: linear-gradient(180deg, #ffffff, #f6f7f9);
+          box-shadow: 0 1px 0 rgba(255,255,255,.7), 0 1px 4px rgba(0,0,0,.06);
           cursor: pointer;
+          transition: transform .06s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+          color: #334155;
         }
-        .a4-toolbar .btn-icon:hover { background: #f3f3f3; }
-        .a4-toolbar .zoom-value {
-          min-width: 42px;
-          text-align: center;
+        .a4-toolbar .btn-icon:hover{
+          background: linear-gradient(180deg, #fffefd, #f0f4f8);
+          box-shadow: 0 2px 10px rgba(0,0,0,.08);
+          transform: translateY(-1px);
+          border-color: color-mix(in srgb, var(--brand-gold) 55%, #cfcfcf);
+        }
+        .a4-toolbar .btn-icon:active{ transform: translateY(0); }
+        .a4-toolbar .btn-icon[disabled],
+        .a4-toolbar .btn-icon[disabled]:hover{
+          opacity: .45;
+          cursor: default;
+          transform: none;
+          box-shadow: 0 1px 0 rgba(255,255,255,.6), 0 1px 3px rgba(0,0,0,.04);
+          background: #f5f5f5;
+        }
+        .a4-toolbar .btn-icon--ghost{
+          background: #ffffff;
+          border-color: #e6e6e6;
+        }
+        .a4-toolbar .btn-icon--ghost:hover{
+          background: #fafafa;
+          border-color: color-mix(in srgb, var(--brand-gold) 35%, #ddd);
+        }
+
+        /* Badges */
+        .a4-toolbar .zoom-badge,
+        .a4-toolbar .page-indicator{
+          min-width: 64px;
+          padding: .25rem .6rem;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--brand-gold) 10%, #fff);
+          border: 1px solid color-mix(in srgb, var(--brand-gold) 45%, transparent);
           font-variant-numeric: tabular-nums;
+          text-align: center;
+          font-weight: 800;
+          color: #334155;
+        }
+        .a4-toolbar .page-indicator{ min-width: 88px; }
+
+        /* Compact select with icon */
+        .a4-toolbar .select-wrap{
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 8px;
+          border: 1px solid color-mix(in srgb, var(--brand-gold) 35%, #dcdcdc);
+          border-radius: 999px;
+          background: #fff;
+          box-shadow: 0 1px 0 rgba(255,255,255,.7);
+        }
+        .a4-toolbar .select-icon{ opacity: .8; }
+        .a4-toolbar .select-compact{
+          border: none;
+          background: transparent;
+          outline: none;
+          padding: 4px 4px 4px 0;
+          font-weight: 700;
+          color: #111827;
+        }
+        .a4-toolbar .select-compact:focus{
+          outline: 2px solid color-mix(in srgb, var(--brand-gold) 45%, transparent);
+          outline-offset: 2px;
+          border-radius: 6px;
         }
 
         /* ---- Modal enhanced styling ---- */

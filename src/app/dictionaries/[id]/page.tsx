@@ -205,13 +205,13 @@ function ResultRowBase({
         <b>
           <span
             className="dict-accent"
-            style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK", sans-serif' }}
+            style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK","TH Sarabun New", sans-serif' }}
             dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_en || '') }}
           />
           &nbsp;&nbsp;
           <span
             className="dict-accent"
-            style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK", sans-serif' }}
+            style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK","TH Sarabun New", sans-serif' }}
             dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_th || '') }}
           />
         </b>
@@ -281,7 +281,7 @@ function DictionaryResultRow({
             <b>
               <span
                 className="dict-accent"
-                style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK", sans-serif' }}
+                style={{ fontSize: '1.3rem', fontFamily: '"TH SarabunPSK","TH Sarabun New", sans-serif' }}
                 dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_th || '') }}
               />
             </b>
@@ -338,7 +338,8 @@ export default function SearchDictionaryPage() {
   // --- Paging / Zoom / Selection ---
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [zoom, setZoom] = useState(1);
+  const [fontScale, setFontScale] = useState(1);
+  const [asideCollapsed, setAsideCollapsed] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   // --- End Paging / Zoom / Selection ---
@@ -468,8 +469,8 @@ export default function SearchDictionaryPage() {
     setPageSize(size);
     fetchResults(1, size);
   };
-  const zoomOut = () => setZoom(z => Math.max(0.8, +(z - 0.1).toFixed(2)));
-  const zoomIn  = () => setZoom(z => Math.min(1.5, +(z + 0.1).toFixed(2)));
+  const zoomOut = () => setFontScale(f => Math.max(0.8, +(f - 0.1).toFixed(2)));
+  const zoomIn  = () => setFontScale(f => Math.min(1.6, +(f + 0.1).toFixed(2)));
   // --- End Toolbar handlers ---
 
   const fetchDictionaryDetails = async () => {
@@ -556,7 +557,7 @@ export default function SearchDictionaryPage() {
   }, [dictionaryId]);
 
   return (
-    <div className={`reader-stage reader-stage--full ${themeClass}`}>
+    <div className={`reader-stage reader-stage--full ${themeClass}`} style={{ ['--reader-font' as any]: fontScale }}>
       <Head>
         <meta charSet="UTF-8" />
         <title>
@@ -568,10 +569,21 @@ export default function SearchDictionaryPage() {
             } - ระบบฐานข้อมูลคำศัพท์
         </title>
       </Head>
-      <main className="a4-container">
+      <main className="a4-container" style={{ ['--aside-w' as any]: asideCollapsed ? '56px' : '260px' }}>
         {/* Sidebar: สารบัญเฉพาะหัวข้อ */}
-        <aside className="reader-aside" aria-label="สารบัญคำศัพท์ (เฉพาะหัวข้อ)">
-          <div className="aside-title">สารบัญคำศัพท์</div>
+        <aside className={`reader-aside ${asideCollapsed ? 'is-collapsed' : ''}`} aria-label="สารบัญคำศัพท์ (เฉพาะหัวข้อ)">
+          <div className="aside-header">
+            <div className="aside-title">สารบัญคำศัพท์</div>
+            <button
+              type="button"
+              className="aside-collapse-btn"
+              aria-label={asideCollapsed ? 'ขยายแถบสารบัญ' : 'ย่อแถบสารบัญ'}
+              title={asideCollapsed ? 'ขยาย' : 'ย่อ'}
+              onClick={() => setAsideCollapsed(v => !v)}
+            >
+              {asideCollapsed ? '»' : '«'}
+            </button>
+          </div>
 
           <div className="aside-actions">
             <label htmlFor="toc-search" className="sr-only">ค้นหาในสารบัญ</label>
@@ -596,31 +608,33 @@ export default function SearchDictionaryPage() {
             </button>
           </div>
 
-          <ul className="aside-list toc-groups">
-            {filteredSidebarGroups.map((group) => (
-              <li key={group.letter} className="toc-group">
-                <div className="toc-letter">{group.letter}</div>
-                <ul className="toc-items">
-                  {group.items.map((it) => (
-                    <li key={it.id} className="toc-item">
-                      <button
-                        type="button"
-                        className="aside-link toc-link"
-                        onClick={() => scrollToAnchor(it.anchor)}
-                        title={`ไปยังคำว่า ${it.label}`}
-                        aria-label={`ไปยังคำว่า ${it.label}`}
-                      >
-                        {it.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
+          <div className="aside-scroll">
+            <ul className="aside-list toc-groups">
+              {filteredSidebarGroups.map((group) => (
+                <li key={group.letter} className="toc-group">
+                  <div className="toc-letter">{group.letter}</div>
+                  <ul className="toc-items">
+                    {group.items.map((it) => (
+                      <li key={it.id} className="toc-item">
+                        <button
+                          type="button"
+                          className="aside-link toc-link"
+                          onClick={() => scrollToAnchor(it.anchor)}
+                          title={`ไปยังคำว่า ${it.label}`}
+                          aria-label={`ไปยังคำว่า ${it.label}`}
+                        >
+                          {it.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
         </aside>
         <section className="a4-page">
-        <div className="a4-zoom-wrap" style={{ ['--reader-zoom' as any]: zoom }}>
+        <div className="a4-zoom-wrap">
         {/* Breadcrumb */}
         <nav aria-label="breadcrumb" className="mb-4">
           {dictLoading ? (
@@ -772,7 +786,7 @@ export default function SearchDictionaryPage() {
                   aria-label={`${p.queryOriginal} ถูกค้นหา ${p.count} ครั้ง`}
                 >
                   <span className="popular-chip__text">{p.queryOriginal}</span>
-                  <span className="popular-chip__count">{p.count}</span>
+                  {/*<span className="popular-chip__count">{p.count}</span>*/}
                 </button>
               ))}
             </div>
@@ -808,7 +822,7 @@ export default function SearchDictionaryPage() {
                           className="font-bold dict-accent"
                           style={{
                             fontSize: '2rem',
-                            fontFamily: 'Tahoma, sans-serif'
+                            fontFamily: '"TH SarabunPSK", sans-serif'
                           }}
                         >
                           {letter}
@@ -818,7 +832,7 @@ export default function SearchDictionaryPage() {
                           style={{
                             fontSize: '1.3rem',
                             color: '#B3186D',
-                            fontFamily: '"TH SarabunPSK", sans-serif'
+                            fontFamily: '"TH SarabunPSK","TH Sarabun New", sans-serif'
                           }}
                         >
                           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -879,7 +893,7 @@ export default function SearchDictionaryPage() {
             <button type="button" className="btn-icon" onClick={zoomOut} title="ย่อ (-)">
               <span aria-hidden="true">−</span>
             </button>
-            <span className="zoom-value">{Math.round(zoom * 100)}%</span>
+            <span className="zoom-value">{Math.round(fontScale * 100)}%</span>
             <button type="button" className="btn-icon" onClick={zoomIn} title="ขยาย (+)">
               <span aria-hidden="true">+</span>
             </button>
