@@ -55,6 +55,7 @@ interface SpecializedDictionaryDetails {
   subcategory: string | null;
 }
 
+
 // Helper: extract a single dictionary by id from either an array result or grouped object result
 function extractDictionaryDetails(data: any, targetId: number): SpecializedDictionaryDetails | null {
   if (!data) return null;
@@ -112,12 +113,44 @@ function extractDictionaryDetails(data: any, targetId: number): SpecializedDicti
   return null;
 }
 
+// --- Helper: render only <mark> highlights, escape the rest ---
+function renderMarkOnly(input: string | null): string {
+  if (!input) return '';
+  let s = String(input);
+  // 1) Convert encoded mark tags to real tags
+  s = s.replace(/&lt;mark&gt;/gi, '<mark>')
+       .replace(/&lt;\/mark&gt;/gi, '</mark>');
+
+  // 2) Temporarily protect <mark> tags
+  const tokens: string[] = [];
+  s = s.replace(/<\/?mark>/gi, (m) => {
+    const idx = tokens.push(m.toLowerCase()) - 1;
+    return `__MARK_TOKEN_${idx}__`;
+  });
+
+  // 3) Escape everything else
+  s = s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // 4) Restore the <mark> tags and add a styling class
+  tokens.forEach((tok, i) => {
+    const restored = tok === '<mark>' ? '<mark class="highlight-mark">' : tok;
+    s = s.replace(`__MARK_TOKEN_${i}__`, restored);
+  });
+
+  return s;
+}
+// --- End helper ---
+
 export default function SearchDictionaryPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const dictionaryIdParam = params.id;
   const dictionaryId = dictionaryIdParam === '0' || isNaN(Number(dictionaryIdParam)) ? 0 : Number(dictionaryIdParam);
+  const themeClass = dictionaryId === 0 ? 'dict-theme-0' : dictionaryId === 3 ? 'dict-theme-3' : 'dict-theme-other';
   const isAllDictionaries = false;
   const initialQuery = searchParams.get('q') || '';
   const initialLanguageFilter = searchParams.get('language') || 'all';
@@ -196,25 +229,6 @@ export default function SearchDictionaryPage() {
       }
       let data: any = await response.json();
       let details = extractDictionaryDetails(data, dictionaryId);
-
-      // Fallback 1: try param name "id"
-      if (!details) {
-        response = await fetch(`/api/dictionaries?id=${dictionaryId}`);
-        if (response.ok) {
-          data = await response.json();
-          details = extractDictionaryDetails(data, dictionaryId) ?? details;
-        }
-      }
-
-      // Fallback 2: try param name "dictionaryId"
-      if (!details) {
-        response = await fetch(`/api/dictionaries?dictionaryId=${dictionaryId}`);
-        if (response.ok) {
-          data = await response.json();
-          details = extractDictionaryDetails(data, dictionaryId) ?? details;
-        }
-      }
-
       if (details) {
         setDictionaryDetails(details);
       } else {
@@ -281,7 +295,7 @@ export default function SearchDictionaryPage() {
   }, [dictionaryId]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${themeClass}`}>
       <Head>
         <meta charSet="UTF-8" />
         <title>
@@ -423,10 +437,9 @@ export default function SearchDictionaryPage() {
                   <section key={letter} className="mb-8">
                     <div className="flex items-center mb-2">
                       <span
-                        className="font-bold"
+                        className="font-bold dict-accent"
                         style={{
                           fontSize: '2rem',
-                          color: '#B3186D',
                           fontFamily: 'Tahoma, sans-serif'
                         }}
                       >
@@ -465,24 +478,22 @@ export default function SearchDictionaryPage() {
                         <div style={{ marginLeft: 30, textIndent: -30 }}>
                           <b>
                             <span
+                              className="dict-accent"
                               style={{
                                 fontSize: '1.3rem',
-                                color: '#B3186D',
                                 fontFamily: '"TH SarabunPSK", sans-serif'
                               }}
-                            >
-                              {entry.term_en || ''}
-                            </span>
+                              dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_en || '') }}
+                            />
                             &nbsp;&nbsp;
                             <span
+                              className="dict-accent"
                               style={{
                                 fontSize: '1.3rem',
-                                color: '#B3186D',
                                 fontFamily: '"TH SarabunPSK", sans-serif'
                               }}
-                            >
-                              {entry.term_th || ''}
-                            </span>
+                              dangerouslySetInnerHTML={{ __html: renderMarkOnly(entry.term_th || '') }}
+                            />
                           </b>
                         </div>
                         {entry.definition_html && (
@@ -534,6 +545,22 @@ export default function SearchDictionaryPage() {
         onUpdateSuccess={handleUpdateSuccess}
       />
       {/* --- End new EditEntryModal component --- */}
+      <style jsx global>{`
+        /* Dictionary color templates */
+        .dict-theme-0 { --dict-color: #0a4376; }
+        .dict-theme-3 { --dict-color: #B3186D; }
+        .dict-theme-other { --dict-color: #04470c; }
+
+        /* Helper class to color text using current dictionary theme */
+        .dict-accent { color: var(--dict-color); }
+
+        /* Optional: emphasized highlight color inside <mark> to match theme */
+        .highlight-mark {
+          background: color-mix(in oklab, var(--dict-color) 20%, #fff);
+          padding: 0 .15em;
+          border-radius: 2px;
+        }
+      `}</style>
     </div>
   );
 }
