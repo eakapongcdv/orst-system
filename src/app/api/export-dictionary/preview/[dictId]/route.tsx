@@ -50,7 +50,7 @@ function generateHtmlContent(dictTitle: string, entries: any[]) {
       body {
         font-family: 'TH Sarabun New', 'TH SarabunPSK', sans-serif; /* Fallback fonts */
         font-size: 14pt; /* Use pt for consistency */
-        margin: 20mm; /* Add some margin */
+        margin: 0mm; /* Add some margin */
         /* Ensure background is white for preview */
         background-color: white;
         color: black;

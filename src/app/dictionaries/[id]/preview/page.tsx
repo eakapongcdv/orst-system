@@ -228,9 +228,39 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
           scale: 2,
           useCORS: true,
           logging: false,
+          /**
+           * html2canvas clones the DOM. Here we sanitize CSS that uses modern color() / color-mix()
+           * which the library cannot parse, and simplify backgrounds for reliability.
+           */
+          onclone: (doc: Document) => {
+            // Hide interactive UI in the clone
+            doc.querySelectorAll('.preview-toolbar').forEach(el => {
+              (el as HTMLElement).style.display = 'none';
+            });
+            // Hide page separators in export
+            doc.querySelectorAll('.page-sep').forEach(el => {
+              (el as HTMLElement).style.display = 'none';
+            });
+            // Neutralize complex backgrounds that might use color-mix()/color()
+            doc.querySelectorAll<HTMLElement>('.preview-shell, .a4-wrapper, .a4-page, .a4-content').forEach(el => {
+              el.style.background = '#ffffff';
+              el.style.backgroundImage = 'none';
+              el.style.backdropFilter = 'none';
+              (el.style as any)['-webkit-backdrop-filter'] = 'none';
+            });
+            // Sanitize <style> tags which include color-mix() or color()
+            doc.querySelectorAll('style').forEach(st => {
+              const t = st.textContent || '';
+              if (t.includes('color-mix(') || t.includes('color(')) {
+                st.textContent = t
+                  .replace(/color-mix\([^)]*\)/g, '#e5e7eb')
+                  .replace(/color\([^)]*\)/g, '#e5e7eb');
+              }
+            });
+          }
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      };
+      } as const;
 
       await html2pdfLib().set(pdfOptions).from(previewContainerRef.current).save();
     } catch (pdfError: any) {
@@ -285,6 +315,14 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
 
   return (
     <div className="preview-page">
+      {isExporting && (
+        <div className="exporting-overlay" role="status" aria-live="polite">
+          <div className="exporting-box">
+            <div className="spinner" aria-hidden="true"></div>
+            <div className="exporting-text">กำลังสร้างไฟล์…</div>
+          </div>
+        </div>
+      )}
       <div className="preview-toolbar">
         <div className="toolbar-group">
           <button
@@ -294,7 +332,11 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
             title="ส่งออกเป็น DOCX"
             aria-label="ส่งออกเป็น DOCX"
           >
-            <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+            {isExporting ? (
+              <span className="spinner" aria-hidden="true" />
+            ) : (
+              <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+            )}
           </button>
           <button
             onClick={handleExportPdf}
@@ -303,7 +345,11 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
             title="ส่งออกเป็น PDF"
             aria-label="ส่งออกเป็น PDF"
           >
-            <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+            {isExporting ? (
+              <span className="spinner" aria-hidden="true" />
+            ) : (
+              <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+            )}
           </button>
         </div>
         <div className="toolbar-sep" aria-hidden="true"></div>
@@ -452,6 +498,33 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
           .page-sep{ display: none; }
           .a4-content{ height: auto; overflow: visible; }
         }
+      `}</style>
+      <style jsx global>{`
+        /* Exporting overlay */
+        .exporting-overlay{
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255,255,255,.55);
+          backdrop-filter: blur(4px) saturate(1.05);
+          -webkit-backdrop-filter: blur(4px) saturate(1.05);
+        }
+        .exporting-box{
+          display: flex; flex-direction: column; align-items: center; gap: .75rem;
+          min-width: 220px; padding: 18px 22px;
+          background: #fff; border: 1px solid var(--brand-border);
+          border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,.15);
+        }
+        .exporting-text{ font-weight: 600; color: #1f2937; }
+        .spinner{
+          width: 28px; height: 28px; border-radius: 50%;
+          border: 3px solid #e5e7eb; border-top-color: var(--brand-gold,#BD9425);
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
