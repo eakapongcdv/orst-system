@@ -11,29 +11,40 @@ import {
 } from '@heroicons/react/24/solid';
 import { useRouter } from "next/navigation";
 
-// --- Utility: Replace all <img> with base64 data URI ---
-async function replaceImagesWithBase64(htmlString: string) {
+// --- Utility: Replace all <img> with base64 data URI (with progress) ---
+async function replaceImagesWithBase64(htmlString: string, onProgress?: (completed: number, total: number) => void) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = htmlString;
-  const imgEls = tempDiv.querySelectorAll('img');
-  await Promise.all(Array.from(imgEls).map(async (img) => {
+  const imgEls = Array.from(tempDiv.querySelectorAll('img'));
+  const total = imgEls.length || 1;
+  let completed = 0;
+
+  for (const img of imgEls) {
     const src = img.getAttribute('src');
-    if (!src || src.startsWith('data:')) return;
+    if (!src || src.startsWith('data:')) {
+      completed++;
+      onProgress?.(completed, total);
+      continue;
+    }
     try {
       const res = await fetch(src);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      img.setAttribute('src', base64);
-    } catch (err) {
-      // ถ้าโหลดรูปไม่ได้ จะข้ามไปเฉย ๆ
+      if (res.ok) {
+        const blob = await res.blob();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        img.setAttribute('src', base64);
+      }
+    } catch {
+      // ignore fetch/convert error for individual image
+    } finally {
+      completed++;
+      onProgress?.(completed, total);
     }
-  }));
+  }
   return tempDiv.innerHTML;
 }
 
@@ -48,6 +59,8 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
   const [htmlContent, setHtmlContent] = useState<string>("");
   const [dictId, setDictId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStage, setExportStage] = useState<'idle' | 'pdf' | 'doc'>('idle');
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -213,6 +226,8 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
       return;
     }
     setIsExporting(true);
+    setExportStage('pdf');
+    setExportProgress(5);
 
     const originalTransform = wrapperRef.current.style.transform;
     const originalTransformOrigin = wrapperRef.current.style.transformOrigin;
@@ -226,7 +241,7 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
         }
       } catch {}
 
-      // Load libraries (prefer those exposed by html2pdf UMD; fallback to direct imports)
+      // Load libraries
       await import("html2pdf.js").catch(() => null);
       const w: any = typeof window !== "undefined" ? (window as any) : {};
       const html2canvas: any =
@@ -291,7 +306,8 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
       const pages = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>(".a4-page"));
       if (pages.length === 0) throw new Error("No pages to export.");
 
-      for (let i = 0; i < pages.length; i++) {
+      const total = pages.length;
+      for (let i = 0; i < total; i++) {
         const pageEl = pages[i];
         pageEl.scrollIntoView({ block: "center" });
 
@@ -310,9 +326,16 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
           pdf.addPage();
           pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
         }
+
+        // Update progress — allocate 90% for page rasterization/adding
+        const pct = 5 + Math.round(((i + 1) / total) * 90);
+        setExportProgress(pct);
       }
 
+      // Finalize (remaining ~5%)
+      setExportProgress(98);
       pdf.save(`Dictionary_${dictId}.pdf`);
+      setExportProgress(100);
 
       cleanup.forEach(fn => fn());
     } catch (err: any) {
@@ -323,22 +346,32 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
         wrapperRef.current.style.transform = originalTransform;
       }
       setIsExporting(false);
+      setTimeout(() => { setExportStage('idle'); setExportProgress(0); }, 300);
     }
   };
 
-  // --- DOCX Export Handler (Now with image base64 support) ---
+  // --- DOCX Export Handler (Now with image base64 support and progress) ---
   const handleExportDocx = async () => {
     if (!previewContainerRef.current || !dictId) {
       alert("Preview content is not ready for export.");
       return;
     }
     setIsExporting(true);
+    setExportStage('doc');
+    setExportProgress(5);
+
     const element = previewContainerRef.current;
     let htmlString = element.innerHTML;
 
     try {
-      // เปลี่ยนทุก <img> เป็น base64 ก่อน
-      htmlString = await replaceImagesWithBase64(htmlString);
+      // เปลี่ยนทุก <img> เป็น base64 พร้อมอัปเดตความคืบหน้า (~90%)
+      htmlString = await replaceImagesWithBase64(htmlString, (completed, total) => {
+        const ratio = completed / Math.max(1, total);
+        const pct = 5 + Math.round(ratio * 85);
+        setExportProgress(pct);
+      });
+
+      setExportProgress(94);
 
       const fullHtml = `
       <!DOCTYPE html>
@@ -359,23 +392,32 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
       link.download = fileName;
       link.style.display = "none";
       document.body.appendChild(link);
+
+      setExportProgress(98);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
+
+      setExportProgress(100);
     } catch (docxError: any) {
       alert(`Failed to generate DOCX file: ${docxError.message || "An error occurred during file creation."}`);
     } finally {
       setIsExporting(false);
+      setTimeout(() => { setExportStage('idle'); setExportProgress(0); }, 300);
     }
   };
 
   return (
     <div className="preview-page">
       {isExporting && (
-        <div className="exporting-overlay" role="status" aria-live="polite">
+        <div className="exporting-overlay" role="dialog" aria-live="polite" aria-label="กำลังส่งออกไฟล์">
           <div className="exporting-box">
             <div className="spinner" aria-hidden="true"></div>
-            <div className="exporting-text">กำลังสร้างไฟล์…</div>
+            <div className="exporting-text">{exportStage === 'pdf' ? 'กำลังสร้าง PDF…' : 'กำลังสร้าง DOCX…'}</div>
+            <div className="exporting-percent">{exportProgress}%</div>
+            <div className="exporting-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={exportProgress}>
+              <div className="bar" style={{ width: `${exportProgress}%` }} />
+            </div>
           </div>
         </div>
       )}
@@ -569,12 +611,31 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
           -webkit-backdrop-filter: blur(4px) saturate(1.05);
         }
         .exporting-box{
-          display: flex; flex-direction: column; align-items: center; gap: .75rem;
-          min-width: 220px; padding: 18px 22px;
+          display: flex; flex-direction: column; align-items: center; gap: .5rem;
+          min-width: 280px; width: 360px; padding: 18px 22px;
           background: #fff; border: 1px solid var(--brand-border);
           border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,.15);
         }
         .exporting-text{ font-weight: 600; color: #1f2937; }
+        .exporting-percent{
+          font-weight: 700;
+          color: #111827;
+          margin-top: -4px;
+        }
+        .exporting-progress{
+          width: 100%;
+          height: 8px;
+          background: #eef2f7;
+          border: 1px solid var(--brand-border);
+          border-radius: 999px;
+          overflow: hidden;
+        }
+        .exporting-progress .bar{
+          height: 100%;
+          width: 0%;
+          background: linear-gradient(90deg, var(--brand-gold,#BD9425), #e3c35a);
+          transition: width .2s ease;
+        }
         .spinner{
           width: 28px; height: 28px; border-radius: 50%;
           border: 3px solid #e5e7eb; border-top-color: var(--brand-gold,#BD9425);
