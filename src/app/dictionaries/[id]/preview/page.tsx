@@ -208,47 +208,70 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
 
   // --- PDF Export Handler ---
   const handleExportPdf = async () => {
-    if (!previewContainerRef.current || !dictId) {
+    // Use the pre-paginated .a4-page elements and export page-by-page to prevent blank pages.
+    if (!wrapperRef.current || !dictId) {
       alert("Preview content is not ready for export.");
       return;
     }
     setIsExporting(true);
 
     try {
-      // Wait for any styles/fonts/layout to finish rendering
-      await new Promise((res) => setTimeout(res, 400));
-      const html2pdfModule = await import("html2pdf.js");
-      const html2pdfLib = html2pdfModule.default || html2pdfModule;
+      // Ensure fonts are ready to avoid flash/blank glyphs in canvas
+      try {
+        // @ts-ignore
+        if (document.fonts && document.fonts.ready) {
+          // @ts-ignore
+          await document.fonts.ready;
+        }
+      } catch { /* ignore */ }
 
-      const pdfOptions = {
-        margin: 10,
+      const html2pdfModule = await import("html2pdf.js");
+      const html2pdfLib = (html2pdfModule as any).default || html2pdfModule;
+
+      // Grab all pre-paginated page nodes
+      const pages = wrapperRef.current.querySelectorAll<HTMLElement>('.a4-page');
+      if (!pages || pages.length === 0) {
+        alert("No pages to export.");
+        setIsExporting(false);
+        return;
+      }
+
+      // Options tuned for reliability. We neutralize transforms and filters in the clone.
+      const opt = {
+        margin: 0,
         filename: `Dictionary_${dictId}.pdf`,
-        image: { type: "png", quality: 0.98 },
+        pagebreak: { mode: [] as string[] }, // we already paginated; don't force extra breaks
         html2canvas: {
           scale: 2,
           useCORS: true,
+          backgroundColor: '#ffffff',
           logging: false,
-          /**
-           * html2canvas clones the DOM. Here we sanitize CSS that uses modern color() / color-mix()
-           * which the library cannot parse, and simplify backgrounds for reliability.
-           */
+          scrollX: 0,
+          scrollY: 0,
           onclone: (doc: Document) => {
-            // Hide interactive UI in the clone
-            doc.querySelectorAll('.preview-toolbar').forEach(el => {
-              (el as HTMLElement).style.display = 'none';
+            // Hide any UI that might be cloned
+            doc.querySelectorAll<HTMLElement>('.preview-toolbar, .page-sep').forEach(el => {
+              el.style.display = 'none';
             });
-            // Hide page separators in export
-            doc.querySelectorAll('.page-sep').forEach(el => {
-              (el as HTMLElement).style.display = 'none';
-            });
-            // Neutralize complex backgrounds that might use color-mix()/color()
+
+            // Remove any transforms and complex effects that can confuse html2canvas
+            const wrap = doc.querySelector<HTMLElement>('.a4-wrapper');
+            if (wrap) {
+              wrap.style.transform = 'none';
+              wrap.style.transformOrigin = 'top left';
+            }
+
+            // Flatten backgrounds / filters
             doc.querySelectorAll<HTMLElement>('.preview-shell, .a4-wrapper, .a4-page, .a4-content').forEach(el => {
               el.style.background = '#ffffff';
               el.style.backgroundImage = 'none';
               el.style.backdropFilter = 'none';
-              (el.style as any)['-webkit-backdrop-filter'] = 'none';
+              // @ts-ignore vendor
+              el.style['-webkit-backdrop-filter'] = 'none';
+              el.style.boxShadow = 'none';
             });
-            // Sanitize <style> tags which include color-mix() or color()
+
+            // Also sanitize any style tags that might contain unsupported color() / color-mix()
             doc.querySelectorAll('style').forEach(st => {
               const t = st.textContent || '';
               if (t.includes('color-mix(') || t.includes('color(')) {
@@ -257,14 +280,32 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
                   .replace(/color\([^)]*\)/g, '#e5e7eb');
               }
             });
+
+            // Ensure white page background
+            (doc.body as HTMLElement).style.background = '#ffffff';
           }
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       } as const;
 
-      await html2pdfLib().set(pdfOptions).from(previewContainerRef.current).save();
+      // Build the PDF by adding each page sequentially.
+      let worker: any = (html2pdfLib as any)().set(opt);
+
+      pages.forEach((page, idx) => {
+        // For each page, render to canvas → toPdf, then add a new page unless it's the last one.
+        worker = worker
+          .from(page)
+          .toCanvas()
+          .toPdf()
+          .get('pdf')
+          .then((pdf: any) => {
+            if (idx < pages.length - 1) pdf.addPage();
+          });
+      });
+
+      await worker.save();
     } catch (pdfError: any) {
-      alert(`Failed to generate PDF: ${pdfError.message || "An error occurred during PDF generation."}`);
+      alert(`Failed to generate PDF: ${pdfError?.message || "An error occurred during PDF generation."}`);
     } finally {
       setIsExporting(false);
     }
