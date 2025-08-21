@@ -208,105 +208,120 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
 
   // --- PDF Export Handler ---
   const handleExportPdf = async () => {
-    // Use the pre-paginated .a4-page elements and export page-by-page to prevent blank pages.
     if (!wrapperRef.current || !dictId) {
       alert("Preview content is not ready for export.");
       return;
     }
     setIsExporting(true);
 
+    const originalTransform = wrapperRef.current.style.transform;
+    const originalTransformOrigin = wrapperRef.current.style.transformOrigin;
+
     try {
-      // Ensure fonts are ready to avoid flash/blank glyphs in canvas
       try {
         // @ts-ignore
         if (document.fonts && document.fonts.ready) {
           // @ts-ignore
           await document.fonts.ready;
         }
-      } catch { /* ignore */ }
+      } catch {}
 
-      const html2pdfModule = await import("html2pdf.js");
-      const html2pdfLib = (html2pdfModule as any).default || html2pdfModule;
+      // Load libraries (prefer those exposed by html2pdf UMD; fallback to direct imports)
+      await import("html2pdf.js").catch(() => null);
+      const w: any = typeof window !== "undefined" ? (window as any) : {};
+      const html2canvas: any =
+        w.html2canvas ||
+        (await import("html2canvas").then((m: any) => m.default).catch(() => null));
+      if (!html2canvas) throw new Error("html2canvas is not available.");
 
-      // Grab all pre-paginated page nodes
-      const pages = wrapperRef.current.querySelectorAll<HTMLElement>('.a4-page');
-      if (!pages || pages.length === 0) {
-        alert("No pages to export.");
-        setIsExporting(false);
-        return;
+      let jsPDFCtor: any =
+        (w.jspdf && w.jspdf.jsPDF) || (w as any).jsPDF;
+      if (!jsPDFCtor) {
+        try {
+          const jspdfMod: any = await import("jspdf");
+          jsPDFCtor = jspdfMod.jsPDF || jspdfMod.default;
+        } catch {
+          jsPDFCtor = (w as any).jsPDF;
+        }
       }
+      if (!jsPDFCtor) throw new Error("jsPDF is not available.");
 
-      // Options tuned for reliability. We neutralize transforms and filters in the clone.
-      const opt = {
-        margin: 0,
-        filename: `Dictionary_${dictId}.pdf`,
-        pagebreak: { mode: [] as string[] }, // we already paginated; don't force extra breaks
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          scrollX: 0,
-          scrollY: 0,
-          onclone: (doc: Document) => {
-            // Hide any UI that might be cloned
-            doc.querySelectorAll<HTMLElement>('.preview-toolbar, .page-sep').forEach(el => {
-              el.style.display = 'none';
-            });
+      const pdf: any = new jsPDFCtor({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-            // Remove any transforms and complex effects that can confuse html2canvas
-            const wrap = doc.querySelector<HTMLElement>('.a4-wrapper');
-            if (wrap) {
-              wrap.style.transform = 'none';
-              wrap.style.transformOrigin = 'top left';
-            }
+      // Temporarily neutralize transforms/effects that can confuse rasterization
+      wrapperRef.current.style.transform = "none";
+      wrapperRef.current.style.transformOrigin = "top left";
 
-            // Flatten backgrounds / filters
-            doc.querySelectorAll<HTMLElement>('.preview-shell, .a4-wrapper, .a4-page, .a4-content').forEach(el => {
-              el.style.background = '#ffffff';
-              el.style.backgroundImage = 'none';
-              el.style.backdropFilter = 'none';
-              // @ts-ignore vendor
-              el.style['-webkit-backdrop-filter'] = 'none';
-              el.style.boxShadow = 'none';
-            });
-
-            // Also sanitize any style tags that might contain unsupported color() / color-mix()
-            doc.querySelectorAll('style').forEach(st => {
-              const t = st.textContent || '';
-              if (t.includes('color-mix(') || t.includes('color(')) {
-                st.textContent = t
-                  .replace(/color-mix\([^)]*\)/g, '#e5e7eb')
-                  .replace(/color\([^)]*\)/g, '#e5e7eb');
-              }
-            });
-
-            // Ensure white page background
-            (doc.body as HTMLElement).style.background = '#ffffff';
-          }
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      } as const;
-
-      // Build the PDF by adding each page sequentially.
-      let worker: any = (html2pdfLib as any)().set(opt);
-
-      pages.forEach((page, idx) => {
-        // For each page, render to canvas → toPdf, then add a new page unless it's the last one.
-        worker = worker
-          .from(page)
-          .toCanvas()
-          .toPdf()
-          .get('pdf')
-          .then((pdf: any) => {
-            if (idx < pages.length - 1) pdf.addPage();
-          });
+      const cleanup: Array<() => void> = [];
+      const toHide = Array.from(document.querySelectorAll<HTMLElement>(".preview-toolbar, .page-sep"));
+      toHide.forEach(el => {
+        const prev = el.style.display;
+        el.style.display = "none";
+        cleanup.push(() => { el.style.display = prev; });
       });
 
-      await worker.save();
-    } catch (pdfError: any) {
-      alert(`Failed to generate PDF: ${pdfError?.message || "An error occurred during PDF generation."}`);
+      const toFlatten = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>(".a4-wrapper, .a4-page, .a4-content, .preview-shell"));
+      const prevStyles = toFlatten.map(el => ({
+        el,
+        background: el.style.background,
+        backgroundImage: el.style.backgroundImage,
+        backdropFilter: (el.style as any).backdropFilter,
+        webkitBackdropFilter: (el.style as any)["-webkit-backdrop-filter" as any],
+        boxShadow: el.style.boxShadow
+      }));
+      toFlatten.forEach(el => {
+        el.style.background = "#ffffff";
+        el.style.backgroundImage = "none";
+        (el.style as any).backdropFilter = "none";
+        (el.style as any)["-webkit-backdrop-filter" as any] = "none";
+        el.style.boxShadow = "none";
+      });
+      cleanup.push(() => {
+        prevStyles.forEach(s => {
+          s.el.style.background = s.background;
+          s.el.style.backgroundImage = s.backgroundImage;
+          (s.el.style as any).backdropFilter = s.backdropFilter || "";
+          (s.el.style as any)["-webkit-backdrop-filter" as any] = s.webkitBackdropFilter || "";
+          s.el.style.boxShadow = s.boxShadow;
+        });
+      });
+
+      const pages = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>(".a4-page"));
+      if (pages.length === 0) throw new Error("No pages to export.");
+
+      for (let i = 0; i < pages.length; i++) {
+        const pageEl = pages[i];
+        pageEl.scrollIntoView({ block: "center" });
+
+        const canvas = await html2canvas(pageEl, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          logging: false
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+
+        if (i === 0) {
+          pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+        } else {
+          pdf.addPage();
+          pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+        }
+      }
+
+      pdf.save(`Dictionary_${dictId}.pdf`);
+
+      cleanup.forEach(fn => fn());
+    } catch (err: any) {
+      alert(`Failed to generate PDF: ${err?.message || "An error occurred during PDF generation."}`);
     } finally {
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transformOrigin = originalTransformOrigin;
+        wrapperRef.current.style.transform = originalTransform;
+      }
       setIsExporting(false);
     }
   };
