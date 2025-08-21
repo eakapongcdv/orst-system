@@ -412,3 +412,38 @@ model PopularSearch {
   @@index([specializedDictionaryId, count])
   @@index([lastSearchedAt])
 }
+
+// === Open API Keys ===
+model ApiKey {
+  id             Int       @id @default(autoincrement())
+  label          String
+  keyPrefix      String
+  hashedKey      String    @unique
+  scopes         String[]  @default([])
+  allowedOrigins String[]  @default([])
+  createdByUserId Int?
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  isActive       Boolean   @default(true)
+
+  accessLogs     ApiAccessLog[]
+
+  @@index([keyPrefix])
+  @@index([isActive])
+}
+
+model ApiAccessLog {
+  id         Int      @id @default(autoincrement())
+  apiKeyId   Int
+  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id])
+  path       String
+  method     String
+  status     Int
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([apiKeyId, createdAt])
+}

@@ -137,6 +137,23 @@ function formatThaiDate(input?: string | null): string {
   return `${dd}/${mm}/${yyyy} ${HH}:${MM}:${SS}`;
 }
 
+// อนุญาตเฉพาะ <mark>...</mark> ที่เหลือ escape ทั้งหมด (กัน XSS)
+function allowMark(input?: string | null): string {
+  if (input == null) return '';
+  const s = String(input);
+  const escaped = s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return escaped
+    .replace(/&lt;mark&gt;/gi, '<mark>')
+    .replace(/&lt;\/mark&gt;/gi, '</mark>');
+}
+// ตัวช่วยสำหรับ JSX
+const MarkHTML = ({ text }: { text?: string | null }) => (
+  <span dangerouslySetInnerHTML={{ __html: allowMark(text) }} />
+);
+
 // ★ ADD: การ์ดผลลัพธ์ (ใช้ class จาก globals.css: result-card, meta-chip ฯลฯ)
 function ResultCard({ data, onEdit, anchorId }: { data: TransliterationSearchResult, onEdit: (row: TransliterationSearchResult) => void, anchorId?: string }) {
   const title =
@@ -155,8 +172,10 @@ function ResultCard({ data, onEdit, anchorId }: { data: TransliterationSearchRes
       onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handleOpen(); } }}>
       {/* หัวเรื่องพร้อมอัญประกาศ + (notes) ต่อท้าย */}
       <h3 className="result-card__title">
-        <span dangerouslySetInnerHTML={{ __html: title }} />
-        {data.notes ? <span> ({data.notes})</span> : null}
+        <MarkHTML text={title} />
+        {data.notes ? (
+          <span dangerouslySetInnerHTML={{ __html: ` (${allowMark(data.notes)})` }} />
+        ) : null}
       </h3>
 
       {/* แถวผลลัพธ์หลักแบบ 2 คอลัมน์: ซ้าย = ธง, ขวา = ข้อความ */}
@@ -179,15 +198,19 @@ function ResultCard({ data, onEdit, anchorId }: { data: TransliterationSearchRes
           {/* บรรทัดโรมัน/คำทับศัพท์ */}
           {(data.romanization || data.transliteration1) && (
             <p className="result-card__roman">
-              {data.romanization}
+              <MarkHTML text={data.romanization || ''} />
               {data.transliteration1 ? (
                 <>
                   {data.romanization ? ', ' : null}
-                  <span dangerouslySetInnerHTML={{ __html: data.transliteration1 }} />
+                  <span dangerouslySetInnerHTML={{ __html: allowMark(data.transliteration1 || '') }} />
                 </>
               ) : null}
               {' '}
-              <span>( คำทับศัพท์ : {data.transliteration1 || data.transliteration2 || '-'} )</span>
+              <span
+                dangerouslySetInnerHTML={{
+                  __html: `( คำทับศัพท์ : ${allowMark(data.transliteration1 || data.transliteration2 || '-')})`,
+                }}
+              />
             </p>
           )}
         </div>
@@ -195,9 +218,13 @@ function ResultCard({ data, onEdit, anchorId }: { data: TransliterationSearchRes
 
       {/* ส่วนล่าง: ซ้าย = หมวดหมู่; ขวา = เวลาแก้ไขล่าสุด */}
       <div className="result-card__footer--split">
-        <span className="text-md text-gray-600"><span className="font-bold mr-2">หมวดหมู่</span>{(data.category && data.category.trim() !== '' ? data.category : '-')}
+        <span className="text-md text-gray-600">
+          <span className="font-bold mr-2">หมวดหมู่</span>
+          <MarkHTML text={(data.category && data.category.trim() !== '' ? data.category : '-')} />
         </span>
-        <span className="text-md text-gray-600"><span className="font-bold mr-2">แหล่งอ้างอิง</span>{(data.referenceCriteria && data.referenceCriteria.trim() !== '' ? data.referenceCriteria : '-')}
+        <span className="text-md text-gray-600">
+          <span className="font-bold mr-2">แหล่งอ้างอิง</span>
+          <MarkHTML text={(data.referenceCriteria && data.referenceCriteria.trim() !== '' ? data.referenceCriteria : '-')} />
         </span>
         {(data.updatedAt || data.formattedPublicationDate) && (
           <span className="result-card__timestamp">แก้ไขล่าสุดเมื่อ : {formatThaiDate(data.updatedAt || data.formattedPublicationDate)}</span>
@@ -1185,7 +1212,13 @@ export default function SearchTransliterationPage() {
         .input, .textarea, .select, .form-select {
           width: 100%;
         }
+        /* Highlight style for &lt;mark&gt; */
+        mark{
+          background: #fff2a8;
+          border-radius: .2em;
+        }
       `}</style>
     </div>
   );
 }
+       

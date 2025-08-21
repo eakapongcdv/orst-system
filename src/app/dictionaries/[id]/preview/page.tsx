@@ -1,5 +1,4 @@
 //dictionaries/[id]/preview/pages.tsx
-//dictionaries/[id]/preview/pages.tsx
 "use client";
 
 import { useEffect, useState, useRef, useLayoutEffect } from "react";
@@ -362,14 +361,6 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
           display: flex;
           flex-direction: column;
           align-items: center;
-          background-color: var(--leather-base);
-          background-image:
-            radial-gradient(12px 12px at 20% 30%, rgba(255,255,255,0.02), transparent 60%),
-            radial-gradient(10px 10px at 70% 65%, rgba(0,0,0,0.08), transparent 60%),
-            radial-gradient(14px 14px at 40% 85%, rgba(255,255,255,0.025), transparent 60%),
-            radial-gradient(600px 400px at 50% -10%, rgba(255,255,255,0.10), transparent 70%),
-            radial-gradient(900px 600px at 110% 120%, rgba(0,0,0,0.30), transparent 70%),
-            linear-gradient(145deg, var(--leather-deep), var(--leather-base) 45%, var(--leather-high) 100%);
           background-blend-mode: overlay, overlay, overlay, soft-light, multiply, normal;
           background-repeat: no-repeat;
           background-size: cover;

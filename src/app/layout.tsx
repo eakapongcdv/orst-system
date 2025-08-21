@@ -50,6 +50,7 @@ export default async function RootLayout({
     //{ name: "นำเข้าคำศัพท์", href: "/file-manager/upload-dictionary" },
     { name: "นำเข้าคำศัพท์", href: "/file-manager/upload-transliteration" },
     { name: "แดชบอร์ด", href: "/dashboard" },
+    { name: "Open API", href: "/open-api/dashboard" },
     { name: "จัดการผู้ใช้", href: "/users" },
   ];
 
