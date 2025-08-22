@@ -1,7 +1,6 @@
 // prisma/schema.prisma
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextIndex"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -228,14 +227,15 @@ model UploadLog {
 
 // หมวด 1: พจนานุกรมเฉพาะสาขาวิชา
 model SpecializedDictionary {
-  id             Int               @id @default(autoincrement())
-  title          String // ชื่อเล่ม เช่น พจนานุกรมศัพท์เคมี
-  category       String // สาขาวิชา เช่น วิทยาศาสตร์, คอมพิวเตอร์
-  subcategory    String? // กลุ่มย่อย เช่น เคมี, ฟิสิกส์, ชีววิทยา
-  year_published Int?
-  entries        DictionaryEntry[] // ความสัมพันธ์ 1:N กับคำศัพท์
-  created_at     DateTime          @default(now())
-  updated_at     DateTime          @updatedAt
+  id              Int               @id @default(autoincrement())
+  title           String // ชื่อเล่ม เช่น พจนานุกรมศัพท์เคมี
+  category        String // สาขาวิชา เช่น วิทยาศาสตร์, คอมพิวเตอร์
+  subcategory     String? // กลุ่มย่อย เช่น เคมี, ฟิสิกส์, ชีววิทยา
+  year_published  Int?
+  entries         DictionaryEntry[] // ความสัมพันธ์ 1:N กับคำศัพท์
+  popularSearches PopularSearch[]
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
 }
 
 // รายการคำศัพท์ในแต่ละพจนานุกรม
@@ -259,7 +259,6 @@ model DictionaryEntry {
   @@unique([specializedDictionaryId, term_th, term_en], name: "uniq_entry_th_en")
   @@index([term_th, term_en], name: "idx_entries_th_en")
   @@index([id, version], name: "idx_entry_id_version")
-  @@fulltext([term_th, term_en, definition_html])
 }
 
 // --- New model for DictionaryEntry version history ---
@@ -310,7 +309,6 @@ model TransliterationEntry {
   @@index([language])
   @@index([wordType])
   @@index([category])
-  @@fulltext([romanization, originalScript1, originalScript2, transliteration1, transliteration2, meaning, notes])
 }
 
 // --- Version history for TransliterationEntry ---
@@ -356,8 +354,6 @@ model GazetteerEntry {
   description   String? // รายละเอียด
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
-
-  @@fulltext([place_name_th, place_name_en, province, district, description])
 }
 
 /**
@@ -366,15 +362,15 @@ model GazetteerEntry {
  * - We keep `queryOriginal` to display the exact text the user typed most recently.
  */
 model PopularSearch {
-  id                       Int      @id @default(autoincrement())
-  specializedDictionaryId  Int
-  specializedDictionary    SpecializedDictionary @relation(fields: [specializedDictionaryId], references: [id], onDelete: Cascade)
-  queryNormalized          String
-  queryOriginal            String
-  count                    Int      @default(1)
-  lastSearchedAt           DateTime @default(now())
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                      Int                   @id @default(autoincrement())
+  specializedDictionaryId Int
+  specializedDictionary   SpecializedDictionary @relation(fields: [specializedDictionaryId], references: [id], onDelete: Cascade)
+  queryNormalized         String
+  queryOriginal           String
+  count                   Int                   @default(1)
+  lastSearchedAt          DateTime              @default(now())
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   @@unique([specializedDictionaryId, queryNormalized])
   @@index([specializedDictionaryId, count])
@@ -396,22 +392,22 @@ model ApiKey {
   revokedAt       DateTime?
   isActive        Boolean   @default(true)
 
-  accessLogs     ApiAccessLog[]
+  accessLogs ApiAccessLog[]
 
   @@index([keyPrefix])
   @@index([isActive])
 }
 
 model ApiAccessLog {
-  id         Int      @id @default(autoincrement())
-  apiKeyId   Int
-  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id])
-  path       String
-  method     String
-  status     Int
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  apiKeyId  Int
+  apiKey    ApiKey   @relation(fields: [apiKeyId], references: [id])
+  path      String
+  method    String
+  status    Int
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   @@index([apiKeyId, createdAt])
 }
@@ -419,47 +415,46 @@ model ApiAccessLog {
 // หมวด 3: สารานุกรม
 /// --- Encyclopedia (สารานุกรม) ---
 model Encyclopedia {
-  id          Int                   @id @default(autoincrement())
-  slug        String                @unique
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
   titleTh     String
   titleEn     String?
   description String?
   coverImage  String?
-  sourceUrl   String?               // แหล่งอ้างอิง/ที่มา (เช่น URL ของ LST)
+  sourceUrl   String? // แหล่งอ้างอิง/ที่มา (เช่น URL ของ LST)
   publisher   String?
-  language    String?               // 'th', 'en', ...
-  tags        Json?                 // string[]
-  meta        Json?                 // เผื่อข้อมูลเฉพาะ (เช่น credits)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  language    String? // 'th', 'en', ...
+  tags        Json? // string[]
+  meta        Json? // เผื่อข้อมูลเฉพาะ (เช่น credits)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  articles    EncyclopediaArticle[]
+  articles EncyclopediaArticle[]
 }
 
 model EncyclopediaArticle {
-  id              Int           @id @default(autoincrement())
-  encyclopediaId  Int
-  slug            String
-  titleTh         String
-  titleEn         String?
-  altTitles       Json?         // string[]
-  summary         String?
-  contentHtml     String?       @db.Text
-  contentText     String?       @db.Text
-  authors         Json?         // string[]
-  images          Json?         // {src, caption}[]
-  keywords        Json?         // string[]
-  externalUrl     String?       // ลิงก์ไปต้นฉบับ LST
-  countryCode     String?       // กรณีเป็นประเทศ (ISO-3166 alpha-2)
-  orderIndex      Int?          // ใช้จัด A-Z
-  publishedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             Int       @id @default(autoincrement())
+  encyclopediaId Int
+  slug           String
+  titleTh        String
+  titleEn        String?
+  altTitles      Json? // string[]
+  summary        String?
+  contentHtml    String?   @db.Text
+  contentText    String?   @db.Text
+  authors        Json? // string[]
+  images         Json? // {src, caption}[]
+  keywords       Json? // string[]
+  externalUrl    String? // ลิงก์ไปต้นฉบับ LST
+  countryCode    String? // กรณีเป็นประเทศ (ISO-3166 alpha-2)
+  orderIndex     Int? // ใช้จัด A-Z
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  encyclopedia    Encyclopedia  @relation(fields: [encyclopediaId], references: [id])
+  encyclopedia Encyclopedia @relation(fields: [encyclopediaId], references: [id])
 
   @@unique([encyclopediaId, slug])
-  @@fulltext([titleTh, titleEn, summary, contentHtml, contentText])
 }
 
 /// --- Taxonomy (อนุกรมวิธาน) ---
@@ -482,8 +477,8 @@ enum TaxonRank {
 // หมวด 4: อนุกรมวิธาน
 model Taxonomy {
   id          Int      @id @default(autoincrement())
-  title       String   // เช่น "อนุกรมวิธานพืช", "อนุกรมวิธานสัตว์"
-  domain      String   // "plant" | "animal" | อื่น ๆ
+  title       String // เช่น "อนุกรมวิธานพืช", "อนุกรมวิธานสัตว์"
+  domain      String // "plant" | "animal" | อื่น ๆ
   version     String?
   description String?
   sourceUrl   String?
@@ -491,37 +486,38 @@ model Taxonomy {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  taxa        Taxon[]
+  taxa Taxon[]
 
   @@index([domain])
 }
 
 model Taxon {
-  id              Int        @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   taxonomyId      Int
   parentId        Int?
   rank            TaxonRank
   scientificName  String
   thaiName        String?
-  commonNames     Json?      // string[]
+  commonNames     Json? // string[]
   authorship      String?
   year            Int?
-  code            String?    // ICN/ICZN
-  status          String?    // accepted/synonym/...
+  code            String? // ICN/ICZN
+  status          String? // accepted/synonym/...
   characteristics String?   @db.Text
   distribution    String?   @db.Text
-  contentHtml     String?   @db.Text  // HTML ที่นำเข้าจากเอกสาร (ใหม่)
-  references      Json?     // {cite, url}[]
-  media           Json?     // images/videos
+  contentHtml     String?   @db.Text // HTML ที่นำเข้าจากเอกสาร (ใหม่)
+  references      Json? // {cite, url}[]
+  media           Json? // images/videos
   extra           Json?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  taxonomy  Taxonomy @relation(fields: [taxonomyId], references: [id])
-  parent    Taxon?   @relation("TaxonChildren", fields: [parentId], references: [id])
-  children  Taxon[]  @relation("TaxonChildren")
+  taxonomy Taxonomy @relation(fields: [taxonomyId], references: [id])
+  parent   Taxon?   @relation("TaxonChildren", fields: [parentId], references: [id])
+  children Taxon[]  @relation("TaxonChildren")
 
-  synonyms  TaxonSynonym[]
+  synonyms TaxonSynonym[]
+  entries  TaxonEntry[]
 
   @@unique([taxonomyId, rank, scientificName])
   @@index([taxonomyId])
@@ -529,12 +525,29 @@ model Taxon {
 }
 
 model TaxonSynonym {
-  id        Int    @id @default(autoincrement())
-  taxonId   Int
-  name      String
+  id         Int     @id @default(autoincrement())
+  taxonId    Int
+  name       String
   authorship String?
-  year      Int?
-  note      String?
+  year       Int?
+  note       String?
 
   taxon Taxon @relation(fields: [taxonId], references: [id])
+}
+
+model TaxonEntry {
+  id          Int      @id @default(autoincrement())
+  taxonId     Int
+  title       String
+  slug        String?
+  contentHtml String?  @db.Text
+  contentText String?  @db.Text
+  orderIndex  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taxon Taxon @relation(fields: [taxonId], references: [id], onDelete: Cascade)
+
+  @@unique([taxonId, title])
+  @@index([taxonId, orderIndex])
 }

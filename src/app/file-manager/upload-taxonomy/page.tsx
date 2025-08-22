@@ -198,7 +198,16 @@ export default function UpdateDictionaryUploadPage() {
     try {
       await new Promise<UploadResult>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/file-manager/upload-taxonomy");
+        // Build API URL with commit flag and optional metadata
+        const apiUrl = new URL("/api/file-manager/upload-taxonomy", window.location.origin);
+        apiUrl.searchParams.set("commit", "1");
+        // Pass title/domain based on selected SpecializedDictionary (if any)
+        const sel = specOptions.find(o => String(o.id) === specializedDictionaryId);
+        if (sel) {
+          apiUrl.searchParams.set("title", sel.title);
+          if (sel.category) apiUrl.searchParams.set("domain", sel.category);
+        }
+        xhr.open("POST", apiUrl.toString());
         xhr.responseType = "json";
 
         xhr.upload.onprogress = (ev) => {
