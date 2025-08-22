@@ -96,6 +96,7 @@ export async function GET(req: NextRequest) {
         orderIndex: true,
         contentHtml: true,
         contentText: true,
+        shortDescription: true,
         // meta fields from schema
         officialNameTh: true,
         official: true,
@@ -128,6 +129,7 @@ export async function GET(req: NextRequest) {
           scientificNameMarked: r.scientificName ? markTextAll(r.scientificName, q) : r.scientificName,
           familyMarked: r.family ? markTextAll(r.family, q) : r.family,
           synonymsMarked: r.synonyms ? markTextAll(r.synonyms, q) : r.synonyms,
+          shortDescriptionMarked: r.shortDescription ? markHtmlAll(r.shortDescription, q) : r.shortDescription,
           authorsDisplayMarked: r.authorsDisplay ? markTextAll(r.authorsDisplay, q) : r.authorsDisplay,
           otherNamesMarked: r.otherNames ? markTextAll(r.otherNames, q) : r.otherNames,
           authorMarked: r.author ? markTextAll(r.author, q) : r.author,

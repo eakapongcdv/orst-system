@@ -14,6 +14,7 @@ type TaxonEntry = {
   orderIndex: number | null;
   contentHtml: string | null;
   contentText: string | null;
+  shortDescription?: string | null;
 
   // NEW meta fields from schema
   official?: string | null;
@@ -32,6 +33,7 @@ type TaxonEntry = {
   titleMarked?: string | null;
   contentHtmlMarked?: string | null;
   contentTextMarked?: string | null;
+  shortDescriptionMarked?: string | null;
   officialNameThMarked?: string | null;
   familyMarked?: string | null;
   synonymsMarked?: string | null;
@@ -479,9 +481,12 @@ export default function TaxonomyBrowserPage() {
                           </dl>
                         </div>
 
-                        <div className="taxon-shortdescription">
-                            {selected.shortDescription}
-                        </div>
+                        {(selected.shortDescriptionMarked || selected.shortDescription) && (
+                          <div
+                            className="taxon-shortdescription"
+                            dangerouslySetInnerHTML={{ __html: selected.shortDescriptionMarked || selected.shortDescription || '' }}
+                          />
+                        )}
 
                         <article
                             className="taxon-article prose prose-sm max-w-none"
@@ -503,7 +508,7 @@ export default function TaxonomyBrowserPage() {
                     {/* Right side bar meta (visible on desktop), slide-panel still available on mobile */}
                     <aside className="taxon-aside taxon-aside--right">
                       <div className="aside-title" style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px'}}>
-                        <span>สรุป/เมตา</span>
+                        <span>-</span>
                         <button
                           type="button"
                           className="btn-icon"
@@ -535,28 +540,7 @@ export default function TaxonomyBrowserPage() {
                             <dt className="col-sm-3">คำระบุชนิด</dt>
                             <dd className="col-sm-9"><i>{summary?.species}</i></dd>
                           </dl>
-
-                          <dl className="row">
-                            <dt className="col-sm-3">วงศ์</dt>
-                            <dd className="col-sm-9">
-                              <span
-                                dangerouslySetInnerHTML={{
-                                  __html: (selected?.familyMarked ?? summary?.family ?? '-') as string,
-                                }}
-                              />
-                            </dd>
-                          </dl>
-                          <dl className="row">
-                            <dt className="col-sm-3">ชื่อพ้อง</dt>
-                            <dd className="col-sm-9">
-                              <span
-                                dangerouslySetInnerHTML={{
-                                  __html: (selected?.synonymsMarked ?? summary?.synonyms ?? '-') as string,
-                                }}
-                              />
-                            </dd>
-                          </dl>
-
+      
                           <dl className="row">
                             <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
                             <dd className="col-sm-9">
@@ -944,8 +928,19 @@ export default function TaxonomyBrowserPage() {
               margin: 12px 0 12px;
             }
             .taxon-metaheader .row { display: contents; }
-            .taxon-metaheader dt { color: #6b7280; font-weight: 600; }
+            .taxon-metaheader dt { color: #111827; font-weight: 900; }
             .taxon-metaheader dd { margin: 0; color: #111827; }
+
+            .taxon-shortdescription {
+              margin: 1rem 0 1rem;
+              font-size: 1rem;
+              line-height: 1.5rem;
+              color: #111827;
+              background: #c1a58c;
+              padding: 0.5rem 1rem 0.5rem 1rem;
+              border-radius: 15px;
+            }
+            .taxon-shortdescription p { margin: 0; }
 
             /* Article: two-column layout on wide screens */
             .taxon-article { text-align: justify; }
@@ -1025,7 +1020,7 @@ export default function TaxonomyBrowserPage() {
 
             .summary-grid .row {
               display: grid;
-              grid-template-columns: 6.5rem 1fr; /* narrower dt, wider dd */
+              grid-template-columns: 4rem 1fr; /* narrower dt, wider dd */
               column-gap: 12px;
               row-gap: 2px;
               margin: 0 0 12px 0;
