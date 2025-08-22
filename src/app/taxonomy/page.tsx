@@ -25,6 +25,7 @@ type TaxonEntry = {
   authorsDisplay?: string | null;
   authorsPeriod?: string | null;
   otherNames?: string | null;
+  synonyms?: string | null;
   author?: string | null;
 
   // Highlighted fields returned by API when q is present
@@ -32,6 +33,8 @@ type TaxonEntry = {
   contentHtmlMarked?: string | null;
   contentTextMarked?: string | null;
   officialNameThMarked?: string | null;
+  familyMarked?: string | null;
+  synonymsMarked?: string | null;
 
   updatedAt?: string;
   taxon?: { id: number; scientificName: string | null };
@@ -273,6 +276,7 @@ export default function TaxonomyBrowserPage() {
       species: selected.species || '-',
       official: selected.officialNameTh || selected.title || '-',
       otherNames: selected.otherNames || '-',
+      synonyms: selected.synonyms || '-',
       authorsDisplay: selected.authorsDisplay || '-',
       authorsPeriod: selected.authorsPeriod || '-',
       family: selected.family || '-',
@@ -449,25 +453,32 @@ export default function TaxonomyBrowserPage() {
                         {/* NEW: meta header (placed before updatedAt) */}
                         <div className="taxon-metaheader">
                           <dl className="row">
-                            <dt>ชื่อวิทยาศาสตร์</dt>
-                            <dd><i>{selected.scientificName || summary?.scientific || '-'}</i></dd>
+                            <dt>ชื่อพ้อง</dt>
+                            <dd>
+                              <i
+                                dangerouslySetInnerHTML={{
+                                  __html:
+                                    (selected.synonymsMarked ?? selected.synonyms ?? summary?.synonyms ?? '-') as string,
+                                }}
+                              />
+                            </dd>
                           </dl>
                           <dl className="row">
                             <dt>วงศ์</dt>
-                            <dd><i>{selected.family || summary?.family || '-'}</i></dd>
+                            <dd>
+                              <i
+                                dangerouslySetInnerHTML={{
+                                  __html:
+                                    (selected.familyMarked ?? selected.family ?? summary?.family ?? '-') as string,
+                                }}
+                              />
+                            </dd>
                           </dl>
                           <dl className="row">
                             <dt>ชื่ออื่น ๆ</dt>
                             <dd>{selected.otherNames || summary?.otherNames || '-'}</dd>
                           </dl>
                         </div>
-
-                        {selected.updatedAt && (
-                            <div className="taxon-updated">
-                            อัปเดตล่าสุด:{' '}
-                            {new Date(selected.updatedAt).toLocaleString('th-TH')}
-                            </div>
-                        )}
 
                         <article
                             className="taxon-article prose prose-sm max-w-none"
@@ -478,6 +489,11 @@ export default function TaxonomyBrowserPage() {
                                 '',
                             }}
                         />
+                        {selected.updatedAt && (
+                          <div className="taxon-updated taxon-updated--bottom">
+                            อัปเดตล่าสุด: {new Date(selected.updatedAt).toLocaleString('th-TH')}
+                          </div>
+                        )}
                         </div>
                     )}
                     </section>
@@ -515,6 +531,27 @@ export default function TaxonomyBrowserPage() {
                           <dl className="row">
                             <dt className="col-sm-3">คำระบุชนิด</dt>
                             <dd className="col-sm-9"><i>{summary?.species}</i></dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">วงศ์</dt>
+                            <dd className="col-sm-9">
+                              <span
+                                dangerouslySetInnerHTML={{
+                                  __html: (selected?.familyMarked ?? summary?.family ?? '-') as string,
+                                }}
+                              />
+                            </dd>
+                          </dl>
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่อพ้อง</dt>
+                            <dd className="col-sm-9">
+                              <span
+                                dangerouslySetInnerHTML={{
+                                  __html: (selected?.synonymsMarked ?? summary?.synonyms ?? '-') as string,
+                                }}
+                              />
+                            </dd>
                           </dl>
 
                           <dl className="row">
@@ -586,78 +623,99 @@ export default function TaxonomyBrowserPage() {
                     <div className="slide-panel__body">
                     {selected ? (
                         <div className="summary-grid">
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">ชื่อหลักหรือชื่อทางการ</dt>
                             <dd className="col-sm-9">{summary?.official}</dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">ชื่อวิทยาศาสตร์</dt>
                             <dd className="col-sm-9">
-                            <b>
+                              <b>
                                 <i>{summary?.scientific}</i>
-                            </b>
+                              </b>
                             </dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">ชื่อสกุล</dt>
                             <dd className="col-sm-9">
-                            <i>{summary?.genus}</i>
+                              <i>{summary?.genus}</i>
                             </dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">คำระบุชนิด</dt>
                             <dd className="col-sm-9">
-                            <i>{summary?.species}</i>
+                              <i>{summary?.species}</i>
                             </dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
+                            <dt className="col-sm-3">วงศ์</dt>
+                            <dd className="col-sm-9">
+                              <span
+                                dangerouslySetInnerHTML={{
+                                  __html: (selected?.familyMarked ?? summary?.family ?? '-') as string,
+                                }}
+                              />
+                            </dd>
+                          </dl>
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่อพ้อง</dt>
+                            <dd className="col-sm-9">
+                              <span
+                                dangerouslySetInnerHTML={{
+                                  __html: (selected?.synonymsMarked ?? summary?.synonyms ?? '-') as string,
+                                }}
+                              />
+                            </dd>
+                          </dl>
+
+                          <dl className="row">
                             <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
                             <dd className="col-sm-9">
-                            {summary?.authorsDisplay &&
-                            typeof summary.authorsDisplay === 'string' ? (
+                              {summary?.authorsDisplay &&
+                              typeof summary.authorsDisplay === 'string' ? (
                                 <div
-                                dangerouslySetInnerHTML={{
+                                  dangerouslySetInnerHTML={{
                                     __html: summary.authorsDisplay.replace(
-                                    /\n/g,
-                                    '<br>'
+                                      /\n/g,
+                                      '<br>'
                                     ),
-                                }}
+                                  }}
                                 />
-                            ) : (
+                              ) : (
                                 '-'
-                            )}
+                              )}
                             </dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</dt>
                             <dd className="col-sm-9">
-                            {summary?.authorsPeriod &&
-                            typeof summary.authorsPeriod === 'string' ? (
+                              {summary?.authorsPeriod &&
+                              typeof summary.authorsPeriod === 'string' ? (
                                 <div
-                                dangerouslySetInnerHTML={{
+                                  dangerouslySetInnerHTML={{
                                     __html: summary.authorsPeriod.replace(/\n/g, '<br>'),
-                                }}
+                                  }}
                                 />
-                            ) : (
+                              ) : (
                                 '-'
-                            )}
+                              )}
                             </dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
                             <dd className="col-sm-9">{summary?.otherNames}</dd>
-                        </dl>
+                          </dl>
 
-                        <dl className="row">
+                          <dl className="row">
                             <dt className="col-sm-3">ผู้เขียนคำอธิบาย</dt>
                             <dd className="col-sm-9">{summary?.author}</dd>
-                        </dl>
+                          </dl>
                         </div>
                     ) : (
                         <div className="text-gray-500">
@@ -871,18 +929,15 @@ export default function TaxonomyBrowserPage() {
             }
             .taxon-sci { text-align: left; font-size: clamp(1.5rem, 1.5vw, 1.5rem); line-height: 1; color: #50151d; }
             .taxon-sci em { font-style: italic; }
-            .taxon-updated { font-size: 0.85rem; color: #6b7280; margin: 4px 0 14px; text-align: right; }
-            /* เพิ่มใน <style jsx> หลัง .taxon-updated */
+            .taxon-updated { font-size: 0.85rem; color: #6b7280; text-align: right; }
+            .taxon-updated--bottom { padding-top: .5rem; margin-top: .5rem; border-top: 1px dashed var(--border, #e5e7eb); }
             .taxon-metaheader {
               display: grid;
-              grid-template-columns: 11rem 1fr;
+              grid-template-columns: 8.5rem 1fr;
               column-gap: 14px;
               row-gap: 6px;
               margin: 6px 0 14px;
               padding: 12px 14px;
-              background: #c4a88e;
-              border: 1px solid #c4a88e;
-              border-radius: 12px;
             }
             .taxon-metaheader .row { display: contents; }
             .taxon-metaheader dt { color: #6b7280; font-weight: 600; }
@@ -966,7 +1021,7 @@ export default function TaxonomyBrowserPage() {
 
             .summary-grid .row {
               display: grid;
-              grid-template-columns: 9.5rem 1fr;
+              grid-template-columns: 7.5rem 1fr;
               column-gap: 12px;
               row-gap: 2px;
               margin: 0 0 12px 0;

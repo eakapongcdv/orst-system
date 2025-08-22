@@ -89,14 +89,18 @@ function normThaiNoSpace(s: string): string {
   return normThaiBasic(s).replace(/\s+/g, '');
 }
 
+function thaiKey(s: string): string {
+  // Normalize, drop zero-width, FFFD, condense spaces, and remove all Thai tone/diacritic marks, then remove spaces
+  return normThaiBasic(s).replace(/[\u0E31\u0E34-\u0E4E]/g, '').replace(/\s+/g, '');
+}
+
 /**
- * Remove title/scientificName header and labeled paragraphs (ชื่อวิทยาศาสตร์, ชื่อพ้อง, ชื่ออื่น ๆ)
- * from the entry content.
- * meta?.removeSynonyms?: boolean — controls removal of synonyms paragraph.
+ * Remove title/scientificName header and labeled paragraphs (ชื่อวิทยาศาสตร์, ชื่อพ้อง, ชื่ออื่น ๆ, วงศ์)
+ * from the entry content — these now always live in meta.
  */
 function sanitizeEntryContent(
   html: string,
-  meta?: { official?: string | null; scientific?: string | null; removeSynonyms?: boolean }
+  meta?: { official?: string | null; scientific?: string | null }
 ): { html: string; text: string } {
   try {
     const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
@@ -105,7 +109,6 @@ function sanitizeEntryContent(
 
     const targetSci = meta?.scientific ? normThaiNoSpace(meta.scientific) : '';
     const targetOfficial = meta?.official ? normThaiNoSpace(meta.official) : '';
-    const shouldRemoveSynonyms = meta?.removeSynonyms !== false;
 
     // 1) Remove header line that contains the scientific name (usually a <strong> with <em>)
     let headerRemoved = false;
@@ -141,27 +144,23 @@ function sanitizeEntryContent(
       const strong = p.querySelector('strong');
       if (!strong) continue;
 
-      const label = normThaiNoSpace(strong.textContent || '');
-      const labelNoTone = label.replace(/[\u0E48-\u0E4B]/g, '');
+      // Build a tone/space-insensitive key for the label
+      const labelKey = thaiKey(strong.textContent || '');
 
-      // Remove labeled paragraphs that should live in meta (not in contentHtml)
-      const isSynonymsLabel =
-        labelNoTone.includes('ชื่อพ้อง') || /^ชื่อพ้อง$/.test(labelNoTone);
+      // Precomputed keys for comparison (tone-insensitive)
+      const KEY = {
+        synonyms: thaiKey('ชื่อพ้อง'),
+        other:    thaiKey('ชื่ออื่น'),            // covers 'ชื่ออื่น', 'ชื่ออื่น ๆ', 'ชื่ออื่นๆ'
+        scientific: thaiKey('ชื่อวิทยาศาสตร์'),
+        family:   thaiKey('วงศ์'),
+      };
 
-      const isOtherNamesLabel =
-        labelNoTone.startsWith('ชื่ออื่นๆ') || labelNoTone.startsWith('ชื่ออื่น');
+      const isSynonymsLabel   = labelKey.startsWith(KEY.synonyms);
+      const isOtherNamesLabel = labelKey.startsWith(KEY.other);
+      const isScientificLabel = labelKey.startsWith(KEY.scientific);
+      const isFamilyLabel     = labelKey.startsWith(KEY.family);
 
-      const isScientificLabel = labelNoTone.startsWith('ชื่อวิทยาศาสตร์');
-
-      const isFamilyLabel =
-        labelNoTone.startsWith('วงศ์') || /^วงศ์์?$/.test(labelNoTone);
-
-      if (
-        isScientificLabel ||
-        isOtherNamesLabel ||
-        isFamilyLabel ||
-        (isSynonymsLabel && shouldRemoveSynonyms)
-      ) {
+      if (isScientificLabel || isOtherNamesLabel || isFamilyLabel || isSynonymsLabel) {
         p.remove();
         continue;
       }
@@ -173,21 +172,16 @@ function sanitizeEntryContent(
   } catch {
     // Fallback: if DOM parsing fails, strip simple labeled blocks via regex
     let out = html;
-    // remove <p><strong>ชื่อวิทยาศาสตร์...</strong>...</p>
-    out = out.replace(/<p>\s*<strong>[^<]*ชื่อ\s*วิทยาศาสตร์[^<]*<\/strong>[\s\S]*?<\/p>/giu, '');
-    // remove <p><strong>ชื่อพ้อง...</strong>...</p> — only when allowed
-    const shouldRemoveSynonyms = meta?.removeSynonyms !== false;
-    if (shouldRemoveSynonyms) {
-      out = out.replace(/<p>\s*<strong>[^<]*ชื่อพ้อง[^<]*<\/strong>[\s\S]*?<\/p>/giu, '');
-      // remove synonyms blocks (ชื่อพ้อง) with possible tone marks
-      out = out.replace(/<p>\s*<strong>\s*ชื่อพ้อง\s*<\/strong>[\s\S]*?<\/p>/giu, '');
-    }
-    // remove ชื่ออื่น ๆ / ชื่ออื่นๆ
-    out = out.replace(/<p>\s*<strong>[^<]*ชื่ออื่น(?:\s*ๆ)?[^<]*<\/strong>[\s\S]*?<\/p>/giu, '');
-
-    // remove วงศ์ blocks (family)
-    out = out.replace(/&lt;p&gt;\s*&lt;strong&gt;[^&lt;]*วงศ์[^&lt;]*&lt;\/strong&gt;[\s\S]*?&lt;\/p&gt;/gi, '');
-    out = out.replace(/<p>\s*<strong>[^<]*วงศ์[^<]*<\/strong>[\s\S]*?<\/p>/gi, '');
+    // ชื่อวิทยาศาสตร์ (allow spaces/variants)
+    out = out.replace(/<p>\s*<strong>[\s\S]*?ชื่อ\s*วิทยาศาสตร์[\s\S]*?<\/strong>[\s\S]*?<\/p>/giu, '');
+    // ชื่อพ้อง (tolerate stray spaces)
+    out = out.replace(/<p>\s*<strong>\s*ชื่อ\s*พ้อง\s*<\/strong>[\s\S]*?<\/p>/giu, '');
+    // ชื่ออื่น ๆ / ชื่ออื่นๆ / ชื่อ อื่นๆ
+    out = out.replace(/<p>\s*<strong>[\s\S]*?ชื่อ\s*อื่น(?:\s*ๆ)?[\s\S]*?<\/strong>[\s\S]*?<\/p>/giu, '');
+    // วงศ์
+    out = out.replace(/<p>\s*<strong>[\s\S]*?วงศ์[\s\S]*?<\/strong>[\s\S]*?<\/p>/giu, '');
+    // Also handle HTML-escaped variants if present
+    out = out.replace(/&lt;p&gt;[\s\S]*?&lt;strong&gt;[\s\S]*?(ชื่อ\s*วิทยาศาสตร์|ชื่อ\s*พ้อง|ชื่อ\s*อื่น(?:\s*ๆ)?|วงศ์)[\s\S]*?&lt;\/strong&gt;[\s\S]*?&lt;\/p&gt;/giu, '');
 
     return { html: out, text: stripHtmlToText(out) };
   }
@@ -714,7 +708,7 @@ export async function POST(req: NextRequest) {
                   }
                   const cleaned = sanitizeEntryContent(
                     part.html,
-                    { official: meta.official || null, scientific: meta.scientific || null, removeSynonyms: !!meta.synonyms }
+                    { official: meta.official || null, scientific: meta.scientific || null }
                   );
 
                   await prisma.taxonEntry.create({
