@@ -1,137 +1,41 @@
 {
   "encyclopedias": [
     {
-      "slug": "european-countries",
-      "titleTh": "สารานุกรมประเทศในทวีปยุโรป",
-      "titleEn": "Encyclopedia of European Countries",
-      "description": "รวมบทความสารานุกรมประเทศในทวีปยุโรป (A–Z)",
-      "coverImage": null,
+      "slug": "plant-taxonomy-letter-kor-2",
+      "titleTh": "อนุกรมวิธานพืช อักษร ก (พิมพ์ครั้งที่ ๒)",
+      "titleEn": "Plant Taxonomy — Letter Kor (2nd ed.)",
+      "description": "สรุปย่อและเชื่อมโยงบทความจาก สารานุกรม อนุกรมวิธานพืช อักษร ก (พิมพ์ครั้งที่ ๒) โดยอ้างอิงจาก LST Encyclopedia",
       "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
       "publisher": "NECTEC LST",
       "language": "th",
-      "tags": ["ยุโรป", "ประเทศ"],
-      "meta": { "source": "LST Encyclopedia" },
+      "tags": ["อนุกรมวิธานพืช", "อักษร ก", "พืช"],
+      "meta": { "source": "LST Encyclopedia", "note": "ข้อมูลย่อสำหรับ seed" },
       "articles": [
-        { "slug": "albania", "titleTh": "สาธารณรัฐแอลเบเนีย", "titleEn": "Albania, Republic of" },
-        { "slug": "andorra", "titleTh": "อันดอร์รา", "titleEn": "Andorra" },
-        { "slug": "austria", "titleTh": "สาธารณรัฐออสเตรีย", "titleEn": "Austria, Republic of" },
-        { "slug": "belarus", "titleTh": "สาธารณรัฐเบลารุส", "titleEn": "Belarus, Republic of" },
-        { "slug": "belgium", "titleTh": "ราชอาณาจักรเบลเยียม", "titleEn": "Belgium, Kingdom of" },
-        { "slug": "bosnia-and-herzegovina", "titleTh": "บอสเนียและเฮอร์เซโกวีนา", "titleEn": "Bosnia and Herzegovina" },
-        { "slug": "bulgaria", "titleTh": "สาธารณรัฐบัลแกเรีย", "titleEn": "Bulgaria, Republic of" },
-        { "slug": "croatia", "titleTh": "สาธารณรัฐโครเอเชีย", "titleEn": "Croatia, Republic of" },
-        { "slug": "czech-republic", "titleTh": "สาธารณรัฐเช็ก", "titleEn": "Czech Republic" },
-        { "slug": "denmark", "titleTh": "ราชอาณาจักรเดนมาร์ก", "titleEn": "Denmark, Kingdom of" },
-        { "slug": "estonia", "titleTh": "สาธารณรัฐเอสโตเนีย", "titleEn": "Estonia, Republic of" },
-        { "slug": "finland", "titleTh": "สาธารณรัฐฟินแลนด์", "titleEn": "Finland, Republic of" },
         {
-          "slug": "france",
-          "titleTh": "สาธารณรัฐฝรั่งเศส",
-          "titleEn": "France; French Republic",
-          "externalUrl": "https://lst.nectec.or.th/encyclopedia/wikipedia/europecountry/view/index.php?namelink=France%3B+French+Republic"
+          "slug": "lindsaea-chienii",
+          "titleTh": "กูดหางนกยูง — Lindsaea chienii Ching",
+          "summary": "เฟิร์นพื้นดิน ใบแบบขนนกสองชั้น; ชื่อวิทยาศาสตร์ Lindsaea chienii (วงศ์ Lindsaeaceae)",
+          "externalUrl": "https://lst.nectec.or.th/encyclopedia/wikipedia/plant_taxonomy/view/index.php?cid=469&namelink=%E0%B8%81%E0%B8%B9%E0%B8%94%E0%B8%AB%E0%B8%B2%E0%B8%87%E0%B8%99%E0%B8%81%E0%B8%A2%E0%B8%B9%E0%B8%87",
+          "contentHtml": "<p><strong>กูดหางนกยูง</strong> (Lindsaea chienii) เป็นเฟิร์นในวงศ์ Lindsaeaceae พบบนดินในป่าชื้น ใบประกอบแบบขนนกสองชั้น</p>",
+          "keywords": ["เฟิร์น", "Lindsaea", "Lindsaeaceae"]
         },
-        { "slug": "germany", "titleTh": "สหพันธ์สาธารณรัฐเยอรมนี", "titleEn": "Germany, Federal Republic of" },
-        { "slug": "united-kingdom", "titleTh": "สหราชอาณาจักรบริเตนใหญ่และไอร์แลนด์เหนือ", "titleEn": "Great Britain and Northern Ireland" },
-        { "slug": "greece", "titleTh": "สาธารณรัฐเฮลเลนิก", "titleEn": "Greece; Hellenic Republic" },
-        { "slug": "hungary", "titleTh": "สาธารณรัฐฮังการี", "titleEn": "Hungary, Republic of" },
-        { "slug": "iceland", "titleTh": "สาธารณรัฐไอซ์แลนด์", "titleEn": "Iceland, Republic of" },
-        { "slug": "ireland", "titleTh": "สาธารณรัฐไอร์แลนด์", "titleEn": "Ireland, Republic of" },
-        { "slug": "italy", "titleTh": "สาธารณรัฐอิตาลี", "titleEn": "Italy; Italian Republic" },
-        { "slug": "latvia", "titleTh": "สาธารณรัฐลัตเวีย", "titleEn": "Latvia, Republic of" },
-        { "slug": "liechtenstein", "titleTh": "ราชรัฐลิกเตนสไตน์", "titleEn": "Liechtenstein, Principality of" },
-        { "slug": "lithuania", "titleTh": "สาธารณรัฐลิทัวเนีย", "titleEn": "Lithuania, Republic of" },
-        { "slug": "luxembourg", "titleTh": "ราชรัฐลักเซมเบิร์ก", "titleEn": "Luxembourg, Grand Duchy of" },
-        { "slug": "macedonia", "titleTh": "สาธารณรัฐมาซิโดเนีย", "titleEn": "Macedonia, Republic of" },
-        { "slug": "malta", "titleTh": "สาธารณรัฐมอลตา", "titleEn": "Malta, Republic of" },
-        { "slug": "moldova", "titleTh": "สาธารณรัฐมอลโดวา", "titleEn": "Moldova, Republic of" },
-        { "slug": "monaco", "titleTh": "ราชรัฐโมนาโก", "titleEn": "Monaco, Principality of" },
-        { "slug": "montenegro", "titleTh": "มอนเตเนโกร", "titleEn": "Montenegro" },
-        { "slug": "netherlands", "titleTh": "ราชอาณาจักรเนเธอร์แลนด์", "titleEn": "Netherlands, Kingdom of the" },
-        { "slug": "norway", "titleTh": "ราชอาณาจักรนอร์เวย์", "titleEn": "Norway, Kingdom of" },
-        { "slug": "poland", "titleTh": "สาธารณรัฐโปแลนด์", "titleEn": "Poland, Republic of" },
-        { "slug": "portugal", "titleTh": "สาธารณรัฐโปรตุเกส", "titleEn": "Portugal, Republic of" },
-        { "slug": "romania", "titleTh": "โรมาเนีย", "titleEn": "Romania" },
-        { "slug": "russian-federation", "titleTh": "สหพันธรัฐรัสเซีย", "titleEn": "Russian Federation" },
-        { "slug": "san-marino", "titleTh": "สาธารณรัฐซานมารีโน", "titleEn": "San Marino, Republic of" },
-        { "slug": "serbia", "titleTh": "สาธารณรัฐเซอร์เบีย", "titleEn": "Serbia, Republic of" },
-        { "slug": "slovakia", "titleTh": "สาธารณรัฐสโลวัก", "titleEn": "Slovakia; Slovak Republic" },
-        { "slug": "slovenia", "titleTh": "สาธารณรัฐสโลวีเนีย", "titleEn": "Slovenia, Republic of" },
-        { "slug": "spain", "titleTh": "ราชอาณาจักรสเปน", "titleEn": "Spain, Kingdom of" },
-        { "slug": "sweden", "titleTh": "ราชอาณาจักรสวีเดน", "titleEn": "Sweden, Kingdom of" },
-        { "slug": "switzerland", "titleTh": "สมาพันธรัฐสวิส", "titleEn": "Switzerland; Swiss Confederation" },
-        { "slug": "ukraine", "titleTh": "ยูเครน", "titleEn": "Ukraine" },
-        { "slug": "vatican-city", "titleTh": "นครรัฐวาติกัน; สันตะสำนัก", "titleEn": "Vatican City State; The Holy See" }
+        {
+          "slug": "colysis-hemionitidea",
+          "titleTh": "กูดหางนกกะลิง — Colysis hemionitidea (Wall. ex Kunze) Bosman",
+          "summary": "เฟิร์นวงศ์ Polypodiaceae; ใบรูปไข่ยาว ก้านใบเรียว",
+          "externalUrl": "https://lst.nectec.or.th/encyclopedia/wikipedia/plant_taxonomy/view/index.php?cid=45&namelink=%E0%B8%81%E0%B8%B9%E0%B8%94%E0%B8%AB%E0%B8%B2%E0%B8%87%E0%B8%99%E0%B8%81%E0%B8%81%E0%B8%B0%E0%B8%A5%E0%B8%B4%E0%B8%87",
+          "contentHtml": "<p><strong>กูดหางนกกะลิง</strong> (Colysis hemionitidea) อยู่ในวงศ์ Polypodiaceae พบตามโขดหินหรือพื้นที่ชื้น</p>",
+          "keywords": ["เฟิร์น", "Colysis", "Polypodiaceae"]
+        },
+        {
+          "slug": "cinnamomum-tamala",
+          "titleTh": "แกง — Cinnamomum tamala Nees & Eberm.",
+          "summary": "ไม้ต้นวงศ์ Lauraceae ใบเรียงตรงข้าม มีเส้นใบคู่ขนานเด่นชัด",
+          "externalUrl": "https://lst.nectec.or.th/encyclopedia/wikipedia/plant_taxonomy/view/index.php?cid=499&namelink=%E0%B9%81%E0%B8%81%E0%B8%87",
+          "contentHtml": "<p><strong>แกง</strong> (Cinnamomum tamala) อยู่ในวงศ์ Lauraceae ใช้เป็นเครื่องเทศในบางภูมิภาค</p>",
+          "keywords": ["Cinnamomum", "Lauraceae", "พฤกษศาสตร์"]
+        }
       ]
-    },
-
-    {
-      "slug": "modern-europe-history-vol-5-l-o",
-      "titleTh": "สารานุกรมประวัติศาสตร์สากลสมัยใหม่ : ยุโรป เล่ม ๕ (L–O)",
-      "titleEn": "Encyclopedia of Modern European History, Vol. 5 (L–O)",
-      "description": "ชุดสารานุกรมประวัติศาสตร์สากลสมัยใหม่ : ยุโรป เล่ม ๕ (ตัวอักษร L–O)",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "publisher": "NECTEC LST",
-      "language": "th",
-      "tags": ["ยุโรป", "ประวัติศาสตร์สากล", "สารานุกรม"],
-      "meta": { "series": "Modern European History", "volume": 5, "letters": "L–O" },
-      "articles": []
-    },
-    {
-      "slug": "modern-europe-history-vol-6-p-s",
-      "titleTh": "สารานุกรมประวัติศาสตร์สากลสมัยใหม่ : ยุโรป เล่ม ๖ (P–S)",
-      "titleEn": "Encyclopedia of Modern European History, Vol. 6 (P–S)",
-      "description": "ชุดสารานุกรมประวัติศาสตร์สากลสมัยใหม่ : ยุโรป เล่ม ๖ (ตัวอักษร P–S)",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "publisher": "NECTEC LST",
-      "language": "th",
-      "tags": ["ยุโรป", "ประวัติศาสตร์สากล", "สารานุกรม"],
-      "meta": { "series": "Modern European History", "volume": 6, "letters": "P–S" },
-      "articles": []
-    },
-    {
-      "slug": "modern-europe-history-vol-7-t-z",
-      "titleTh": "สารานุกรมประวัติศาสตร์สากลสมัยใหม่ : ยุโรป เล่ม ๗ (T–Z)",
-      "titleEn": "Encyclopedia of Modern European History, Vol. 7 (T–Z)",
-      "description": "ชุดสารานุกรมประวัติศาสตร์สากลสมัยใหม่ : ยุโรป เล่ม ๗ (ตัวอักษร T–Z)",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "publisher": "NECTEC LST",
-      "language": "th",
-      "tags": ["ยุโรป", "ประวัติศาสตร์สากล", "สารานุกรม"],
-      "meta": { "series": "Modern European History", "volume": 7, "letters": "T–Z" },
-      "articles": []
-    },
-
-    {
-      "slug": "thai-music-terms",
-      "titleTh": "สารานุกรมศัพท์ดนตรีไทย ภาคคีตะ-ดุริยางค์ (พิมพ์ครั้งที่ ๓)",
-      "titleEn": "Encyclopedia of Thai Music Terms",
-      "description": "ศัพท์ดนตรีไทย ภาคคีตะ-ดุริยางค์ (ฉบับพิมพ์ครั้งที่ ๓)",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "publisher": "NECTEC LST",
-      "language": "th",
-      "tags": ["ดนตรีไทย", "ศัพท์"],
-      "articles": []
-    },
-
-    {
-      "slug": "ramakien-vol-1",
-      "titleTh": "สารานุกรมวรรณคดีไทย เรื่องรามเกียรติ์ เล่ม ๑",
-      "titleEn": "Thai Literature Encyclopedia: Ramakien Vol. 1",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "publisher": "NECTEC LST",
-      "language": "th",
-      "tags": ["วรรณคดีไทย", "รามเกียรติ์"],
-      "articles": []
-    },
-    {
-      "slug": "ramakien-vol-2",
-      "titleTh": "สารานุกรมวรรณคดีไทย เรื่องรามเกียรติ์ เล่ม ๒",
-      "titleEn": "Thai Literature Encyclopedia: Ramakien Vol. 2",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "publisher": "NECTEC LST",
-      "language": "th",
-      "tags": ["วรรณคดีไทย", "รามเกียรติ์"],
-      "articles": []
     }
   ]
 }

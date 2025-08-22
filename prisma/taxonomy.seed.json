@@ -3,45 +3,36 @@
     {
       "title": "อนุกรมวิธานพืช",
       "domain": "plant",
-      "version": "1.0",
-      "description": "ลำดับชั้นอนุกรมวิธานสำหรับพืช (หลายเล่มตามช่วงอักษร)",
+      "version": "2.0",
+      "description": "อนุกรมวิธานพืช (รวมตัวอย่างอักษร ก พิมพ์ครั้งที่ ๒) จาก LST Encyclopedia",
       "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "meta": {
-        "volumes": [
-          "อักษร ก (พิมพ์ครั้งที่ ๒)",
-          "อักษร ข เล่ม ๑",
-          "อักษร ข เล่ม ๒",
-          "อักษร ค",
-          "อักษร ฆ–จ",
-          "อักษร ฉ–ฒ",
-          "อักษร ด",
-          "อักษร ต เล่ม ๑",
-          "อักษร ต เล่ม ๒"
-        ]
-      },
+      "meta": { "source": "LST Encyclopedia" },
       "taxa": [
-        { "rank": "KINGDOM", "scientificName": "Plantae", "thaiName": "พืช", "status": "accepted" },
-        { "rank": "FAMILY",  "scientificName": "Poaceae", "thaiName": "วงศ์หญ้า", "parentScientificName": "Plantae", "status": "accepted" },
-        { "rank": "GENUS",   "scientificName": "Oryza", "thaiName": "ข้าว (สกุล)", "parentScientificName": "Poaceae", "status": "accepted" },
-        { "rank": "SPECIES", "scientificName": "Oryza sativa", "thaiName": "ข้าวเจ้า/ข้าวปลูก", "parentScientificName": "Oryza", "status": "accepted", "commonNames": ["ข้าว (rice)"], "references": [{"cite": "FAO / GBIF", "url": "https://www.gbif.org/"}] }
-      ]
-    },
-    {
-      "title": "อนุกรมวิธานสัตว์",
-      "domain": "animal",
-      "version": "1.0",
-      "description": "ลำดับชั้นอนุกรมวิธานสำหรับสัตว์",
-      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
-      "meta": {
-        "volumes": [
-          "อักษร ก"
-        ]
-      },
-      "taxa": [
-        { "rank": "KINGDOM", "scientificName": "Animalia", "thaiName": "สัตว์", "status": "accepted" },
-        { "rank": "FAMILY",  "scientificName": "Felidae", "thaiName": "วงศ์แมว", "parentScientificName": "Animalia", "status": "accepted" },
-        { "rank": "GENUS",   "scientificName": "Panthera", "thaiName": "เสือใหญ่ (สกุล)", "parentScientificName": "Felidae", "status": "accepted" },
-        { "rank": "SPECIES", "scientificName": "Panthera tigris", "thaiName": "เสือโคร่ง", "parentScientificName": "Panthera", "status": "accepted", "commonNames": ["tiger"] }
+        { "rank": "KINGDOM", "scientificName": "Plantae", "thaiName": "พืช" },
+
+        { "rank": "FAMILY", "scientificName": "Lindsaeaceae", "parentScientificName": "Plantae", "thaiName": "วงศ์กูดหางนกยูง" },
+        { "rank": "GENUS", "scientificName": "Lindsaea", "parentScientificName": "Lindsaeaceae" },
+        { "rank": "SPECIES", "scientificName": "Lindsaea chienii", "thaiName": "กูดหางนกยูง", "parentScientificName": "Lindsaea",
+          "references": [
+            { "title": "กูดหางนกยูง — Lindsaea chienii", "url": "https://lst.nectec.or.th/encyclopedia/wikipedia/plant_taxonomy/view/index.php?cid=469&namelink=%E0%B8%81%E0%B8%B9%E0%B8%94%E0%B8%AB%E0%B8%B2%E0%B8%87%E0%B8%99%E0%B8%81%E0%B8%A2%E0%B8%B9%E0%B8%87" }
+          ]
+        },
+
+        { "rank": "FAMILY", "scientificName": "Polypodiaceae", "parentScientificName": "Plantae", "thaiName": "วงศ์กูด" },
+        { "rank": "GENUS", "scientificName": "Colysis", "parentScientificName": "Polypodiaceae" },
+        { "rank": "SPECIES", "scientificName": "Colysis hemionitidea", "thaiName": "กูดหางนกกะลิง", "parentScientificName": "Colysis",
+          "references": [
+            { "title": "กูดหางนกกะลิง — Colysis hemionitidea", "url": "https://lst.nectec.or.th/encyclopedia/wikipedia/plant_taxonomy/view/index.php?cid=45&namelink=%E0%B8%81%E0%B8%B9%E0%B8%94%E0%B8%AB%E0%B8%B2%E0%B8%87%E0%B8%99%E0%B8%81%E0%B8%81%E0%B8%B0%E0%B8%A5%E0%B8%B4%E0%B8%87" }
+          ]
+        },
+
+        { "rank": "FAMILY", "scientificName": "Lauraceae", "parentScientificName": "Plantae", "thaiName": "วงศ์อบเชย" },
+        { "rank": "GENUS", "scientificName": "Cinnamomum", "parentScientificName": "Lauraceae" },
+        { "rank": "SPECIES", "scientificName": "Cinnamomum tamala", "thaiName": "แกง", "parentScientificName": "Cinnamomum",
+          "references": [
+            { "title": "แกง — Cinnamomum tamala", "url": "https://lst.nectec.or.th/encyclopedia/wikipedia/plant_taxonomy/view/index.php?cid=499&namelink=%E0%B9%81%E0%B8%81%E0%B8%87" }
+          ]
+        }
       ]
     }
   ]

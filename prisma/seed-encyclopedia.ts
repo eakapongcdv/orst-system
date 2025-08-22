@@ -6,12 +6,75 @@ import path from 'path';
 const prisma = new PrismaClient();
 
 /**
- * Helper: create a Taxon if not exists (by taxonomyId + scientificName).
- * Avoids relying on a composite unique that may not be defined in the schema.
+ * Optional JSON schema structures for taxonomy seeding
  */
+type JsonTaxon = {
+  rank?: string | null;
+  scientificName: string;
+  thaiName?: string | null;
+  status?: string | null;
+  parentScientificName?: string | null;
+  commonNames?: string[] | null;
+  references?: Array<Record<string, any>> | null;
+};
+
+type JsonTaxonomy = {
+  title: string;
+  domain?: string | null;
+  version?: string | null;
+  description?: string | null;
+  sourceUrl?: string | null;
+  meta?: Record<string, any> | null;
+  taxa?: JsonTaxon[];
+};
+
+/**
+ * Normalize string rank to Prisma enum TaxonRank.
+ */
+function mapRank(input?: string | null): TaxonRank {
+  if (!input) return TaxonRank.SPECIES;
+  const k = String(input).trim().toUpperCase();
+  // Common synonyms (EN/TH) mapped to canonical ranks
+  const dict: Record<string, TaxonRank> = {
+    KINGDOM: TaxonRank.KINGDOM,
+    PHYLUM: TaxonRank.PHYLUM,
+    DIVISION: TaxonRank.PHYLUM, // some datasets use Division ~ Phylum (plants)
+    CLASS: TaxonRank.CLASS,
+    ORDER: TaxonRank.ORDER,
+    FAMILY: TaxonRank.FAMILY,
+    GENUS: TaxonRank.GENUS,
+    SPECIES: TaxonRank.SPECIES,
+    SUBSPECIES: (TaxonRank as any).SUBSPECIES ?? TaxonRank.SPECIES, // fallback if enum lacks
+    VARIETY: (TaxonRank as any).VARIETY ?? TaxonRank.SPECIES,       // fallback if enum lacks
+    ชนิด: TaxonRank.SPECIES,
+    วงศ์: TaxonRank.FAMILY,
+    ชั้น: TaxonRank.CLASS,
+    อันดับ: TaxonRank.ORDER,
+    สกุล: TaxonRank.GENUS,
+    ไฟลัม: TaxonRank.PHYLUM,
+    อาณาจักร: TaxonRank.KINGDOM,
+  };
+  return dict[k] ?? (TaxonRank as any)[k] ?? TaxonRank.SPECIES;
+}
+
 async function findOrCreateTaxon(
-  data: Omit<Prisma.TaxonUncheckedCreateInput, 'id' | 'createdAt' | 'updatedAt'>
+  data: Omit<Prisma.TaxonUncheckedCreateInput, 'id' | 'createdAt' | 'updatedAt'> & {
+    parentScientificName?: string | null;
+  }
 ) {
+  // Resolve parentId from parentScientificName if provided and parentId is not set
+  let parentId = data.parentId ?? undefined;
+  if (!parentId && data.parentScientificName) {
+    const parent = await prisma.taxon.findFirst({
+      where: {
+        taxonomyId: data.taxonomyId as number,
+        scientificName: data.parentScientificName,
+      },
+      select: { id: true },
+    });
+    if (parent) parentId = parent.id;
+  }
+
   const existing = await prisma.taxon.findFirst({
     where: {
       taxonomyId: data.taxonomyId as number,
@@ -19,7 +82,18 @@ async function findOrCreateTaxon(
     },
   });
   if (existing) return existing;
-  return prisma.taxon.create({ data });
+
+  const payload: Prisma.TaxonUncheckedCreateInput = {
+    taxonomyId: data.taxonomyId,
+    parentId: parentId ?? null,
+    rank: data.rank,
+    scientificName: data.scientificName,
+    thaiName: (data as any).thaiName ?? null,
+    status: (data as any).status ?? null,
+    commonNames: (data as any).commonNames ?? [],
+    references: (data as any).references ?? [],
+  };
+  return prisma.taxon.create({ data: payload });
 }
 
 async function seedFromJsonIfExists() {
@@ -104,9 +178,109 @@ async function seedFromJsonIfExists() {
   return true;
 }
 
+/**
+ * Seed Taxonomy/Taxa from prisma/taxonomy.seed.json if present.
+ * The JSON structure should be:
+ * {
+ *   "taxonomies": [
+ *     {
+ *       "title": "อนุกรมวิธานสัตว์",
+ *       "domain": "animal",
+ *       "version": "1.0",
+ *       "description": "...",
+ *       "sourceUrl": "...",
+ *       "meta": {...},
+ *       "taxa": [
+ *         { "rank": "KINGDOM", "scientificName": "Animalia", "thaiName": "สัตว์", "status": "accepted" },
+ *         { "rank": "FAMILY", "scientificName": "Felidae", "parentScientificName": "Animalia" },
+ *         ...
+ *       ]
+ *     }
+ *   ]
+ * }
+ */
+async function seedTaxonomyFromJsonIfExists() {
+  const jsonPath = path.resolve(process.cwd(), 'prisma/taxonomy.seed.json');
+  if (!fs.existsSync(jsonPath)) return false;
+
+  const raw = fs.readFileSync(jsonPath, 'utf8');
+  const payload = JSON.parse(raw) as { taxonomies?: JsonTaxonomy[] };
+  if (!payload.taxonomies?.length) return false;
+
+  for (const t of payload.taxonomies) {
+    // Find existing taxonomy by title, else create
+    let tax = await prisma.taxonomy.findFirst({ where: { title: t.title } });
+    if (!tax) {
+      tax = await prisma.taxonomy.create({
+        data: {
+          title: t.title,
+          domain: (t.domain && t.domain.trim() !== '' ? t.domain : 'general'),
+          version: t.version ?? null,
+          description: t.description ?? null,
+          sourceUrl: t.sourceUrl ?? null,
+          meta: t.meta ?? {},
+        },
+      });
+    }
+
+    // Index to speed up parent resolution within this taxonomy
+    const cacheByName = new Map<string, number>();
+
+    // Prefetch any existing taxa names to avoid duplicates
+    const existing = await prisma.taxon.findMany({
+      where: { taxonomyId: tax.id },
+      select: { id: true, scientificName: true },
+    });
+    for (const ex of existing) cacheByName.set(ex.scientificName, ex.id);
+
+    for (const item of t.taxa ?? []) {
+      const sci = item.scientificName;
+      if (!sci) continue;
+
+      // If already cached/exists, skip
+      if (cacheByName.has(sci)) continue;
+
+      // Resolve parentId if parentScientificName provided
+      let parentId: number | undefined;
+      if (item.parentScientificName) {
+        // prefer cache
+        if (cacheByName.has(item.parentScientificName)) {
+          parentId = cacheByName.get(item.parentScientificName)!;
+        } else {
+          const p = await prisma.taxon.findFirst({
+            where: { taxonomyId: tax.id, scientificName: item.parentScientificName },
+            select: { id: true },
+          });
+          if (p) parentId = p.id;
+        }
+      }
+
+      const created = await prisma.taxon.create({
+        data: {
+          taxonomyId: tax.id,
+          parentId: parentId ?? null,
+          rank: mapRank(item.rank),
+          scientificName: item.scientificName,
+          thaiName: item.thaiName ?? null,
+          status: item.status ?? null,
+          commonNames: item.commonNames ?? [],
+          references: item.references ?? [],
+        },
+      });
+
+      cacheByName.set(created.scientificName, created.id);
+    }
+  }
+
+  return true;
+}
+
 async function main() {
   // 1) Try to seed full data from prisma/encyclopedia.seed.json (if provided)
   const loadedFromJson = await seedFromJsonIfExists();
+
+  // Try to seed taxonomy sets from JSON if available
+  const taxLoadedFromJson = await seedTaxonomyFromJsonIfExists();
 
   // 2) If no JSON provided, seed a compact default dataset (can be extended later)
   if (!loadedFromJson) {
@@ -277,7 +451,7 @@ async function main() {
     status: 'accepted',
   });
 
-  console.log('✅ Seeded: Encyclopedia + Taxonomy (sample or JSON)');
+  console.log(`✅ Seeded: Encyclopedia (${loadedFromJson ? 'JSON' : 'sample'}) + Taxonomy (${typeof taxLoadedFromJson === 'boolean' ? (taxLoadedFromJson ? 'JSON' : 'sample') : 'sample'})`);
 }
 
 main()
