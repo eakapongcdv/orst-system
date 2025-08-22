@@ -247,6 +247,9 @@ export default function TaxonomyBrowserPage() {
   }, [pagination]);
 
   const total = pagination?.total ?? results.length;
+  const pageSizeEff = pagination?.pageSize ?? pageSize;
+  const rangeStart = pagination ? Math.min(total, (pagination.currentPage - 1) * pageSizeEff + 1) : 0;
+  const rangeEnd = pagination ? Math.min(total, pagination.currentPage * pageSizeEff) : 0;
 
   const selected = useMemo(() => {
     if (!results.length) return null;
@@ -381,16 +384,6 @@ export default function TaxonomyBrowserPage() {
           {err && (
             <div className="alert alert--danger" role="alert">
               <strong>เกิดข้อผิดพลาด:</strong> {err}
-            </div>
-          )}
-
-          {/* Result Summary */}
-          {!loading && !err && (
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">ผลการค้นหา</h2>
-              <span className="text-sm text-gray-600">
-                {(pagination?.total ?? results.length)} รายการ • หน้า {pagination?.currentPage ?? 1}/{pagination?.totalPages ?? 1}
-              </span>
             </div>
           )}
 
@@ -736,28 +729,26 @@ export default function TaxonomyBrowserPage() {
           {!loading && !err && pagination && pagination.totalPages > 1 && (
             <footer className="bottom-toolbar" role="navigation" aria-label="เลขหน้า">
               <div className="toolbar">
-                {/* Left controls: first / prev */}
-                <div className="toolbar__section">
-                  <button
-                    className="tbtn"
-                    onClick={() => fetchData(1, pageSize)}
-                    disabled={!pagination.hasPrevPage}
-                    aria-label="หน้าแรก"
-                    title="หน้าแรก"
-                  >
-                    <span aria-hidden="true">«</span>
-                  </button>
-                  <button
-                    className="tbtn"
-                    onClick={() =>
-                      fetchData(pagination.prevPage || Math.max(1, pagination.currentPage - 1), pageSize)
-                    }
-                    disabled={!pagination.hasPrevPage}
-                    aria-label="ก่อนหน้า"
-                    title="ก่อนหน้า"
-                  >
-                    <span aria-hidden="true">‹</span>
-                  </button>
+                {/* Left: page size selector */}
+                <div className="toolbar__section toolbar__section--left">
+                  <label htmlFor="pageSize" className="sr-only">ต่อหน้า</label>
+                  <div className="select-wrap" title="จำนวนรายการต่อหน้า">
+                    <span className="select-label">ต่อหน้า</span>
+                    <select
+                      id="pageSize"
+                      className="select select--sm"
+                      value={pageSize}
+                      onChange={(e) => {
+                        const s = parseInt(e.target.value, 10);
+                        setPageSize(s);
+                        fetchData(1, s);
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Center: page numbers */}
@@ -780,29 +771,32 @@ export default function TaxonomyBrowserPage() {
                   )}
                 </div>
 
-                {/* Right controls: info, page size, next / last */}
+                {/* Right: range info + nav controls */}
                 <div className="toolbar__section toolbar__section--right">
                   <div className="toolbar__info">
-                    {(pagination?.total ?? results.length)} รายการ • หน้า {pagination?.currentPage ?? 1}/{pagination?.totalPages ?? 1}
+                    {rangeStart}&ndash;{rangeEnd} จาก {total} • หน้า {pagination?.currentPage ?? 1}/{pagination?.totalPages ?? 1}
                   </div>
-                  <label htmlFor="pageSize" className="sr-only">ต่อหน้า</label>
-                  <div className="select-wrap">
-                    <span className="select-label">ต่อหน้า</span>
-                    <select
-                      id="pageSize"
-                      className="select select--sm"
-                      value={pageSize}
-                      onChange={(e) => {
-                        const s = parseInt(e.target.value, 10);
-                        setPageSize(s);
-                        fetchData(1, s);
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
+
+                  <button
+                    className="tbtn"
+                    onClick={() => fetchData(1, pageSize)}
+                    disabled={!pagination.hasPrevPage}
+                    aria-label="หน้าแรก"
+                    title="หน้าแรก"
+                  >
+                    <span aria-hidden="true">«</span>
+                  </button>
+                  <button
+                    className="tbtn"
+                    onClick={() =>
+                      fetchData(pagination.prevPage || Math.max(1, pagination.currentPage - 1), pageSize)
+                    }
+                    disabled={!pagination.hasPrevPage}
+                    aria-label="ก่อนหน้า"
+                    title="ก่อนหน้า"
+                  >
+                    <span aria-hidden="true">‹</span>
+                  </button>
                   <button
                     className="tbtn"
                     onClick={() =>
@@ -836,39 +830,37 @@ export default function TaxonomyBrowserPage() {
               position: sticky;
               bottom: 0;
               background: #ffffffcc;
-              backdrop-filter: saturate(1.2) blur(6px);
+              backdrop-filter: saturate(1.1) blur(6px);
               border-top: 1px solid #e5e7eb;
               padding: 8px 0;
               z-index: 35;
             }
             .toolbar{
               display: grid;
-              grid-template-columns: 1fr auto 1fr;
+              grid-template-columns: auto 1fr auto; /* left: size, center: numbers, right: info+nav */
               align-items: center;
               gap: 12px;
-            }
-            @media (max-width: 640px){
-              .toolbar{
-                grid-template-columns: 1fr;
-                row-gap: 10px;
-              }
-              .toolbar__section--right{
-                justify-content: space-between;
-              }
             }
             .toolbar__section{
               display: flex;
               align-items: center;
-              gap: 6px;
+              gap: 8px;
+              min-height: 40px;
             }
-            .toolbar__section--right{
-              justify-content: flex-end;
-              gap: 10px;
-            }
+            .toolbar__section--left{ justify-content: flex-start; }
             .toolbar__pager{
               justify-content: center;
               flex-wrap: wrap;
-              min-height: 40px;
+            }
+            .toolbar__section--right{
+              justify-content: flex-end;
+              gap: 8px;
+            }
+            @media (max-width: 640px){
+              .toolbar{
+                grid-template-columns: 1fr auto; /* hide numbers on small screens */
+              }
+              .toolbar__pager{ display: none; }
             }
             .tsep{ color:#9ca3af; padding: 0 2px; }
             .tbtn{
