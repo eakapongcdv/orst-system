@@ -812,11 +812,10 @@ export default function TaxonomyBrowserPage() {
             display: grid;
             grid-template-columns: 24px 1fr auto auto;
             align-items: center;
-            gap: 8px;
             background: #fff;
             border: 1px solid var(--border, #e5e7eb);
             border-radius: 9999px;
-            padding: 10px 12px;
+            padding: 2px 10px;
             box-shadow: 0 2px 8px rgba(15,23,42,.06);
             transition: box-shadow .2s ease;
             }
