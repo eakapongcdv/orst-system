@@ -285,6 +285,11 @@ export default function TaxonomyBrowserPage() {
     };
   }, [selected]);
 
+  // Determine visibility of meta rows (hide if empty)
+  const hasSynonyms = !!(selected?.synonymsMarked || selected?.synonyms);
+  const hasFamily = !!(selected?.familyMarked || selected?.family);
+  const hasOtherNames = !!(selected?.otherNames);
+
   return (
     <div className="reader-stage reader-stage--full">
       <Head>
@@ -453,32 +458,36 @@ export default function TaxonomyBrowserPage() {
 
                         {/* NEW: meta header (placed before updatedAt) */}
                         <div className="taxon-metaheader">
-                          <dl className="row">
-                            <dt>ชื่อพ้อง</dt>
-                            <dd>
-                              <i
-                                dangerouslySetInnerHTML={{
-                                  __html:
-                                    (selected.synonymsMarked ?? selected.synonyms ?? summary?.synonyms ?? '-') as string,
-                                }}
-                              />
-                            </dd>
-                          </dl>
-                          <dl className="row">
-                            <dt>วงศ์</dt>
-                            <dd>
-                              <i
-                                dangerouslySetInnerHTML={{
-                                  __html:
-                                    (selected.familyMarked ?? selected.family ?? summary?.family ?? '-') as string,
-                                }}
-                              />
-                            </dd>
-                          </dl>
-                          <dl className="row">
-                            <dt>ชื่ออื่น ๆ</dt>
-                            <dd>{selected.otherNames || summary?.otherNames || '-'}</dd>
-                          </dl>
+                          {hasSynonyms && (
+                            <dl className="row">
+                              <dt>ชื่อพ้อง</dt>
+                              <dd>
+                                <i
+                                  dangerouslySetInnerHTML={{
+                                    __html: (selected.synonymsMarked ?? selected.synonyms) as string,
+                                  }}
+                                />
+                              </dd>
+                            </dl>
+                          )}
+                          {hasFamily && (
+                            <dl className="row">
+                              <dt>วงศ์</dt>
+                              <dd>
+                                <i
+                                  dangerouslySetInnerHTML={{
+                                    __html: (selected.familyMarked ?? selected.family) as string,
+                                  }}
+                                />
+                              </dd>
+                            </dl>
+                          )}
+                          {hasOtherNames && (
+                            <dl className="row">
+                              <dt>ชื่ออื่น ๆ</dt>
+                              <dd>{selected.otherNames}</dd>
+                            </dl>
+                          )}
                         </div>
 
                         {(selected.shortDescriptionMarked || selected.shortDescription) && (
@@ -541,6 +550,31 @@ export default function TaxonomyBrowserPage() {
                             <dd className="col-sm-9"><i>{summary?.species}</i></dd>
                           </dl>
       
+                          {hasFamily && (
+                            <dl className="row">
+                              <dt className="col-sm-3">วงศ์</dt>
+                              <dd className="col-sm-9">
+                                <span
+                                  dangerouslySetInnerHTML={{
+                                    __html: (selected?.familyMarked ?? selected?.family) as string,
+                                  }}
+                                />
+                              </dd>
+                            </dl>
+                          )}
+                          {hasSynonyms && (
+                            <dl className="row">
+                              <dt className="col-sm-3">ชื่อพ้อง</dt>
+                              <dd className="col-sm-9">
+                                <span
+                                  dangerouslySetInnerHTML={{
+                                    __html: (selected?.synonymsMarked ?? selected?.synonyms) as string,
+                                  }}
+                                />
+                              </dd>
+                            </dl>
+                          )}
+
                           <dl className="row">
                             <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
                             <dd className="col-sm-9">
@@ -559,10 +593,12 @@ export default function TaxonomyBrowserPage() {
                             </dd>
                           </dl>
 
-                          <dl className="row">
-                            <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
-                            <dd className="col-sm-9">{summary?.otherNames}</dd>
-                          </dl>
+                          {hasOtherNames && (
+                            <dl className="row">
+                              <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
+                              <dd className="col-sm-9">{selected?.otherNames}</dd>
+                            </dl>
+                          )}
 
                           <dl className="row">
                             <dt className="col-sm-3">ผู้เขียนคำอธิบาย</dt>
@@ -638,26 +674,30 @@ export default function TaxonomyBrowserPage() {
                             </dd>
                           </dl>
 
-                          <dl className="row">
-                            <dt className="col-sm-3">วงศ์</dt>
-                            <dd className="col-sm-9">
-                              <span
-                                dangerouslySetInnerHTML={{
-                                  __html: (selected?.familyMarked ?? summary?.family ?? '-') as string,
-                                }}
-                              />
-                            </dd>
-                          </dl>
-                          <dl className="row">
-                            <dt className="col-sm-3">ชื่อพ้อง</dt>
-                            <dd className="col-sm-9">
-                              <span
-                                dangerouslySetInnerHTML={{
-                                  __html: (selected?.synonymsMarked ?? summary?.synonyms ?? '-') as string,
-                                }}
-                              />
-                            </dd>
-                          </dl>
+                          {hasFamily && (
+                            <dl className="row">
+                              <dt className="col-sm-3">วงศ์</dt>
+                              <dd className="col-sm-9">
+                                <span
+                                  dangerouslySetInnerHTML={{
+                                    __html: (selected?.familyMarked ?? selected?.family) as string,
+                                  }}
+                                />
+                              </dd>
+                            </dl>
+                          )}
+                          {hasSynonyms && (
+                            <dl className="row">
+                              <dt className="col-sm-3">ชื่อพ้อง</dt>
+                              <dd className="col-sm-9">
+                                <span
+                                  dangerouslySetInnerHTML={{
+                                    __html: (selected?.synonymsMarked ?? selected?.synonyms) as string,
+                                  }}
+                                />
+                              </dd>
+                            </dl>
+                          )}
 
                           <dl className="row">
                             <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
@@ -694,10 +734,12 @@ export default function TaxonomyBrowserPage() {
                             </dd>
                           </dl>
 
-                          <dl className="row">
-                            <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
-                            <dd className="col-sm-9">{summary?.otherNames}</dd>
-                          </dl>
+                          {hasOtherNames && (
+                            <dl className="row">
+                              <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
+                              <dd className="col-sm-9">{selected?.otherNames}</dd>
+                            </dl>
+                          )}
 
                           <dl className="row">
                             <dt className="col-sm-3">ผู้เขียนคำอธิบาย</dt>
@@ -890,7 +932,7 @@ export default function TaxonomyBrowserPage() {
               background: #fff;
               border: 1px solid var(--border, #e5e7eb);
               border-radius: 14px;
-              padding: 22px 22px 28px;
+              padding: 30px;
               box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
             }
             .taxon-header {

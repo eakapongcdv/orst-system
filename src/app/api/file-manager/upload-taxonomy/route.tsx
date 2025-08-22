@@ -38,6 +38,47 @@ function extractOtherNamesByRegex(html: string): string | undefined {
   }
   return undefined;
 }
+
+function extractAuthorByRegex(html: string): string | undefined {
+  const cleaned = normThaiBasic(html);
+  // Pattern A: the author value is INSIDE the <strong> tag after the label (e.g., <p><strong>ผู้...เขียน ชื่อผู้เขียน</strong></p>)
+  const reInside = /<p>\s*<strong>\s*ผู้[\u0E00-\u0E7F\s\u200B-\u200D\uFEFF์]*เขียน\s+([\s\S]*?)\s*<\/strong>\s*<\/p>/iu;
+  let m = cleaned.match(reInside);
+  if (m && m[1]) {
+    const dom = new JSDOM(`<!doctype html><html><body>${m[1]}</body></html>`);
+    const txt = dom.window.document.body.textContent || '';
+    const t = normThaiBasic(txt);
+    if (t) return t;
+  }
+  // Pattern B: the author value is AFTER the </strong> (e.g., <p><strong>ผู้...เขียน</strong> ชื่อผู้เขียน</p>)
+  const reAfter = /<p>\s*<strong>\s*ผู้[\u0E00-\u0E7F\s\u200B-\u200D\uFEFF์]*เขียน\s*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  m = cleaned.match(reAfter);
+  if (m && m[1]) {
+    const dom = new JSDOM(`<!doctype html><html><body>${m[1]}</body></html>`);
+    const txt = dom.window.document.body.textContent || '';
+    const t = normThaiBasic(txt);
+    if (t) return t;
+  }
+  // Pattern C: fallback – find a <p> whose first <strong> starts with ผู้…เขียน, then strip the label and take the rest of text
+  try {
+    const dom = new JSDOM(`<!doctype html><html><body>${cleaned}</body></html>`);
+    const ps = Array.from(dom.window.document.querySelectorAll('p'));
+    for (const p of ps) {
+      const st = p.querySelector('strong');
+      if (!st) continue;
+      const label = thaiKey(st.textContent || '');
+      const isAuthorLabel = label.startsWith(thaiKey('ผู้เขียน'));
+      if (isAuthorLabel) {
+        // remove the label portion from the full text
+        const full = normThaiBasic(p.textContent || '');
+        const lab = normThaiBasic(st.textContent || '');
+        const val = normThaiBasic(full.replace(lab, ''));
+        if (val) return val;
+      }
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
 // src/app/api/file-manager/upload-taxonomy/route.tsx
 import { NextRequest, NextResponse } from 'next/server';
 import mammoth from 'mammoth';
@@ -363,6 +404,11 @@ function parseMetaFromHtml(html: string): {
   try {
     const other = extractOtherNamesByRegex(html);
     if (other && !out.otherNames) out.otherNames = other;
+  } catch { /* ignore */ }
+
+  try {
+    const authorVal = extractAuthorByRegex(html);
+    if (authorVal && !out.author) out.author = authorVal;
   } catch { /* ignore */ }
 
   try {
