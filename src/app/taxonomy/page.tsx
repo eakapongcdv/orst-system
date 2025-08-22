@@ -732,68 +732,195 @@ export default function TaxonomyBrowserPage() {
             )
             )}
             
-          {/* Pagination */}
+          {/* Bottom toolbar (pagination) */}
           {!loading && !err && pagination && pagination.totalPages > 1 && (
-            <nav className="pagination mt-8" role="navigation" aria-label="เลขหน้า">
-              <button
-                className="pagination__control"
-                onClick={() => fetchData(pagination.prevPage || Math.max(1, pagination.currentPage - 1))}
-                disabled={!pagination.hasPrevPage}
-                aria-label="ก่อนหน้า"
-              >
-                ←
-              </button>
+            <footer className="bottom-toolbar" role="navigation" aria-label="เลขหน้า">
+              <div className="toolbar">
+                {/* Left controls: first / prev */}
+                <div className="toolbar__section">
+                  <button
+                    className="tbtn"
+                    onClick={() => fetchData(1, pageSize)}
+                    disabled={!pagination.hasPrevPage}
+                    aria-label="หน้าแรก"
+                    title="หน้าแรก"
+                  >
+                    <span aria-hidden="true">«</span>
+                  </button>
+                  <button
+                    className="tbtn"
+                    onClick={() =>
+                      fetchData(pagination.prevPage || Math.max(1, pagination.currentPage - 1), pageSize)
+                    }
+                    disabled={!pagination.hasPrevPage}
+                    aria-label="ก่อนหน้า"
+                    title="ก่อนหน้า"
+                  >
+                    <span aria-hidden="true">‹</span>
+                  </button>
+                </div>
 
-              <ul className="pagination__list" role="list">
-                {pageNumbers.map((p, idx) => (
-                  <li key={`${p}-${idx}`}>
-                    {p === '…' ? (
-                      <span className="pagination__ellipsis">…</span>
+                {/* Center: page numbers */}
+                <div className="toolbar__section toolbar__pager" aria-live="polite">
+                  {pageNumbers.map((p, idx) =>
+                    p === '…' ? (
+                      <span key={`${p}-${idx}`} className="tsep">…</span>
                     ) : (
                       <button
-                        onClick={() => fetchData(p as number)}
-                        className={`pagination__item ${p === pagination.currentPage ? 'is-active' : ''}`}
+                        key={`${p}-${idx}`}
+                        onClick={() => fetchData(p as number, pageSize)}
+                        className={`tbtn tbtn-number ${p === pagination.currentPage ? 'is-active' : ''}`}
                         aria-current={p === pagination.currentPage ? 'page' : undefined}
+                        aria-label={`ไปหน้า ${p}`}
+                        title={`ไปหน้า ${p}`}
                       >
                         {p}
                       </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                    )
+                  )}
+                </div>
 
-              <button
-                className="pagination__control"
-                onClick={() => fetchData(pagination.nextPage || Math.min(pagination.totalPages, pagination.currentPage + 1))}
-                disabled={!pagination.hasNextPage}
-                aria-label="ถัดไป"
-              >
-                →
-              </button>
-
-              <div className="pagination__size">
-                <label htmlFor="pageSize">ต่อหน้า</label>
-                <select
-                  id="pageSize"
-                  className="select"
-                  value={pageSize}
-                  onChange={(e) => {
-                    const s = parseInt(e.target.value, 10);
-                    setPageSize(s);
-                    fetchData(1, s);
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
+                {/* Right controls: info, page size, next / last */}
+                <div className="toolbar__section toolbar__section--right">
+                  <div className="toolbar__info">
+                    {(pagination?.total ?? results.length)} รายการ • หน้า {pagination?.currentPage ?? 1}/{pagination?.totalPages ?? 1}
+                  </div>
+                  <label htmlFor="pageSize" className="sr-only">ต่อหน้า</label>
+                  <div className="select-wrap">
+                    <span className="select-label">ต่อหน้า</span>
+                    <select
+                      id="pageSize"
+                      className="select select--sm"
+                      value={pageSize}
+                      onChange={(e) => {
+                        const s = parseInt(e.target.value, 10);
+                        setPageSize(s);
+                        fetchData(1, s);
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                  <button
+                    className="tbtn"
+                    onClick={() =>
+                      fetchData(pagination.nextPage || Math.min(pagination.totalPages, pagination.currentPage + 1), pageSize)
+                    }
+                    disabled={!pagination.hasNextPage}
+                    aria-label="ถัดไป"
+                    title="ถัดไป"
+                  >
+                    <span aria-hidden="true">›</span>
+                  </button>
+                  <button
+                    className="tbtn"
+                    onClick={() => fetchData(pagination.totalPages, pageSize)}
+                    disabled={!pagination.hasNextPage}
+                    aria-label="หน้าสุดท้าย"
+                    title="หน้าสุดท้าย"
+                  >
+                    <span aria-hidden="true">»</span>
+                  </button>
+                </div>
               </div>
-            </nav>
+            </footer>
           )}
 
           {/* Styles */}
           </div>
           <style jsx>{`
+            /* Bottom toolbar (sticky) */
+            .bottom-toolbar{
+              position: sticky;
+              bottom: 0;
+              background: #ffffffcc;
+              backdrop-filter: saturate(1.2) blur(6px);
+              border-top: 1px solid #e5e7eb;
+              padding: 8px 0;
+              z-index: 35;
+            }
+            .toolbar{
+              display: grid;
+              grid-template-columns: 1fr auto 1fr;
+              align-items: center;
+              gap: 12px;
+            }
+            @media (max-width: 640px){
+              .toolbar{
+                grid-template-columns: 1fr;
+                row-gap: 10px;
+              }
+              .toolbar__section--right{
+                justify-content: space-between;
+              }
+            }
+            .toolbar__section{
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .toolbar__section--right{
+              justify-content: flex-end;
+              gap: 10px;
+            }
+            .toolbar__pager{
+              justify-content: center;
+              flex-wrap: wrap;
+              min-height: 40px;
+            }
+            .tsep{ color:#9ca3af; padding: 0 2px; }
+            .tbtn{
+              height: 36px;
+              min-width: 36px;
+              padding: 0 10px;
+              border-radius: 10px;
+              border: 1px solid #e5e7eb;
+              background: #f9fafb;
+              color: #374151;
+              font-weight: 600;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+            }
+            .tbtn:hover{ background:#f3f4f6; border-color:#d1d5db; color:#111827; }
+            .tbtn:active{ transform: translateY(0.5px); }
+            .tbtn[disabled]{ opacity:.45; cursor: not-allowed; }
+            .tbtn-number{ min-width: 38px; padding: 0 12px; }
+            .tbtn-number.is-active{
+              background:#0c57d2; border-color:#0c57d2; color:#fff;
+              box-shadow: 0 1px 4px rgba(12,87,210,.25);
+            }
+            .toolbar__info{
+              font-size: .9rem;
+              color:#6b7280;
+              white-space: nowrap;
+            }
+            .select-wrap{
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              padding: 2px 8px;
+              border: 1px solid #e5e7eb;
+              border-radius: 10px;
+              background:#fff;
+            }
+            .select-label{ font-size: .85rem; color:#6b7280; }
+            .select--sm{
+              height: 28px;
+              padding: 2px 8px;
+              font-size: .9rem;
+              line-height: 1;
+            }
+            .sr-only{
+              position: absolute;
+              width: 1px; height: 1px;
+              padding: 0; margin: -1px;
+              overflow: hidden; clip: rect(0,0,0,0);
+              white-space: nowrap; border: 0;
+            }
             /* Layout */
             /* Make page full width on this screen */
             .fullpage { padding: 0; margin: 0; width: 100vw; }
