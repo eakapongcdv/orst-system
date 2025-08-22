@@ -131,60 +131,128 @@ function parseMetaFromHtml(html: string): {
   genus?: string;
   species?: string;
   authorsDisplay?: string;
+  authorsPeriod?: string;
+  otherNames?: string;
+  author?: string;
 } {
   const out: any = {};
+  const norm = (s: string) =>
+    collapseDuplicateThaiVowels(
+      (s || '')
+        .normalize('NFC')
+        .replace(/\u00A0/g, ' ')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\uFFFD/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
+  const normLabel = (s: string) =>
+    norm(s)
+      .replace(/\s+/g, '')
+      .replace(/[.:;、,]/g, '')
+      .replace(/ๆ/g, 'ๆ');
+
   try {
     const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
     const doc = dom.window.document;
 
-    // Prefer a <strong> that contains <em>
-    let host: Element | null = null;
-    const strongWithEm = doc.querySelector('strong em')?.parentElement || null;
-    if (strongWithEm) host = strongWithEm;
-    else {
-      // fallback: any element containing <em>
-      host = doc.querySelector('em')?.parentElement || null;
-    }
+    // 1) โครงแบบหัวเรื่อง: <strong>ไทย <em>Latin</em> …</strong>
+    let host: Element | null = doc.querySelector('strong em')?.parentElement || null;
+    if (!host) host = doc.querySelector('em')?.parentElement || null;
 
     if (host) {
       const em = host.querySelector('em');
-      const hostText = (host.textContent || '').normalize('NFC').replace(/\s+/g, ' ').trim();
-      const emText = (em?.textContent || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+      const hostText = norm(host.textContent || '');
+      const emText = norm(em?.textContent || '');
 
       if (emText) {
-        // genus/species
         const parts = emText.split(/\s+/);
         if (parts[0]) out.genus = parts[0];
         if (parts[1]) out.species = parts[1];
 
-        // scientific = italic + any trailing authors that appear after <em>
+        // scientific = ข้อความเอียง + ส่วนต่อท้ายหลัง <em>
         let tail = '';
-        if (em && host) {
-          const nodes = Array.from(host.childNodes);
+        if (em) {
           let seen = false;
-          for (const n of nodes) {
+          for (const n of Array.from(host.childNodes)) {
             if (n === em) { seen = true; continue; }
             if (!seen) continue;
-            if (n.nodeType === 3) tail += (n.textContent || '');
-            else if ((n as Element).tagName) tail += (n as Element).textContent || '';
+            tail += n.textContent || '';
           }
         }
-        const sci = (emText + ' ' + tail).replace(/\s+/g, ' ').trim();
+        const sci = norm(`${emText} ${tail}`);
         if (sci) out.scientific = sci;
       }
 
-      // official (Thai common name) = hostText before the italic text
-      if (emText && hostText.includes(emText)) {
-        const before = hostText.split(emText)[0];
-        const th = (before || '').replace(/[^\u0E00-\u0E7F\s]/g, '').replace(/\s+/g, ' ').trim();
-        if (th) out.official = th;
+      // official ไทย = ส่วนก่อนข้อความเอียง
+      if (hostText) {
+        const emTxt = norm(host.querySelector('em')?.textContent || '');
+        if (emTxt && hostText.includes(emTxt)) {
+          const before = hostText.split(emTxt)[0];
+          const th = norm(before).replace(/[^\u0E00-\u0E7F\s]/g, '').trim();
+          if (th) { out.official = th; }
+        }
       }
 
-      // authorsDisplay = everything in hostText after the scientific core
-      if (emText && hostText.includes(emText)) {
-        const after = hostText.split(emText)[1] || '';
-        const auth = after.replace(/\s+/g, ' ').trim();
+      // authorsDisplay = ข้อความหลังแกนวิทยาศาสตร์
+      if (out.scientific) {
+        const after = hostText.split(norm(host.querySelector('em')?.textContent || ''))[1] || '';
+        const auth = norm(after);
         if (auth) out.authorsDisplay = auth;
+      }
+    }
+
+    // 2) สแกนย่อหน้าที่มี <strong> เป็น label ภาษาไทย
+    const ps = Array.from(doc.querySelectorAll('p'));
+    for (const p of ps) {
+      const strong = p.querySelector('strong');
+      if (!strong) continue;
+      const label = normLabel(strong.textContent || '');
+      const contentText = norm(p.textContent || '').replace(norm(strong.textContent || ''), '').trim();
+      const emText = norm(p.querySelector('em')?.textContent || '');
+
+      if (!label) continue;
+
+      if (/^ชื่อวิทยาศาสตร์$/.test(label) && (emText || contentText)) {
+        out.scientific = emText || contentText;
+        const parts = (emText || contentText).split(/\s+/);
+        if (parts[0]) out.genus = out.genus || parts[0];
+        if (parts[1]) out.species = out.species || parts[1];
+        continue;
+      }
+      if (/^ชื่อสกุล$/.test(label) && (emText || contentText)) {
+        out.genus = emText || contentText;
+        continue;
+      }
+      if (/^คำระบุชนิด$/.test(label) && (emText || contentText)) {
+        out.species = emText || contentText;
+        continue;
+      }
+      if (/^ชื่อผู้ตั้งพรรณพืช$/.test(label)) {
+        // เก็บเป็น HTML พร้อม <br>
+        const htmlVal = p.innerHTML.replace(/<strong>[\s\S]*?<\/strong>/i, '');
+        const withNewline = htmlVal
+          .replace(/\u00A0/g, ' ')
+          .replace(/\uFFFD/g, '')
+          .replace(/\s*<br\s*\/?\s*>\s*/gi, '\n');
+        const val = norm(stripHtmlToText(withNewline)).replace(/\n/g, '<br>');
+        if (val) out.authorsDisplay = val;
+        continue;
+      }
+      if (/^ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช$/.test(label)) {
+        const htmlVal = p.innerHTML.replace(/<strong>[\s\S]*?<\/strong>/i, '');
+        const withNewline = htmlVal.replace(/\s*<br\s*\/?\s*>\s*/gi, '\n');
+        const val = norm(stripHtmlToText(withNewline)).replace(/\n/g, '<br>');
+        if (val) out.authorsPeriod = val;
+        continue;
+      }
+      if (/^ชื่ออื่นๆ?$/.test(label) && contentText) {
+        out.otherNames = contentText;
+        continue;
+      }
+      if (/^ผู้เขียนคำอธิบาย$/.test(label) && contentText) {
+        out.author = contentText;
+        continue;
       }
     }
   } catch {
@@ -193,41 +261,6 @@ function parseMetaFromHtml(html: string): {
   return out;
 }
 
-async function saveEntryMetaIfPossible(entryId: number, meta: {
-  official?: string;
-  scientific?: string;
-  genus?: string;
-  species?: string;
-  authorsDisplay?: string;
-}) {
-  // Try a JSON/meta column first
-  const jsonCandidates = ['meta', 'metaJson', 'metadata', 'summary', 'summaryJson'];
-  for (const key of jsonCandidates) {
-    try {
-      await prisma.taxonEntry.update({ where: { id: entryId }, data: { [key]: meta } as any });
-      return;
-    } catch {}
-  }
-  // Then try common flat fields one-by-one (ignore if a field doesn't exist)
-  const mappings: Array<[string, string | undefined]> = [
-    ['official', meta.official],
-    ['officialName', meta.official],
-    ['officialTh', meta.official],
-    ['thaiOfficialName', meta.official],
-    ['scientific', meta.scientific],
-    ['scientificName', meta.scientific],
-    ['genus', meta.genus],
-    ['species', meta.species],
-    ['authors', meta.authorsDisplay],
-    ['authorsDisplay', meta.authorsDisplay],
-  ];
-  for (const [k, v] of mappings) {
-    if (!v) continue;
-    try {
-      await prisma.taxonEntry.update({ where: { id: entryId }, data: { [k]: v } as any });
-    } catch {}
-  }
-}
 
 // Split entries whenever we encounter an element that *contains a STRONG*
 // whose text roughly matches "ผู้…เขียน" (with tolerance for corrupted glyphs).
@@ -449,7 +482,9 @@ export async function POST(req: NextRequest) {
               for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 try {
-                  const createdEntry = await prisma.taxonEntry.create({
+                  const meta = parseMetaFromHtml(part.html);
+
+                  await prisma.taxonEntry.create({
                     data: {
                       taxonId: createdTaxon.id,
                       title: part.title || `หัวข้อที่ ${i + 1}`,
@@ -457,12 +492,20 @@ export async function POST(req: NextRequest) {
                       contentHtml: part.html,
                       contentText: part.text,
                       orderIndex: i + 1,
+
+                      // --- meta fields mapped to schema ---
+                      officialNameTh: meta.official || null,
+                      official: meta.official || null,
+                      scientificName: meta.scientific || null,
+                      genus: meta.genus || null,
+                      species: meta.species || null,
+                      authorsDisplay: meta.authorsDisplay || null,
+                      authorsPeriod: meta.authorsPeriod || null,
+                      otherNames: meta.otherNames || null,
+                      author: meta.author || null,
+                      meta: meta as any,
                     },
                   });
-                  try {
-                    const meta = parseMetaFromHtml(part.html);
-                    await saveEntryMetaIfPossible(createdEntry.id, meta);
-                  } catch {}
                   entryCount++;
                 } catch {
                   // ignore individual entry errors to keep import resilient

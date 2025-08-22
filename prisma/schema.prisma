@@ -544,6 +544,7 @@ model TaxonEntry {
   contentText    String?  @db.Text
   // --- Extracted meta fields (optional) ---
   officialNameTh String? // ชื่อหลักหรือชื่อทางการ (ไทย)
+  official       String? // ชื่อหลัก (ไทย) — ฟิลด์ alias สำหรับ meta key "official"
   scientificName String? // ชื่อวิทยาศาสตร์ (เช่น "Stachyphrynium spicatum (Roxb.) K. Schum.")
   genus          String? // สกุล (เช่น "Stachyphrynium")
   species        String? // คำระบุชนิด (เช่น "spicatum")
@@ -562,4 +563,7 @@ model TaxonEntry {
   @@index([taxonId, orderIndex])
   @@index([scientificName])
   @@index([officialNameTh])
+  @@index([official])
+  @@index([genus])
+  @@index([species])
 }

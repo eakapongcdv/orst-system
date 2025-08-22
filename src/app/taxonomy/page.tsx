@@ -389,7 +389,7 @@ export default function TaxonomyBrowserPage() {
                             type="button"
                             className={`aside-link ${selected?.id === r.id ? 'is-active' : ''}`}
                             onClick={() => setSelectedId(r.id)}
-                            title={r.title || undefined}
+                            title={r.officialNameTh || undefined}
                             >
                             <div
                                 className="aside-link__title"
