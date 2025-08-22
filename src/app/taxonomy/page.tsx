@@ -14,12 +14,26 @@ type TaxonEntry = {
   orderIndex: number | null;
   contentHtml: string | null;
   contentText: string | null;
-  updatedAt?: string;
-  taxon?: { id: number; scientificName: string | null };
+
+  // NEW meta fields from schema
+  official?: string | null;
+  officialNameTh?: string | null;
+  scientificName?: string | null;
+  genus?: string | null;
+  species?: string | null;
+  authorsDisplay?: string | null;
+  authorsPeriod?: string | null;
+  otherNames?: string | null;
+  author?: string | null;
+
   // Highlighted fields returned by API when q is present
   titleMarked?: string | null;
   contentHtmlMarked?: string | null;
   contentTextMarked?: string | null;
+  officialNameThMarked?: string | null;
+
+  updatedAt?: string;
+  taxon?: { id: number; scientificName: string | null };
 };
 
 type Pagination = {
@@ -233,38 +247,39 @@ export default function TaxonomyBrowserPage() {
     return results.find((r) => r.id === selectedId) || results[0] || null;
   }, [results, selectedId]);
 
+  // summary: schema-first
   const summary = useMemo(() => {
     if (!selected) return null;
     const html = selected.contentHtml || '';
     const text = html ? htmlToText(html) : (selected.contentText || '');
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
 
-    const authorDesc = extractAuthorFromHtml(html);
-    const sci = extractScientificName(html) || selected.taxon?.scientificName || null;
-    const { genus, species } = splitGenusSpecies(sci || '');
-    const official = extractThaiOfficialName(html) || selected.title || null;
-    const otherNames = extractOtherNames(html);
-    const plantAuthorsFull = extractPlantAuthorsFull(html);
-    const plantAuthorsShort = extractAuthorsShort(html);
-    const plantAuthorsPeriod = extractPlantAuthorsPeriod(html);
+    const sci =
+      selected.scientificName ||
+      selected.taxon?.scientificName ||
+      extractScientificName(html) ||
+      null;
 
-    // authors display: prefer explicit block, otherwise short suffix after </em>
-    const authorsDisplay = plantAuthorsFull || (plantAuthorsShort ? `- ${plantAuthorsShort}` : null);
+    const { genus, species } = splitGenusSpecies(sci || '');
 
     return {
-      author: authorDesc || '-',
+      author: selected.author || extractAuthorFromHtml(html) || '-',
       updated: selected.updatedAt ? new Date(selected.updatedAt).toLocaleString('th-TH') : '-',
       chars: text.length,
       words,
       readMins: words ? Math.max(1, Math.round(words / 250)) : 0,
       order: selected.orderIndex ?? undefined,
+
       scientific: sci || '-',
-      genus: genus || '-',
-      species: species || '-',
-      official: official || '-',
-      otherNames: otherNames || '-',
-      authorsDisplay: authorsDisplay || '-',
-      authorsPeriod: plantAuthorsPeriod || '-',
+      genus: selected.genus || genus || '-',
+      species: selected.species || species || '-',
+      official: selected.officialNameTh || selected.title || '-',
+      otherNames: selected.otherNames || extractOtherNames(html) || '-',
+      authorsDisplay:
+        selected.authorsDisplay ||
+        extractPlantAuthorsFull(html) ||
+        (extractAuthorsShort(html) ? `- ${extractAuthorsShort(html)}` : '-') ,
+      authorsPeriod: selected.authorsPeriod || extractPlantAuthorsPeriod(html) || '-',
     };
   }, [selected]);
 
@@ -381,29 +396,31 @@ export default function TaxonomyBrowserPage() {
                 <div className="taxon-layout">
                     {/* Left panel: list of titles */}
                     <aside className="taxon-aside taxon-aside--left">
-                    <div className="aside-title">สารบัญ</div>
-                    <ul className="aside-list" role="list">
+                      <div className="aside-title">สารบัญ</div>
+                      <ul className="aside-list" role="list">
                         {results.map((r) => (
-                        <li key={r.id}>
+                          <li key={r.id}>
                             <button
-                            type="button"
-                            className={`aside-link ${selected?.id === r.id ? 'is-active' : ''}`}
-                            onClick={() => setSelectedId(r.id)}
-                            title={r.officialNameTh || undefined}
+                              type="button"
+                              className={`aside-link ${selected?.id === r.id ? 'is-active' : ''}`}
+                              onClick={() => setSelectedId(r.id)}
+                              title={r.officialNameTh || r.official || undefined}
                             >
-                            <div
+                              <div
                                 className="aside-link__title"
                                 dangerouslySetInnerHTML={{
-                                __html: r.titleMarked || r.title || `หัวข้อ #${r.id}`,
+                                  __html:
+                                    r.officialNameThMarked ||
+                                    r.officialNameTh ||
+                                    r.titleMarked ||
+                                    r.title ||
+                                    `หัวข้อ #${r.id}`,
                                 }}
-                            />
-                            {r.taxon?.scientificName && (
-                                <div className="aside-link__sci">{r.taxon.scientificName}</div>
-                            )}
+                              />
                             </button>
-                        </li>
+                          </li>
                         ))}
-                    </ul>
+                      </ul>
                     </aside>
 
                     {/* Main content */}
@@ -411,22 +428,42 @@ export default function TaxonomyBrowserPage() {
                     {!!selected && (
                         <div className="taxon-card taxon-card--a4">
                         <div className="taxon-header">
+                            {/* Main content header */}
                             <h3
-                            className="taxon-title"
-                            dangerouslySetInnerHTML={{
+                              className="taxon-title"
+                              dangerouslySetInnerHTML={{
                                 __html:
-                                selected.titleMarked ||
-                                selected.title ||
-                                `หัวข้อ #${selected.id}`,
-                            }}
+                                  selected.officialNameThMarked ||
+                                  selected.officialNameTh ||
+                                  selected.titleMarked ||
+                                  selected.title ||
+                                  `หัวข้อ #${selected.id}`,
+                              }}
                             />
-                            {selected.taxon?.scientificName ? (
-                            <div className="taxon-sci">
-                                <em>{selected.taxon.scientificName}</em>
-                            </div>
+
+                            {(selected.scientificName || selected.taxon?.scientificName) ? (
+                              <div className="taxon-sci">
+                                <em>{selected.scientificName || selected.taxon?.scientificName}</em>
+                              </div>
                             ) : (
-                            <div className="taxon-sci" />
+                              <div className="taxon-sci" />
                             )}
+                        </div>
+
+                        {/* NEW: meta header (placed before updatedAt) */}
+                        <div className="taxon-metaheader">
+                          <dl className="row">
+                            <dt>ชื่อวิทยาศาสตร์</dt>
+                            <dd><i>{selected.scientificName || summary?.scientific || '-'}</i></dd>
+                          </dl>
+                          <dl className="row">
+                            <dt>ชื่อวงศ์</dt>
+                            <dd><i>{selected.genus || summary?.genus || '-'}</i></dd>
+                          </dl>
+                          <dl className="row">
+                            <dt>ชื่ออื่น ๆ</dt>
+                            <dd>{selected.otherNames || summary?.otherNames || '-'}</dd>
+                          </dl>
                         </div>
 
                         {selected.updatedAt && (
@@ -830,15 +867,30 @@ export default function TaxonomyBrowserPage() {
             .btn-info:hover { background: #0a4dbb; }
             .btn-info__label { font-weight: 600; }
             .taxon-title {
-              font-size: clamp(1.5rem, 2.2vw, 2.125rem);
+              font-size: clamp(2.5rem, 2.5vw, 2.5rem);
               line-height: 1.15;
               font-weight: 800;
-              color: #1f2937;
+              color: #50151d;
               margin: 0;
             }
-            .taxon-sci { text-align: right; font-size: clamp(1rem, 1.4vw, 1.25rem); line-height: 1.25; color: #374151; }
+            .taxon-sci { text-align: left; font-size: clamp(1.5rem, 1.5vw, 1.5rem); line-height: 1; color: #50151d; }
             .taxon-sci em { font-style: italic; }
             .taxon-updated { font-size: 0.85rem; color: #6b7280; margin: 4px 0 14px; text-align: right; }
+            /* เพิ่มใน <style jsx> หลัง .taxon-updated */
+            .taxon-metaheader {
+              display: grid;
+              grid-template-columns: 11rem 1fr;
+              column-gap: 14px;
+              row-gap: 6px;
+              margin: 6px 0 14px;
+              padding: 12px 14px;
+              background: #c4a88e;
+              border: 1px solid #c4a88e;
+              border-radius: 12px;
+            }
+            .taxon-metaheader .row { display: contents; }
+            .taxon-metaheader dt { color: #6b7280; font-weight: 600; }
+            .taxon-metaheader dd { margin: 0; color: #111827; }
 
             /* Article: two-column layout on wide screens */
             .taxon-article { text-align: justify; }

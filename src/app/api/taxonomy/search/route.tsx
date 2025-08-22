@@ -61,6 +61,14 @@ export async function GET(req: NextRequest) {
       ? {
           OR: [
             { title: { contains: q, mode: 'insensitive' } },
+            { officialNameTh: { contains: q, mode: 'insensitive' } },
+            { official: { contains: q, mode: 'insensitive' } },
+            { scientificName: { contains: q, mode: 'insensitive' } },
+            { genus: { contains: q, mode: 'insensitive' } },
+            { species: { contains: q, mode: 'insensitive' } },
+            { authorsDisplay: { contains: q, mode: 'insensitive' } },
+            { otherNames: { contains: q, mode: 'insensitive' } },
+            { author: { contains: q, mode: 'insensitive' } },
             { contentText: { contains: q, mode: 'insensitive' } },
             { contentHtml: { contains: q, mode: 'insensitive' } },
             { taxon: { is: { scientificName: { contains: q, mode: 'insensitive' } } } },
@@ -86,6 +94,17 @@ export async function GET(req: NextRequest) {
         orderIndex: true,
         contentHtml: true,
         contentText: true,
+        // meta fields from schema
+        officialNameTh: true,
+        official: true,
+        scientificName: true,
+        genus: true,
+        species: true,
+        authorsDisplay: true,
+        authorsPeriod: true,
+        otherNames: true,
+        author: true,
+        meta: true,
         updatedAt: true,
         taxon: {
           select: {
@@ -100,6 +119,12 @@ export async function GET(req: NextRequest) {
       ? results.map(r => ({
           ...r,
           titleMarked: r.title ? markTextAll(r.title, q) : r.title,
+          officialNameThMarked: r.officialNameTh ? markTextAll(r.officialNameTh, q) : r.officialNameTh,
+          officialMarked: r.official ? markTextAll(r.official, q) : r.official,
+          scientificNameMarked: r.scientificName ? markTextAll(r.scientificName, q) : r.scientificName,
+          authorsDisplayMarked: r.authorsDisplay ? markTextAll(r.authorsDisplay, q) : r.authorsDisplay,
+          otherNamesMarked: r.otherNames ? markTextAll(r.otherNames, q) : r.otherNames,
+          authorMarked: r.author ? markTextAll(r.author, q) : r.author,
           contentTextMarked: r.contentText ? markTextAll(r.contentText, q) : r.contentText,
           contentHtmlMarked: r.contentHtml ? markHtmlAll(r.contentHtml, q) : r.contentHtml,
         }))
