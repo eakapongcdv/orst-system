@@ -94,18 +94,35 @@ function thaiKey(s: string): string {
   return normThaiBasic(s).replace(/[\u0E31\u0E34-\u0E4E]/g, '').replace(/\s+/g, '');
 }
 
-function extractFirstParagraphText(html: string): string | undefined {
+function extractFirstParagraphHtml(html: string): string | undefined {
   try {
     const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
     const firstP = dom.window.document.querySelector('p');
     if (!firstP) return undefined;
-    const txt = firstP.textContent || '';
-    const t = normThaiBasic(txt);
-    return t || undefined;
+    // Keep the whole <p>...</p> as HTML
+    const out = (firstP as any).outerHTML || undefined;
+    return out;
   } catch {
-    // fallback: quick strip to text and take up to first period-ish
-    const t = stripHtmlToText(html);
-    return t || undefined;
+    // Fallback: best-effort to get a <p>... if HTML is escaped, otherwise undefined
+    const m = html.match(/&lt;p&gt;[\s\S]*?&lt;\/p&gt;/i);
+    if (m) return m[0];
+    const m2 = html.match(/<p[\s\S]*?<\/p>/i);
+    return m2 ? m2[0] : undefined;
+  }
+}
+
+function removeFirstParagraph(html: string): string {
+  try {
+    const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
+    const { document } = dom.window;
+    const firstP = document.querySelector('p');
+    if (firstP) firstP.remove();
+    return document.body.innerHTML;
+  } catch {
+    // Fallback: strip the first <p>...</p> (handles both escaped and normal)
+    let out = html.replace(/<p[\s\S]*?<\/p>/i, '');
+    out = out.replace(/&lt;p&gt;[\s\S]*?&lt;\/p&gt;/i, '');
+    return out;
   }
 }
 
@@ -725,16 +742,18 @@ export async function POST(req: NextRequest) {
                     part.html,
                     { official: meta.official || null, scientific: meta.scientific || null }
                   );
-                  const shortDesc = extractFirstParagraphText(cleaned.html);
+                  const shortDescHtml = extractFirstParagraphHtml(cleaned.html);
+                  const contentHtmlFinal = removeFirstParagraph(cleaned.html);
+                  const contentTextFinal = stripHtmlToText(contentHtmlFinal);
 
                   await prisma.taxonEntry.create({
                     data: {
                       taxonId: createdTaxon.id,
                       title: part.title || `หัวข้อที่ ${i + 1}`,
                       slug: slugifyBasic(part.title || `หัวข้อที่ ${i + 1}`),
-                      contentHtml: cleaned.html,
-                      contentText: cleaned.text,
-                      shortDescription: shortDesc || null,
+                      contentHtml: contentHtmlFinal,
+                      contentText: contentTextFinal,
+                      shortDescription: shortDescHtml || null,
                       orderIndex: i + 1,
 
                       // --- meta fields mapped to schema ---

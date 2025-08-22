@@ -479,6 +479,10 @@ export default function TaxonomyBrowserPage() {
                           </dl>
                         </div>
 
+                        <div className="taxon-shortdescription">
+                            {selected.shortDescription}
+                        </div>
+
                         <article
                             className="taxon-article prose prose-sm max-w-none"
                             dangerouslySetInnerHTML={{
@@ -934,11 +938,10 @@ export default function TaxonomyBrowserPage() {
             .taxon-updated--bottom { padding-top: .5rem; margin-top: .5rem; border-top: 1px dashed var(--border, #e5e7eb); }
             .taxon-metaheader {
               display: grid;
-              grid-template-columns: 6.5rem 1fr; /* narrower dt, wider dd */
+              grid-template-columns: 4rem 1fr;
               column-gap: 14px;
               row-gap: 6px;
-              margin: 6px 0 14px;
-              padding: 12px 14px;
+              margin: 12px 0 12px;
             }
             .taxon-metaheader .row { display: contents; }
             .taxon-metaheader dt { color: #6b7280; font-weight: 600; }

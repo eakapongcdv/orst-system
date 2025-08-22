@@ -542,7 +542,7 @@ model TaxonEntry {
   slug             String?
   contentHtml      String?  @db.Text
   contentText      String?  @db.Text
-  shortDescription String? // สรุปย่อจากย่อหน้าแรก (plaintext)
+  shortDescription String?  @db.Text // HTML ของย่อหน้าแรก (&lt;p&gt;...&lt;/p&gt;) ที่ตัดออกจากเนื้อหา
   // --- Extracted meta fields (optional) ---
   officialNameTh   String? // ชื่อหลักหรือชื่อทางการ (ไทย)
   official         String? // ชื่อหลัก (ไทย) — ฟิลด์ alias สำหรับ meta key "official"
