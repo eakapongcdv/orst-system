@@ -1,0 +1,48 @@
+{
+  "taxonomies": [
+    {
+      "title": "อนุกรมวิธานพืช",
+      "domain": "plant",
+      "version": "1.0",
+      "description": "ลำดับชั้นอนุกรมวิธานสำหรับพืช (หลายเล่มตามช่วงอักษร)",
+      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
+      "meta": {
+        "volumes": [
+          "อักษร ก (พิมพ์ครั้งที่ ๒)",
+          "อักษร ข เล่ม ๑",
+          "อักษร ข เล่ม ๒",
+          "อักษร ค",
+          "อักษร ฆ–จ",
+          "อักษร ฉ–ฒ",
+          "อักษร ด",
+          "อักษร ต เล่ม ๑",
+          "อักษร ต เล่ม ๒"
+        ]
+      },
+      "taxa": [
+        { "rank": "KINGDOM", "scientificName": "Plantae", "thaiName": "พืช", "status": "accepted" },
+        { "rank": "FAMILY",  "scientificName": "Poaceae", "thaiName": "วงศ์หญ้า", "parentScientificName": "Plantae", "status": "accepted" },
+        { "rank": "GENUS",   "scientificName": "Oryza", "thaiName": "ข้าว (สกุล)", "parentScientificName": "Poaceae", "status": "accepted" },
+        { "rank": "SPECIES", "scientificName": "Oryza sativa", "thaiName": "ข้าวเจ้า/ข้าวปลูก", "parentScientificName": "Oryza", "status": "accepted", "commonNames": ["ข้าว (rice)"], "references": [{"cite": "FAO / GBIF", "url": "https://www.gbif.org/"}] }
+      ]
+    },
+    {
+      "title": "อนุกรมวิธานสัตว์",
+      "domain": "animal",
+      "version": "1.0",
+      "description": "ลำดับชั้นอนุกรมวิธานสำหรับสัตว์",
+      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
+      "meta": {
+        "volumes": [
+          "อักษร ก"
+        ]
+      },
+      "taxa": [
+        { "rank": "KINGDOM", "scientificName": "Animalia", "thaiName": "สัตว์", "status": "accepted" },
+        { "rank": "FAMILY",  "scientificName": "Felidae", "thaiName": "วงศ์แมว", "parentScientificName": "Animalia", "status": "accepted" },
+        { "rank": "GENUS",   "scientificName": "Panthera", "thaiName": "เสือใหญ่ (สกุล)", "parentScientificName": "Felidae", "status": "accepted" },
+        { "rank": "SPECIES", "scientificName": "Panthera tigris", "thaiName": "เสือโคร่ง", "parentScientificName": "Panthera", "status": "accepted", "commonNames": ["tiger"] }
+      ]
+    }
+  ]
+}
