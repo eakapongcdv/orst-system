@@ -158,6 +158,7 @@ export default function TaxonomyBrowserPage() {
 
   // selection state
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [rightOpen, setRightOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -273,7 +274,16 @@ export default function TaxonomyBrowserPage() {
         <title>Taxonomy Browser</title>
       </Head>
 
-      <main className="container py-8">
+      <main className="fullpage">
+        <nav className="breadcrumbs-bar" aria-label="breadcrumb">
+          <ul className="bc-list">
+            <li className="bc-item">สารานุกรม และ อนุกรมวิธาน</li>
+            <li className="bc-sep" aria-hidden="true">›</li>
+            <li className="bc-item">อนุกรมวิธานพืช</li>
+            <li className="bc-sep" aria-hidden="true">›</li>
+            <li className="bc-item bc-current">อนุกรมวิธานพืช อักษร ต เล่ม ๒</li>
+          </ul>
+        </nav>
         <section className="a4-page">
           <h1 className="section-title text-center mb-6">สืบค้น TaxonEntry</h1>
 
@@ -354,122 +364,221 @@ export default function TaxonomyBrowserPage() {
             </div>
           )}
 
-          {/* 3-column reading layout */}
-          {!loading && !err && (
+        {/* 3-column reading layout */}
+            {!loading && !err && (
             results.length === 0 ? (
-              <div className="brand-card p-6 text-center text-gray-600">ไม่พบผลการค้นหา</div>
+                <div className="brand-card p-6 text-center text-gray-600">ไม่พบผลการค้นหา</div>
             ) : (
-              <div className="taxon-layout">
-                {/* Left panel: list of titles */}
-                <aside className="taxon-aside taxon-aside--left">
-                  <div className="aside-title">สารบัญ</div>
-                  <ul className="aside-list" role="list">
-                    {results.map((r) => (
-                      <li key={r.id}>
-                        <button
-                          type="button"
-                          className={`aside-link ${selected?.id === r.id ? 'is-active' : ''}`}
-                          onClick={() => setSelectedId(r.id)}
-                          title={r.title || undefined}
+                <>
+                <div className="taxon-layout">
+                    {/* Left panel: list of titles */}
+                    <aside className="taxon-aside taxon-aside--left">
+                    <div className="aside-title">สารบัญ</div>
+                    <ul className="aside-list" role="list">
+                        {results.map((r) => (
+                        <li key={r.id}>
+                            <button
+                            type="button"
+                            className={`aside-link ${selected?.id === r.id ? 'is-active' : ''}`}
+                            onClick={() => setSelectedId(r.id)}
+                            title={r.title || undefined}
+                            >
+                            <div
+                                className="aside-link__title"
+                                dangerouslySetInnerHTML={{
+                                __html: r.titleMarked || r.title || `หัวข้อ #${r.id}`,
+                                }}
+                            />
+                            {r.taxon?.scientificName && (
+                                <div className="aside-link__sci">{r.taxon.scientificName}</div>
+                            )}
+                            </button>
+                        </li>
+                        ))}
+                    </ul>
+                    </aside>
+
+                    {/* Main content */}
+                    <section className="taxon-main">
+                    {!!selected && (
+                        <div className="taxon-card">
+                        <div className="taxon-header">
+                            <h3
+                            className="taxon-title"
+                            dangerouslySetInnerHTML={{
+                                __html:
+                                selected.titleMarked ||
+                                selected.title ||
+                                `หัวข้อ #${selected.id}`,
+                            }}
+                            />
+                            {selected.taxon?.scientificName ? (
+                            <div className="taxon-sci">
+                                <em>{selected.taxon.scientificName}</em>
+                            </div>
+                            ) : (
+                            <div className="taxon-sci" />
+                            )}
+                            <div className="taxon-actions">
+                            <button
+                                type="button"
+                                className="btn-info"
+                                onClick={() => setRightOpen(true)}
+                                aria-label="แสดงสรุป"
+                            >
+                                <svg
+                                viewBox="0 0 24 24"
+                                width="18"
+                                height="18"
+                                fill="currentColor"
+                                aria-hidden="true"
+                                >
+                                <path d="M11 17h2v-6h-2v6zm1-8.2c.7 0 1.2-.5 1.2-1.2S12.7 6.4 12 6.4s-1.2.5-1.2 1.2.5 1.2 1.2 1.2z" />
+                                </svg>
+                                <span className="btn-info__label">สรุป</span>
+                            </button>
+                            </div>
+                        </div>
+
+                        {selected.updatedAt && (
+                            <div className="taxon-updated">
+                            อัปเดตล่าสุด:{' '}
+                            {new Date(selected.updatedAt).toLocaleString('th-TH')}
+                            </div>
+                        )}
+
+                        <article
+                            className="taxon-article prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{
+                            __html:
+                                selected.contentHtmlMarked ||
+                                selected.contentHtml ||
+                                '',
+                            }}
+                        />
+                        </div>
+                    )}
+                    </section>
+                </div>
+
+                {/* Slide overlay & panel */}
+                <div
+                    className={`slide-overlay ${rightOpen ? 'is-open' : ''}`}
+                    onClick={() => setRightOpen(false)}
+                />
+                <aside
+                    className={`slide-panel ${rightOpen ? 'is-open' : ''}`}
+                    aria-hidden={!rightOpen}
+                >
+                    <div className="slide-panel__head">
+                    <h4 className="slide-panel__title">สรุป/เมตา</h4>
+                    <button
+                        className="btn-icon"
+                        aria-label="ปิด"
+                        onClick={() => setRightOpen(false)}
+                    >
+                        <svg
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        fill="currentColor"
+                        aria-hidden="true"
                         >
-                          <div
-                            className="aside-link__title"
-                            dangerouslySetInnerHTML={{ __html: r.titleMarked || r.title || `หัวข้อ #${r.id}` }}
-                          />
-                          {r.taxon?.scientificName && (
-                            <div className="aside-link__sci">{r.taxon.scientificName}</div>
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </aside>
-
-                {/* Main content */}
-                <section className="taxon-main">
-                  {!!selected && (
-                    <div className="taxon-card">
-                      <div className="taxon-header">
-                        <h3 className="taxon-title" dangerouslySetInnerHTML={{ __html: selected.titleMarked || selected.title || `หัวข้อ #${selected.id}` }} />
-                        {selected.taxon?.scientificName ? (
-                          <div className="taxon-sci"><em>{selected.taxon.scientificName}</em></div>
-                        ) : <div className="taxon-sci" />}
-                      </div>
-                      {selected.updatedAt && (
-                        <div className="taxon-updated">อัปเดตล่าสุด: {new Date(selected.updatedAt).toLocaleString('th-TH')}</div>
-                      )}
-                      <article
-                        className="taxon-article prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: selected.contentHtmlMarked || selected.contentHtml || '' }}
-                      />
+                        <path
+                            fillRule="evenodd"
+                            d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z"
+                            clipRule="evenodd"
+                        />
+                        </svg>
+                    </button>
                     </div>
-                  )}
-                </section>
 
-                {/* Right panel: summary */}
-                <aside className="taxon-aside taxon-aside--right">
-                  {selected ? (
-                    <div className="summary-box jumbotron" style={{ paddingTop: 32, paddingBottom: 32, marginBottom: 0 }}>
-                      <div className="summary-grid">
+                    <div className="slide-panel__body">
+                    {selected ? (
+                        <div className="summary-grid">
                         <dl className="row">
-                          <dt className="col-sm-3">ชื่อหลักหรือชื่อทางการ</dt>
-                          <dd className="col-sm-9">{summary?.official}</dd>
+                            <dt className="col-sm-3">ชื่อหลักหรือชื่อทางการ</dt>
+                            <dd className="col-sm-9">{summary?.official}</dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">ชื่อวิทยาศาสตร์</dt>
-                          <dd className="col-sm-9">
-                            <b><i>{summary?.scientific}</i></b>
-                          </dd>
+                            <dt className="col-sm-3">ชื่อวิทยาศาสตร์</dt>
+                            <dd className="col-sm-9">
+                            <b>
+                                <i>{summary?.scientific}</i>
+                            </b>
+                            </dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">ชื่อสกุล</dt>
-                          <dd className="col-sm-9"><i>{summary?.genus}</i></dd>
+                            <dt className="col-sm-3">ชื่อสกุล</dt>
+                            <dd className="col-sm-9">
+                            <i>{summary?.genus}</i>
+                            </dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">คำระบุชนิด</dt>
-                          <dd className="col-sm-9"><i>{summary?.species}</i></dd>
+                            <dt className="col-sm-3">คำระบุชนิด</dt>
+                            <dd className="col-sm-9">
+                            <i>{summary?.species}</i>
+                            </dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
-                          <dd className="col-sm-9">
-                            {summary?.authorsDisplay && typeof summary.authorsDisplay === 'string'
-                              ? (<div dangerouslySetInnerHTML={{ __html: summary.authorsDisplay.replace(/\n/g, '<br>') }} />)
-                              : '-'}
-                          </dd>
+                            <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
+                            <dd className="col-sm-9">
+                            {summary?.authorsDisplay &&
+                            typeof summary.authorsDisplay === 'string' ? (
+                                <div
+                                dangerouslySetInnerHTML={{
+                                    __html: summary.authorsDisplay.replace(
+                                    /\n/g,
+                                    '<br>'
+                                    ),
+                                }}
+                                />
+                            ) : (
+                                '-'
+                            )}
+                            </dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</dt>
-                          <dd className="col-sm-9">
-                            {summary?.authorsPeriod && typeof summary.authorsPeriod === 'string'
-                              ? (<div dangerouslySetInnerHTML={{ __html: summary.authorsPeriod.replace(/\n/g, '<br>') }} />)
-                              : '-'}
-                          </dd>
+                            <dt className="col-sm-3">ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</dt>
+                            <dd className="col-sm-9">
+                            {summary?.authorsPeriod &&
+                            typeof summary.authorsPeriod === 'string' ? (
+                                <div
+                                dangerouslySetInnerHTML={{
+                                    __html: summary.authorsPeriod.replace(/\n/g, '<br>'),
+                                }}
+                                />
+                            ) : (
+                                '-'
+                            )}
+                            </dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
-                          <dd className="col-sm-9">{summary?.otherNames}</dd>
+                            <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
+                            <dd className="col-sm-9">{summary?.otherNames}</dd>
                         </dl>
 
                         <dl className="row">
-                          <dt className="col-sm-3">ผู้เขียนคำอธิบาย</dt>
-                          <dd className="col-sm-9">{summary?.author}</dd>
+                            <dt className="col-sm-3">ผู้เขียนคำอธิบาย</dt>
+                            <dd className="col-sm-9">{summary?.author}</dd>
                         </dl>
-                      </div>
+                        </div>
+                    ) : (
+                        <div className="text-gray-500">
+                        เลือกหัวข้อจากรายการเพื่อดูสรุป
+                        </div>
+                    )}
                     </div>
-                  ) : (
-                    <div className="text-gray-500">เลือกหัวข้อจากด้านซ้ายเพื่อดูรายละเอียด</div>
-                  )}
                 </aside>
-              </div>
+                </>
             )
-          )}
-
+            )}
           {/* Pagination */}
           {!loading && !err && pagination && pagination.totalPages > 1 && (
             <nav className="pagination mt-8" role="navigation" aria-label="เลขหน้า">
@@ -533,14 +642,38 @@ export default function TaxonomyBrowserPage() {
           <style jsx>{`
             /* Layout */
             /* Make page full width on this screen */
+            .fullpage { padding: 0; margin: 0; width: 100vw; }
             .a4-page { max-width: 100%; }
+            /* Breadcrumbs */
+            .breadcrumbs-bar {
+              width: 100%;
+              padding: 10px 16px;
+              background: #f8fafc;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .bc-list {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              list-style: none;
+              margin: 0;
+              padding: 0;
+              font-size: .95rem;
+              color: #475569;
+              white-space: nowrap;
+              overflow: auto;
+            }
+            .bc-item { color: #334155; }
+            .bc-current { font-weight: 700; color: #111827; }
+            .bc-sep { color: #94a3b8; }
+
             /* Center the search bar and limit it to 60% of viewport width */
             .searchbar-wrap { width: 60vw; max-width: 60%; margin: 0 auto; }
             @media (max-width: 1024px) { .searchbar-wrap { width: 90vw; max-width: 100%; } }
 
             .taxon-layout {
               display: grid;
-              grid-template-columns: minmax(180px, 15%) minmax(420px, 65%) minmax(240px, 20%);
+              grid-template-columns: minmax(180px, 15%) 1fr;
               gap: 18px;
             }
             @media (max-width: 1200px) {
@@ -551,7 +684,6 @@ export default function TaxonomyBrowserPage() {
               .taxon-aside--left, .taxon-aside--right { position: static; top: auto; }
             }
 
-            
             .taxon-aside {
               background: #fff;
               border: 1px solid var(--border, #e5e7eb);
@@ -587,11 +719,18 @@ export default function TaxonomyBrowserPage() {
             }
             .taxon-header {
               display: grid;
-              grid-template-columns: 1fr minmax(240px, 1fr);
+              grid-template-columns: 1fr minmax(240px, 1fr) auto;
               gap: 24px;
               align-items: end;
               margin-bottom: 8px;
             }
+            .taxon-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+            .btn-info {
+              display: inline-flex; align-items: center; gap: 8px;
+              background: #0c57d2; color: #fff; padding: 8px 12px; border-radius: 10px; border: 0; cursor: pointer;
+            }
+            .btn-info:hover { background: #0a4dbb; }
+            .btn-info__label { font-weight: 600; }
             .taxon-title {
               font-size: clamp(1.5rem, 2.2vw, 2.125rem);
               line-height: 1.15;
@@ -699,6 +838,44 @@ export default function TaxonomyBrowserPage() {
               color: #111827;
               word-break: break-word;
             }
+
+            /* Slide-out panel and overlay */
+            .slide-overlay {
+              position: fixed;
+              inset: 0;
+              background: rgba(15,23,42,.25);
+              backdrop-filter: blur(2px);
+              opacity: 0;
+              transition: opacity .25s ease;
+              pointer-events: none;
+              z-index: 40;
+            }
+            .slide-overlay.is-open { opacity: 1; pointer-events: auto; }
+
+            .slide-panel {
+              position: fixed;
+              top: 0;
+              right: 0;
+              bottom: 0;
+              width: 40vw;
+              max-width: 720px;
+              min-width: 320px;
+              background: #fff;
+              border-left: 1px solid #e5e7eb;
+              box-shadow: -8px 0 24px rgba(15,23,42,.08);
+              transform: translateX(100%);
+              transition: transform .3s ease;
+              z-index: 50;
+              display: flex;
+              flex-direction: column;
+            }
+            .slide-panel.is-open { transform: translateX(0); }
+            .slide-panel__head {
+              display: flex; align-items: center; justify-content: space-between;
+              padding: 14px 16px; border-bottom: 1px solid #e5e7eb;
+            }
+            .slide-panel__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #111827; }
+            .slide-panel__body { padding: 16px; overflow: auto; }
           `}</style>
         </section>
       </main>
