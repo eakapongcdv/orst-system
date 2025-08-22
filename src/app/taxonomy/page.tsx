@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 
 // === Types ===
 type TaxonEntry = {
@@ -275,18 +276,25 @@ export default function TaxonomyBrowserPage() {
       </Head>
 
       <main className="fullpage">
-        <nav className="breadcrumbs-bar" aria-label="breadcrumb">
-          <ul className="bc-list">
-            <li className="bc-item">สารานุกรม และ อนุกรมวิธาน</li>
-            <li className="bc-sep" aria-hidden="true">›</li>
-            <li className="bc-item">อนุกรมวิธานพืช</li>
-            <li className="bc-sep" aria-hidden="true">›</li>
-            <li className="bc-item bc-current">อนุกรมวิธานพืช อักษร ต เล่ม ๒</li>
-          </ul>
-        </nav>
+        
         <section className="a4-page">
-          <h1 className="section-title text-center mb-6">สืบค้น TaxonEntry</h1>
-
+          <div className="container">
+          {/* Breadcrumb */}
+        <nav aria-label="breadcrumb" className="mb-4">
+          <ol className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <li>
+              <Link href="/dictionaries" className="hover:underline">สารานุกรม และ อนุกรมวิธาน</Link>
+            </li>
+            <li className="text-gray-300">•</li>
+            <li className="font-extrabold" style={{ color: 'var(--brand-gold)' }} aria-current="page">
+              อนุกรมวิธาน
+            </li>
+            <li className="text-gray-300">•</li>
+            <li className="font-extrabold" style={{ color: 'var(--brand-gold)' }} aria-current="page">
+              อนุกรมวิธานพืช ต
+            </li>
+          </ol>
+        </nav>
             {/* Search Bar */}
             <form onSubmit={onSubmit} className="mb-8" role="search" aria-label="ค้นหา TaxonEntry">
                 <div className="searchbar-wrap">
@@ -401,7 +409,7 @@ export default function TaxonomyBrowserPage() {
                     {/* Main content */}
                     <section className="taxon-main">
                     {!!selected && (
-                        <div className="taxon-card">
+                        <div className="taxon-card taxon-card--a4">
                         <div className="taxon-header">
                             <h3
                             className="taxon-title"
@@ -459,6 +467,8 @@ export default function TaxonomyBrowserPage() {
                         </div>
                     )}
                     </section>
+                    {/* Right reserved space (keep empty when panel is closed) */}
+                    <div className="taxon-spacer-right" aria-hidden />
                 </div>
 
                 {/* Slide overlay & panel */}
@@ -579,6 +589,7 @@ export default function TaxonomyBrowserPage() {
                 </>
             )
             )}
+            
           {/* Pagination */}
           {!loading && !err && pagination && pagination.totalPages > 1 && (
             <nav className="pagination mt-8" role="navigation" aria-label="เลขหน้า">
@@ -639,6 +650,7 @@ export default function TaxonomyBrowserPage() {
           )}
 
           {/* Styles */}
+          </div>
           <style jsx>{`
             /* Layout */
             /* Make page full width on this screen */
@@ -647,9 +659,11 @@ export default function TaxonomyBrowserPage() {
             /* Breadcrumbs */
             .breadcrumbs-bar {
               width: 100%;
-              padding: 10px 16px;
-              background: #f8fafc;
+              background: linear-gradient(180deg, #f9fafb, #f3f4f6);
               border-bottom: 1px solid #e5e7eb;
+              position: sticky;
+              top: 0;
+              z-index: 10;
             }
             .bc-list {
               display: flex;
@@ -657,32 +671,63 @@ export default function TaxonomyBrowserPage() {
               gap: 8px;
               list-style: none;
               margin: 0;
-              padding: 0;
+              padding: 10px 0;
               font-size: .95rem;
               color: #475569;
+              white-space: nowrap;           /* keep one line */
+              flex-wrap: nowrap;             /* never wrap to next row */
+              overflow-x: auto;              /* allow horizontal scroll when needed */
+              overflow-y: hidden;
+              -webkit-overflow-scrolling: touch;
+            }
+            .bc-list > * { flex: 0 0 auto; }
+            .bc-item {
+              display: inline-flex;
+              align-items: center;
+              gap: .5rem;
+              padding: .35rem .65rem;
+              border-radius: 999px;
+              background: #fff;
+              border: 1px solid #e5e7eb;
+              color: #334155;
+              font-weight: 700;
               white-space: nowrap;
-              overflow: auto;
             }
-            .bc-item { color: #334155; }
-            .bc-current { font-weight: 700; color: #111827; }
-            .bc-sep { color: #94a3b8; }
+            .bc-item.bc-current {
+              color: #111827;
+              border-color: #c7d2fe;
+              background: #eef2ff;
+            }
+            .bc-sep { color: #94a3b8; padding-inline: .25rem; flex: 0 0 auto; }
 
-            /* Center the search bar and limit it to 60% of viewport width */
-            .searchbar-wrap { width: 60vw; max-width: 60%; margin: 0 auto; }
-            @media (max-width: 1024px) { .searchbar-wrap { width: 90vw; max-width: 100%; } }
 
-            .taxon-layout {
+            .taxon-layout{
               display: grid;
-              grid-template-columns: minmax(180px, 15%) 1fr;
-              gap: 18px;
+              grid-template-columns:
+                minmax(220px, 16%)              /* left index */
+                minmax(0, 1fr)                  /* main column */
+                clamp(240px, 22vw, 360px);      /* reserved right space */
+              gap: 20px;
+              align-items: start;
             }
-            @media (max-width: 1200px) {
-              .taxon-layout { grid-template-columns: 1fr; }
+            @media (max-width: 1280px){
+              .taxon-layout{
+                grid-template-columns:
+                  minmax(200px, 20%)
+                  1fr
+                  clamp(160px, 16vw, 240px);
+              }
             }
-            @media (max-width: 1023px) {
-              .taxon-layout { grid-template-columns: 1fr; }
-              .taxon-aside--left, .taxon-aside--right { position: static; top: auto; }
+            @media (max-width: 1024px){
+              .taxon-layout{ grid-template-columns: 1fr; }
+              .taxon-aside--left,
+              .taxon-spacer-right{ display: none; }
             }
+            /* Reserved right column (kept blank) */
+            .taxon-spacer-right{ background: transparent; min-height: 1px; }
+
+            /* A4 responsive plate: no min-width, just cap max width & center */
+            .taxon-card.taxon-card--a4{ width: min(100%, 900px); margin-inline: auto; }
 
             .taxon-aside {
               background: #fff;
@@ -760,8 +805,8 @@ export default function TaxonomyBrowserPage() {
             .taxon-article em { font-style: italic; }
 
             /* Searchbar */
-            .searchbar-wrap { width: min(60vw, 960px); margin: 0 auto; }
-            @media (max-width: 1024px) { .searchbar-wrap { width: min(90vw, 720px); } }
+            .searchbar-wrap { width: 100%; max-width: 1100px; margin: 0 auto 1rem; }
+            @media (max-width: 1024px) { .searchbar-wrap { max-width: 720px; } }
 
             .searchbar {
             display: grid;
