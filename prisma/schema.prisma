@@ -134,7 +134,7 @@ model Document {
 model DocumentVersion {
   id         Int      @id @default(autoincrement())
   documentId Int // The main document this is a version of
-  document   Document @relation(fields: [documentId], references: [id])
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   version    Int // Version number
   name       String // Name at the time of versioning
   type       String // Type at the time of versioning
@@ -157,7 +157,7 @@ model DocumentShare {
   id         Int      @id @default(autoincrement())
   documentId Int
   userId     Int // The user the document is shared with
-  document   Document @relation(name: "DocumentShares", fields: [documentId], references: [id])
+  document   Document @relation(name: "DocumentShares", fields: [documentId], references: [id], onDelete: Cascade)
   user       User     @relation(name: "SharedDocuments", fields: [userId], references: [id])
   permission String // e.g., "READ", "WRITE", "COMMENT"
   createdAt  DateTime @default(now())
@@ -239,7 +239,6 @@ model SpecializedDictionary {
 }
 
 // รายการคำศัพท์ในแต่ละพจนานุกรม
-// รายการคำศัพท์ในแต่ละพจนานุกรม
 model DictionaryEntry {
   id                      Int                      @id @default(autoincrement())
   specializedDictionaryId Int // FK
@@ -255,13 +254,12 @@ model DictionaryEntry {
   // --- End added relation ---
   created_at              DateTime                 @default(now())
   updated_at              DateTime                 @updatedAt
-  SpecializedDictionary   SpecializedDictionary    @relation(fields: [specializedDictionaryId], references: [id])
-  // --- End add index ---
+  SpecializedDictionary   SpecializedDictionary    @relation(fields: [specializedDictionaryId], references: [id], onDelete: Cascade)
 
   @@unique([specializedDictionaryId, term_th, term_en], name: "uniq_entry_th_en")
   @@index([term_th, term_en], name: "idx_entries_th_en")
-  // --- Add index for versioning ---
-  @@index([id, version], name: "idx_entry_id_version") // Useful for fetching specific versions
+  @@index([id, version], name: "idx_entry_id_version")
+  @@fulltext([term_th, term_en, definition_html])
 }
 
 // --- New model for DictionaryEntry version history ---
@@ -275,7 +273,7 @@ model DictionaryEntryVersion {
   changed_at         DateTime        @default(now()) // When the change occurred
   changed_by_user_id Int? // Optional: FK to User who made the change (requires User model link)
   // changed_by              User?    @relation(fields: [changed_by_user_id], references: [id]) // Optional relation
-  DictionaryEntry    DictionaryEntry @relation(fields: [dictionaryEntryId], references: [id])
+  DictionaryEntry    DictionaryEntry @relation(fields: [dictionaryEntryId], references: [id], onDelete: Cascade)
 
   @@unique([dictionaryEntryId, version], name: "uniq_entry_version") // Ensure one log per entry version
   @@index([dictionaryEntryId], name: "idx_dict_entry_versions_entry_id")
@@ -306,8 +304,13 @@ model TransliterationEntry {
   versions TransliterationEntryVersion[]
 
   // เพิ่ม relation ย้อนกลับ
-  dictionaryEntry   DictionaryEntry? @relation("EntryTranslit", fields: [dictionaryEntryId], references: [id])
+  dictionaryEntry   DictionaryEntry? @relation("EntryTranslit", fields: [dictionaryEntryId], references: [id], onDelete: SetNull)
   dictionaryEntryId Int?
+
+  @@index([language])
+  @@index([wordType])
+  @@index([category])
+  @@fulltext([romanization, originalScript1, originalScript2, transliteration1, transliteration2, meaning, notes])
 }
 
 // --- Version history for TransliterationEntry ---
@@ -333,9 +336,9 @@ model TransliterationEntryVersion {
 
   changed_at         DateTime @default(now())
   changed_by_user_id Int?
-  changed_by         User?    @relation(fields: [changed_by_user_id], references: [id])
+  changed_by         User?    @relation(fields: [changed_by_user_id], references: [id], onDelete: SetNull)
 
-  TransliterationEntry TransliterationEntry @relation(fields: [transliterationEntryId], references: [id])
+  TransliterationEntry TransliterationEntry @relation(fields: [transliterationEntryId], references: [id], onDelete: Cascade)
 
   @@unique([transliterationEntryId, version], name: "uniq_translit_version")
   @@index([transliterationEntryId], name: "idx_translit_versions_entry_id")
@@ -343,7 +346,6 @@ model TransliterationEntryVersion {
 }
 
 // หมวด 5: อักษรานุกรมภูมิศาสตร์ไทย
-
 model GazetteerEntry {
   id            Int      @id @default(autoincrement())
   place_name_th String // ชื่อสถานที่ (ไทย)
@@ -354,6 +356,8 @@ model GazetteerEntry {
   description   String? // รายละเอียด
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
+
+  @@fulltext([place_name_th, place_name_en, province, district, description])
 }
 
 /**
@@ -364,6 +368,7 @@ model GazetteerEntry {
 model PopularSearch {
   id                       Int      @id @default(autoincrement())
   specializedDictionaryId  Int
+  specializedDictionary    SpecializedDictionary @relation(fields: [specializedDictionaryId], references: [id], onDelete: Cascade)
   queryNormalized          String
   queryOriginal            String
   count                    Int      @default(1)
@@ -378,18 +383,18 @@ model PopularSearch {
 
 // === Open API Keys ===
 model ApiKey {
-  id             Int       @id @default(autoincrement())
-  label          String
-  keyPrefix      String
-  hashedKey      String    @unique
-  scopes         String[]  @default([])
-  allowedOrigins String[]  @default([])
+  id              Int       @id @default(autoincrement())
+  label           String
+  keyPrefix       String
+  hashedKey       String    @unique
+  scopes          String[]  @default([])
+  allowedOrigins  String[]  @default([])
   createdByUserId Int?
-  createdAt      DateTime  @default(now())
-  lastUsedAt     DateTime?
-  expiresAt      DateTime?
-  revokedAt      DateTime?
-  isActive       Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+  isActive        Boolean   @default(true)
 
   accessLogs     ApiAccessLog[]
 
@@ -454,6 +459,7 @@ model EncyclopediaArticle {
   encyclopedia    Encyclopedia  @relation(fields: [encyclopediaId], references: [id])
 
   @@unique([encyclopediaId, slug])
+  @@fulltext([titleTh, titleEn, summary, contentHtml, contentText])
 }
 
 /// --- Taxonomy (อนุกรมวิธาน) ---
@@ -486,22 +492,25 @@ model Taxonomy {
   updatedAt   DateTime @updatedAt
 
   taxa        Taxon[]
+
+  @@index([domain])
 }
 
 model Taxon {
-  id             Int        @id @default(autoincrement())
-  taxonomyId     Int
-  parentId       Int?
-  rank           TaxonRank
-  scientificName String
-  thaiName       String?
-  commonNames    Json?      // string[]
-  authorship     String?
-  year           Int?
-  code           String?    // ICN/ICZN
-  status         String?    // accepted/synonym/...
+  id              Int        @id @default(autoincrement())
+  taxonomyId      Int
+  parentId        Int?
+  rank            TaxonRank
+  scientificName  String
+  thaiName        String?
+  commonNames     Json?      // string[]
+  authorship      String?
+  year            Int?
+  code            String?    // ICN/ICZN
+  status          String?    // accepted/synonym/...
   characteristics String?   @db.Text
   distribution    String?   @db.Text
+  contentHtml     String?   @db.Text  // HTML ที่นำเข้าจากเอกสาร (ใหม่)
   references      Json?     // {cite, url}[]
   media           Json?     // images/videos
   extra           Json?
@@ -513,15 +522,19 @@ model Taxon {
   children  Taxon[]  @relation("TaxonChildren")
 
   synonyms  TaxonSynonym[]
+
+  @@unique([taxonomyId, rank, scientificName])
+  @@index([taxonomyId])
+  @@index([parentId])
 }
 
 model TaxonSynonym {
-  id       Int    @id @default(autoincrement())
-  taxonId  Int
-  name     String
+  id        Int    @id @default(autoincrement())
+  taxonId   Int
+  name      String
   authorship String?
-  year     Int?
-  note     String?
+  year      Int?
+  note      String?
 
   taxon Taxon @relation(fields: [taxonId], references: [id])
 }
