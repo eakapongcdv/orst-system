@@ -549,31 +549,6 @@ export default function TaxonomyBrowserPage() {
                             <dt className="col-sm-3">คำระบุชนิด</dt>
                             <dd className="col-sm-9"><i>{summary?.species}</i></dd>
                           </dl>
-      
-                          {hasFamily && (
-                            <dl className="row">
-                              <dt className="col-sm-3">วงศ์</dt>
-                              <dd className="col-sm-9">
-                                <span
-                                  dangerouslySetInnerHTML={{
-                                    __html: (selected?.familyMarked ?? selected?.family) as string,
-                                  }}
-                                />
-                              </dd>
-                            </dl>
-                          )}
-                          {hasSynonyms && (
-                            <dl className="row">
-                              <dt className="col-sm-3">ชื่อพ้อง</dt>
-                              <dd className="col-sm-9">
-                                <span
-                                  dangerouslySetInnerHTML={{
-                                    __html: (selected?.synonymsMarked ?? selected?.synonyms) as string,
-                                  }}
-                                />
-                              </dd>
-                            </dl>
-                          )}
 
                           <dl className="row">
                             <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
@@ -895,6 +870,7 @@ export default function TaxonomyBrowserPage() {
               top: 94px;
               max-height: calc(100vh - 120px);
               overflow: auto;
+              background: #e5e7eb !important;
             }
             /* Reserved right column (kept blank) */
             .taxon-spacer-right{ background: transparent; min-height: 1px; }
