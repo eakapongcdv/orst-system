@@ -50,7 +50,7 @@ export default function UpdateDictionaryUploadPage() {
   /** Constraints: Only .html */
   const allowedTypes = ["text/html"];
   const allowedExt = [".html", ".htm"];
-  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+  const MAX_FILE_SIZE = 200 * 1024 * 1024; // 20MB
 
   const tabs = useMemo(
     () => ([

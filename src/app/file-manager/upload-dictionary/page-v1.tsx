@@ -29,7 +29,7 @@ export default function HtmlUploadPage() {
   // Accept only .html files
   const allowedTypes = ["text/html"];
   const allowedExt = [".html", ".htm"];
-  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+  const MAX_FILE_SIZE = 200 * 1024 * 1024; // 20 MB
 
   const validateFile = (file: File): boolean => {
     // Check MIME type and extension

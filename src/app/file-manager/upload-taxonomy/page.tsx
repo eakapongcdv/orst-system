@@ -1,5 +1,5 @@
 "use client";
-//src/app/file-manager/taxonomy/page.tsx
+//src/app/file-manager/upload-taxonomy/page.tsx
 import { useState, useRef, ChangeEvent, DragEvent, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -198,7 +198,7 @@ export default function UpdateDictionaryUploadPage() {
     try {
       await new Promise<UploadResult>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/file-manager/upload-dictionary");
+        xhr.open("POST", "/api/file-manager/upload-taxonomy");
         xhr.responseType = "json";
 
         xhr.upload.onprogress = (ev) => {

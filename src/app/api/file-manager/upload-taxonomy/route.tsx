@@ -1,4 +1,4 @@
-//src/app/api/file-manager/upload-dictionary/route.tsx
+//src/app/api/file-manager/upload-taxonomy/route.tsx
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { JSDOM } from 'jsdom';
