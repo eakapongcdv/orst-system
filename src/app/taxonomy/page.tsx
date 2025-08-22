@@ -427,25 +427,6 @@ export default function TaxonomyBrowserPage() {
                             ) : (
                             <div className="taxon-sci" />
                             )}
-                            <div className="taxon-actions">
-                            <button
-                                type="button"
-                                className="btn-info"
-                                onClick={() => setRightOpen(true)}
-                                aria-label="แสดงสรุป"
-                            >
-                                <svg
-                                viewBox="0 0 24 24"
-                                width="18"
-                                height="18"
-                                fill="currentColor"
-                                aria-hidden="true"
-                                >
-                                <path d="M11 17h2v-6h-2v6zm1-8.2c.7 0 1.2-.5 1.2-1.2S12.7 6.4 12 6.4s-1.2.5-1.2 1.2.5 1.2 1.2 1.2z" />
-                                </svg>
-                                <span className="btn-info__label">สรุป</span>
-                            </button>
-                            </div>
                         </div>
 
                         {selected.updatedAt && (
@@ -467,8 +448,74 @@ export default function TaxonomyBrowserPage() {
                         </div>
                     )}
                     </section>
-                    {/* Right reserved space (keep empty when panel is closed) */}
-                    <div className="taxon-spacer-right" aria-hidden />
+                    {/* Right side bar meta (visible on desktop), slide-panel still available on mobile */}
+                    <aside className="taxon-aside taxon-aside--right">
+                      <div className="aside-title" style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px'}}>
+                        <span>สรุป/เมตา</span>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          title="แสดงแบบขยาย"
+                          aria-label="แสดงแบบขยาย"
+                          onClick={() => setRightOpen(true)}
+                        >
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M4 7a3 3 0 0 1 3-3h4a1 1 0 1 1 0 2H7a1 1 0 0 0-1 1v4a1 1 0 1 1-2 0V7Zm14 10a3 3 0 0 1-3 3h-4a1 1 0 1 1 0-2h4a1 1 0 0 0 1-1v-4a1 1 0 1 1 2 0v4Z"/></svg>
+                        </button>
+                      </div>
+                      {selected ? (
+                        <div className="summary-grid">
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่อหลักหรือชื่อทางการ</dt>
+                            <dd className="col-sm-9">{summary?.official}</dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่อวิทยาศาสตร์</dt>
+                            <dd className="col-sm-9"><b><i>{summary?.scientific}</i></b></dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่อสกุล</dt>
+                            <dd className="col-sm-9"><i>{summary?.genus}</i></dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">คำระบุชนิด</dt>
+                            <dd className="col-sm-9"><i>{summary?.species}</i></dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่อผู้ตั้งพรรณพืช</dt>
+                            <dd className="col-sm-9">
+                              {summary?.authorsDisplay && typeof summary.authorsDisplay === 'string'
+                                ? (<div dangerouslySetInnerHTML={{ __html: summary.authorsDisplay.replace(/\n/g, '<br>') }} />)
+                                : '-'}
+                            </dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</dt>
+                            <dd className="col-sm-9">
+                              {summary?.authorsPeriod && typeof summary.authorsPeriod === 'string'
+                                ? (<div dangerouslySetInnerHTML={{ __html: summary.authorsPeriod.replace(/\n/g, '<br>') }} />)
+                                : '-'}
+                            </dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">ชื่ออื่น ๆ</dt>
+                            <dd className="col-sm-9">{summary?.otherNames}</dd>
+                          </dl>
+
+                          <dl className="row">
+                            <dt className="col-sm-3">ผู้เขียนคำอธิบาย</dt>
+                            <dd className="col-sm-9">{summary?.author}</dd>
+                          </dl>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500">เลือกหัวข้อจากรายการเพื่อดูสรุป</div>
+                      )}
+                    </aside>
                 </div>
 
                 {/* Slide overlay & panel */}
@@ -721,7 +768,13 @@ export default function TaxonomyBrowserPage() {
             @media (max-width: 1024px){
               .taxon-layout{ grid-template-columns: 1fr; }
               .taxon-aside--left,
-              .taxon-spacer-right{ display: none; }
+              .taxon-aside--right{ display: none; }
+            }
+            .taxon-aside--right{
+              position: sticky;
+              top: 94px;
+              max-height: calc(100vh - 120px);
+              overflow: auto;
             }
             /* Reserved right column (kept blank) */
             .taxon-spacer-right{ background: transparent; min-height: 1px; }
