@@ -552,6 +552,8 @@ model TaxonEntry {
   authorsPeriod  String? // ช่วงเวลาผู้ตั้งพรรณพืช แบบข้อความ
   otherNames     String? // ชื่ออื่น ๆ รวมไว้เป็นสตริง
   author         String? // ผู้เขียนคำอธิบาย
+  synonyms       String? // ชื่อพ้อง (รายการ)
+  family         String? // วงศ์ (เช่น "Marantaceae")
   meta           Json? // ที่เก็บข้อมูลเพิ่มเติมในอนาคต (เช่น โครงสร้าง JSON เต็ม)
   orderIndex     Int?
   createdAt      DateTime @default(now())
@@ -566,4 +568,5 @@ model TaxonEntry {
   @@index([official])
   @@index([genus])
   @@index([species])
+  @@index([family])
 }

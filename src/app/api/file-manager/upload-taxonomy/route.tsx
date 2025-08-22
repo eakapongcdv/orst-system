@@ -134,6 +134,8 @@ function parseMetaFromHtml(html: string): {
   authorsPeriod?: string;
   otherNames?: string;
   author?: string;
+  synonyms?: string; // ชื่อพ้อง
+  family?: string;   // วงศ์
 } {
   const out: any = {};
   const norm = (s: string) =>
@@ -252,6 +254,18 @@ function parseMetaFromHtml(html: string): {
       }
       if (/^ผู้เขียนคำอธิบาย$/.test(label) && contentText) {
         out.author = contentText;
+        continue;
+      }
+      if (/^ชื่อพ้อง$/.test(label)) {
+        // Keep punctuation and italics text; remove label only
+        const htmlVal = p.innerHTML.replace(/<strong>[\s\S]*?<\/strong>/i, '');
+        const val = norm(stripHtmlToText(htmlVal));
+        if (val) out.synonyms = val;
+        continue;
+      }
+      if (/^วงศ์$/.test(label)) {
+        // Prefer content in <em> if present
+        out.family = emText || contentText || out.family;
         continue;
       }
     }
@@ -503,6 +517,8 @@ export async function POST(req: NextRequest) {
                       authorsPeriod: meta.authorsPeriod || null,
                       otherNames: meta.otherNames || null,
                       author: meta.author || null,
+                      synonyms: meta.synonyms || null,
+                      family: meta.family || null,
                       meta: meta as any,
                     },
                   });
