@@ -428,7 +428,8 @@ export default function TaxonomyBrowserPage() {
                     {!!selected && (
                         <div className="taxon-card taxon-card--a4">
                         <div className="taxon-header">
-                            {/* Main content header */}
+                          {/* Headline (title + scientific name inline, flexible) */}
+                          <div className="taxon-headline">
                             <h3
                               className="taxon-title"
                               dangerouslySetInnerHTML={{
@@ -440,14 +441,12 @@ export default function TaxonomyBrowserPage() {
                                   `หัวข้อ #${selected.id}`,
                               }}
                             />
-
                             {(selected.scientificName || selected.taxon?.scientificName) ? (
                               <div className="taxon-sci">
                                 <em>{selected.scientificName || selected.taxon?.scientificName}</em>
                               </div>
-                            ) : (
-                              <div className="taxon-sci" />
-                            )}
+                            ) : null}
+                          </div>
                         </div>
 
                         {/* NEW: meta header (placed before updatedAt) */}
@@ -908,11 +907,13 @@ export default function TaxonomyBrowserPage() {
             }
             .taxon-header {
               display: grid;
-              grid-template-columns: 1fr minmax(240px, 1fr) auto;
-              gap: 24px;
-              align-items: end;
+              grid-template-columns: 1fr auto; /* headline + actions */
+              gap: 16px;
+              align-items: baseline;
               margin-bottom: 8px;
             }
+            .taxon-headline { display: flex; align-items: baseline; gap: clamp(12px, 1.5vw, 18px); flex-wrap: wrap; }
+            .taxon-sci { font-size: clamp(1.5rem, 1.5vw, 1.5rem); line-height: 1.2; color: #6b2a34; opacity: .9; }
             .taxon-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
             .btn-info {
               display: inline-flex; align-items: center; gap: 8px;
@@ -927,13 +928,13 @@ export default function TaxonomyBrowserPage() {
               color: #50151d;
               margin: 0;
             }
-            .taxon-sci { text-align: left; font-size: clamp(1.5rem, 1.5vw, 1.5rem); line-height: 1; color: #50151d; }
+            
             .taxon-sci em { font-style: italic; }
             .taxon-updated { font-size: 0.85rem; color: #6b7280; text-align: right; }
             .taxon-updated--bottom { padding-top: .5rem; margin-top: .5rem; border-top: 1px dashed var(--border, #e5e7eb); }
             .taxon-metaheader {
               display: grid;
-              grid-template-columns: 8.5rem 1fr;
+              grid-template-columns: 6.5rem 1fr; /* narrower dt, wider dd */
               column-gap: 14px;
               row-gap: 6px;
               margin: 6px 0 14px;
@@ -1021,7 +1022,7 @@ export default function TaxonomyBrowserPage() {
 
             .summary-grid .row {
               display: grid;
-              grid-template-columns: 7.5rem 1fr;
+              grid-template-columns: 6.5rem 1fr; /* narrower dt, wider dd */
               column-gap: 12px;
               row-gap: 2px;
               margin: 0 0 12px 0;

@@ -94,6 +94,21 @@ function thaiKey(s: string): string {
   return normThaiBasic(s).replace(/[\u0E31\u0E34-\u0E4E]/g, '').replace(/\s+/g, '');
 }
 
+function extractFirstParagraphText(html: string): string | undefined {
+  try {
+    const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
+    const firstP = dom.window.document.querySelector('p');
+    if (!firstP) return undefined;
+    const txt = firstP.textContent || '';
+    const t = normThaiBasic(txt);
+    return t || undefined;
+  } catch {
+    // fallback: quick strip to text and take up to first period-ish
+    const t = stripHtmlToText(html);
+    return t || undefined;
+  }
+}
+
 /**
  * Remove title/scientificName header and labeled paragraphs (ชื่อวิทยาศาสตร์, ชื่อพ้อง, ชื่ออื่น ๆ, วงศ์)
  * from the entry content — these now always live in meta.
@@ -710,6 +725,7 @@ export async function POST(req: NextRequest) {
                     part.html,
                     { official: meta.official || null, scientific: meta.scientific || null }
                   );
+                  const shortDesc = extractFirstParagraphText(cleaned.html);
 
                   await prisma.taxonEntry.create({
                     data: {
@@ -718,6 +734,7 @@ export async function POST(req: NextRequest) {
                       slug: slugifyBasic(part.title || `หัวข้อที่ ${i + 1}`),
                       contentHtml: cleaned.html,
                       contentText: cleaned.text,
+                      shortDescription: shortDesc || null,
                       orderIndex: i + 1,
 
                       // --- meta fields mapped to schema ---

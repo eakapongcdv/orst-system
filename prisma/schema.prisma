@@ -536,28 +536,29 @@ model TaxonSynonym {
 }
 
 model TaxonEntry {
-  id             Int      @id @default(autoincrement())
-  taxonId        Int
-  title          String
-  slug           String?
-  contentHtml    String?  @db.Text
-  contentText    String?  @db.Text
+  id               Int      @id @default(autoincrement())
+  taxonId          Int
+  title            String
+  slug             String?
+  contentHtml      String?  @db.Text
+  contentText      String?  @db.Text
+  shortDescription String? // สรุปย่อจากย่อหน้าแรก (plaintext)
   // --- Extracted meta fields (optional) ---
-  officialNameTh String? // ชื่อหลักหรือชื่อทางการ (ไทย)
-  official       String? // ชื่อหลัก (ไทย) — ฟิลด์ alias สำหรับ meta key "official"
-  scientificName String? // ชื่อวิทยาศาสตร์ (เช่น "Stachyphrynium spicatum (Roxb.) K. Schum.")
-  genus          String? // สกุล (เช่น "Stachyphrynium")
-  species        String? // คำระบุชนิด (เช่น "spicatum")
-  authorsDisplay String? // รายชื่อผู้ตั้งพรรณพืช แบบที่จะแสดงผล (รองรับ <br>)
-  authorsPeriod  String? // ช่วงเวลาผู้ตั้งพรรณพืช แบบข้อความ
-  otherNames     String? // ชื่ออื่น ๆ รวมไว้เป็นสตริง
-  author         String? // ผู้เขียนคำอธิบาย
-  synonyms       String? // ชื่อพ้อง (รายการ)
-  family         String? // วงศ์ (เช่น "Marantaceae")
-  meta           Json? // ที่เก็บข้อมูลเพิ่มเติมในอนาคต (เช่น โครงสร้าง JSON เต็ม)
-  orderIndex     Int?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  officialNameTh   String? // ชื่อหลักหรือชื่อทางการ (ไทย)
+  official         String? // ชื่อหลัก (ไทย) — ฟิลด์ alias สำหรับ meta key "official"
+  scientificName   String? // ชื่อวิทยาศาสตร์ (เช่น "Stachyphrynium spicatum (Roxb.) K. Schum.")
+  genus            String? // สกุล (เช่น "Stachyphrynium")
+  species          String? // คำระบุชนิด (เช่น "spicatum")
+  authorsDisplay   String? // รายชื่อผู้ตั้งพรรณพืช แบบที่จะแสดงผล (รองรับ <br>)
+  authorsPeriod    String? // ช่วงเวลาผู้ตั้งพรรณพืช แบบข้อความ
+  otherNames       String? // ชื่ออื่น ๆ รวมไว้เป็นสตริง
+  author           String? // ผู้เขียนคำอธิบาย
+  synonyms         String? // ชื่อพ้อง (รายการ)
+  family           String? // วงศ์ (เช่น "Marantaceae")
+  meta             Json? // ที่เก็บข้อมูลเพิ่มเติมในอนาคต (เช่น โครงสร้าง JSON เต็ม)
+  orderIndex       Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   taxon Taxon @relation(fields: [taxonId], references: [id], onDelete: Cascade)
 
