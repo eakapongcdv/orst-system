@@ -1,5 +1,5 @@
 "use client";
-
+//src/app/file-manager/upload-transliteration/page.tsx
 import { useState, useRef, useMemo, ChangeEvent, DragEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';

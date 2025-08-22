@@ -1,5 +1,5 @@
 "use client";
-//src/app/file-manager/upload-dictionary/page.tsx
+//src/app/file-manager/taxonomy/page.tsx
 import { useState, useRef, ChangeEvent, DragEvent, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -89,7 +89,7 @@ export default function UpdateDictionaryUploadPage() {
           }
         }
       } catch (e: any) {
-        if (!ignore) setSpecError(e?.message || "ไม่สามารถโหลดรายการพจนานุกรมเฉพาะสาขาได้");
+        if (!ignore) setSpecError(e?.message || "ไม่สามารถโหลดรายการอนุกรมวิธานเฉพาะสาขาได้");
       } finally {
         if (!ignore) setLoadingSpecs(false);
       }
@@ -327,16 +327,16 @@ export default function UpdateDictionaryUploadPage() {
         )}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
           <div>
-            <h1 className="page-title">นำเข้าพจนานุกรม</h1>
+            <h1 className="page-title">นำเข้าอนุกรมวิธาน</h1>
             <div className="mt-2 flex items-center gap-2">
-              <label htmlFor="specSelect" className="sr-only">เลือกพจนานุกรมเฉพาะสาขาวิชา</label>
+              <label htmlFor="specSelect" className="sr-only">เลือกอนุกรมวิธานเฉพาะสาขาวิชา</label>
               <select
                 id="specSelect"
                 className="select"
                 value={specializedDictionaryId}
                 onChange={(e) => setSpecializedDictionaryId(e.target.value)}
                 disabled={loadingSpecs || !specOptions.length}
-                aria-label="เลือกพจนานุกรมเฉพาะสาขาวิชา"
+                aria-label="เลือกอนุกรมวิธานเฉพาะสาขาวิชา"
               >
                 {loadingSpecs && <option value="">กำลังโหลด...</option>}
                 {!loadingSpecs && specOptions.length === 0 && <option value="">ไม่มีรายการ</option>}

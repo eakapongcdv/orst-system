@@ -250,7 +250,6 @@ model DictionaryEntry {
   version                 Int                      @default(1) // Starts at version 1
   // --- End added version field ---
   related_transliteration TransliterationEntry[]   @relation("EntryTranslit")
-  related_encyclopedia    EncyclopediaEntry[]      @relation("EntryEncyclo")
   // --- Added relation to version log ---
   versions                DictionaryEntryVersion[] // Relation to change log
   // --- End added relation ---
@@ -343,42 +342,6 @@ model TransliterationEntryVersion {
   @@index([changed_at], name: "idx_translit_versions_changed_at")
 }
 
-// หมวด 3: สารานุกรม
-model Encyclopedia {
-  id         Int                 @id @default(autoincrement())
-  title      String // ชื่อเล่มหรือหมวด
-  category   String? // หมวดหลัก
-  entries    EncyclopediaEntry[] // รายการหัวข้อสารานุกรม
-  created_at DateTime            @default(now())
-  updated_at DateTime            @updatedAt
-}
-
-model EncyclopediaEntry {
-  id              Int               @id @default(autoincrement())
-  encyclopediaId  Int
-  term            String
-  content_html    String? // รายละเอียด
-  related_entries DictionaryEntry[] @relation("EntryEncyclo")
-  created_at      DateTime          @default(now())
-  updated_at      DateTime          @updatedAt
-
-  Encyclopedia Encyclopedia @relation(fields: [encyclopediaId], references: [id])
-}
-
-// หมวด 4: อนุกรมวิธาน
-model Taxonomy {
-  id              Int        @id @default(autoincrement())
-  scientific_name String // ชื่อวิทยาศาสตร์
-  common_name     String? // ชื่อสามัญ
-  rank            String? // ลำดับชั้น (Kingdom, Phylum, Genus, Species, ฯลฯ)
-  parent_id       Int? // สำหรับเชื่อมโยงลำดับชั้น
-  parent          Taxonomy?  @relation("ParentChild", fields: [parent_id], references: [id])
-  children        Taxonomy[] @relation("ParentChild")
-  description     String?
-  created_at      DateTime   @default(now())
-  updated_at      DateTime   @updatedAt
-}
-
 // หมวด 5: อักษรานุกรมภูมิศาสตร์ไทย
 
 model GazetteerEntry {
@@ -446,4 +409,119 @@ model ApiAccessLog {
   createdAt  DateTime @default(now())
 
   @@index([apiKeyId, createdAt])
+}
+
+// หมวด 3: สารานุกรม
+/// --- Encyclopedia (สารานุกรม) ---
+model Encyclopedia {
+  id          Int                   @id @default(autoincrement())
+  slug        String                @unique
+  titleTh     String
+  titleEn     String?
+  description String?
+  coverImage  String?
+  sourceUrl   String?               // แหล่งอ้างอิง/ที่มา (เช่น URL ของ LST)
+  publisher   String?
+  language    String?               // 'th', 'en', ...
+  tags        Json?                 // string[]
+  meta        Json?                 // เผื่อข้อมูลเฉพาะ (เช่น credits)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  articles    EncyclopediaArticle[]
+}
+
+model EncyclopediaArticle {
+  id              Int           @id @default(autoincrement())
+  encyclopediaId  Int
+  slug            String
+  titleTh         String
+  titleEn         String?
+  altTitles       Json?         // string[]
+  summary         String?
+  contentHtml     String?       @db.Text
+  contentText     String?       @db.Text
+  authors         Json?         // string[]
+  images          Json?         // {src, caption}[]
+  keywords        Json?         // string[]
+  externalUrl     String?       // ลิงก์ไปต้นฉบับ LST
+  countryCode     String?       // กรณีเป็นประเทศ (ISO-3166 alpha-2)
+  orderIndex      Int?          // ใช้จัด A-Z
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  encyclopedia    Encyclopedia  @relation(fields: [encyclopediaId], references: [id])
+
+  @@unique([encyclopediaId, slug])
+}
+
+/// --- Taxonomy (อนุกรมวิธาน) ---
+enum TaxonRank {
+  KINGDOM
+  PHYLUM
+  CLASS
+  ORDER
+  FAMILY
+  GENUS
+  SPECIES
+  SUBSPECIES
+  VARIETY
+  TRIBE
+  SUBFAMILY
+  SECTION
+  SERIES
+}
+
+// หมวด 4: อนุกรมวิธาน
+model Taxonomy {
+  id          Int      @id @default(autoincrement())
+  title       String   // เช่น "อนุกรมวิธานพืช", "อนุกรมวิธานสัตว์"
+  domain      String   // "plant" | "animal" | อื่น ๆ
+  version     String?
+  description String?
+  sourceUrl   String?
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taxa        Taxon[]
+}
+
+model Taxon {
+  id             Int        @id @default(autoincrement())
+  taxonomyId     Int
+  parentId       Int?
+  rank           TaxonRank
+  scientificName String
+  thaiName       String?
+  commonNames    Json?      // string[]
+  authorship     String?
+  year           Int?
+  code           String?    // ICN/ICZN
+  status         String?    // accepted/synonym/...
+  characteristics String?   @db.Text
+  distribution    String?   @db.Text
+  references      Json?     // {cite, url}[]
+  media           Json?     // images/videos
+  extra           Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  taxonomy  Taxonomy @relation(fields: [taxonomyId], references: [id])
+  parent    Taxon?   @relation("TaxonChildren", fields: [parentId], references: [id])
+  children  Taxon[]  @relation("TaxonChildren")
+
+  synonyms  TaxonSynonym[]
+}
+
+model TaxonSynonym {
+  id       Int    @id @default(autoincrement())
+  taxonId  Int
+  name     String
+  authorship String?
+  year     Int?
+  note     String?
+
+  taxon Taxon @relation(fields: [taxonId], references: [id])
 }

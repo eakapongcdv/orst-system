@@ -204,6 +204,7 @@ html, body{
 /* =========================
    Modern background textures
    ========================= */
+/* Subtle paper-like noise + faint radial dots */
 .bg-texture{
   background:
     radial-gradient(circle at 25% 20%, rgba(0,0,0,0.03) 0 2px, transparent 2px) 0 0/18px 18px,
@@ -374,7 +375,7 @@ html, body{
   align-items: center;
   gap: .5rem;
   background: var(--brand-gold);
-  color: #fff; /* force white text */
+  color: #1f2937;
   border-radius: var(--radius-md);
   padding: .6rem 1.1rem;
   font-weight: 800;
@@ -384,36 +385,8 @@ html, body{
 }
 .btn-primary:hover { background: var(--brand-gold-700); }
 .btn-primary:active { transform: translateY(1px); }
-/* Combine transition and hover for primary and secondary buttons */
-.btn-primary svg, .btn-secondary svg { transition: transform .15s ease; }
-.btn-primary:hover svg, .btn-secondary:hover svg { transform: translateX(3px); }
-
-/* Ensure primary buttons render icons in white as well */
-.btn-primary,
-.btn-primary:visited,
-.btn-primary:hover,
-.btn-primary:focus {
-  color: #fff !important;
-}
-.btn-primary svg, .btn-secondary svg {
-  color: inherit; /* allow currentColor to cascade */
-}
-/* Make common SVG shapes follow currentColor for fill/stroke, for both primary and secondary */
-.btn-primary svg path,
-.btn-primary svg circle,
-.btn-primary svg rect,
-.btn-primary svg polygon,
-.btn-primary svg line,
-.btn-primary svg polyline,
-.btn-secondary svg path,
-.btn-secondary svg circle,
-.btn-secondary svg rect,
-.btn-secondary svg polygon,
-.btn-secondary svg line,
-.btn-secondary svg polyline {
-  fill: currentColor;
-  stroke: currentColor;
-}
+.btn-primary svg { transition: transform .15s ease; }
+.btn-primary:hover svg { transform: translateX(3px); }
 .btn-secondary {
   display: inline-flex;
   align-items: center;
@@ -429,14 +402,6 @@ html, body{
 }
 .btn-secondary:hover { background: var(--brand-green-700); }
 .btn-secondary:active { transform: translateY(1px); }
-
-/* Ensure secondary buttons render icons in white as well */
-.btn-secondary,
-.btn-secondary:visited,
-.btn-secondary:hover,
-.btn-secondary:focus {
-  color: #fff !important;
-}
 
 .btn--sm{ padding:.4rem .7rem; font-size:.9rem; border-radius: var(--radius-md); }
 
@@ -658,8 +623,8 @@ a:hover { color: var(--brand-green-700); }
 @media (prefers-color-scheme: dark){
   .bg-login-right{
     background:
-      radial-gradient(circle at 25% 20%, rgba(255,255,255,0.06) 0 2px, transparent 2px),
-      radial-gradient(circle at 75% 80%, rgba(255,255,255,0.04) 0 2px, transparent 2px),
+      radial-gradient(circle at 25% 20%, rgba(255,255,255,0.06) 0 2px, transparent 2px) 0 0/18px 18px,
+      radial-gradient(circle at 75% 80%, rgba(255,255,255,0.04) 0 2px, transparent 2px) 0 0/22px 22px,
       linear-gradient(180deg, #0f0f10, #121314);
   }
   .bg-login-right::after{
@@ -715,11 +680,6 @@ a:hover { color: var(--brand-green-700); }
 .h2 { font-size: clamp(1.2rem, 1rem + .8vw, 1.8rem); font-weight: 800; line-height: 1.15; }
 .text-lead { font-size: clamp(.8rem, .75rem + .3vw, 1rem); color: var(--muted-ink); }
 .form-hint { font-size: .6rem; color: var(--muted-ink); }
-
-/* Balanced text sizes */
-.text-md { font-size: 1rem; line-height: 1.55; }
-.text-sm { font-size: .925rem; line-height: 1.5; }
-.text-xs { font-size: .82rem; line-height: 1.45; }
 
 .form-label{ font-size: 1rem !important; font-weight: 700; color: var(--brand-ink); }
 
@@ -812,17 +772,6 @@ nav[aria-label="พจนานุกรม"]{
   background: none;
 }
 
-/* Generic centered container with balanced paddings */
-.container{
-  max-width: 72rem;             /* 1152px */
-  margin-inline: auto;
-  padding-left: clamp(1rem, 3.2vw, 2.25rem);
-  padding-right: clamp(1rem, 3.2vw, 2.25rem);
-}
-@media (min-width: 1536px){
-  .container{ max-width: 76rem; } /* 1216px on ultra-wide */
-}
-
 /* Page header */
 .page-header {
   display: flex;
@@ -834,11 +783,10 @@ nav[aria-label="พจนานุกรม"]{
   border-bottom: 1px solid var(--brand-border);
 }
 .page-title {
-  font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2rem);
+  font-size: clamp(1.4rem, 1rem + 1.6vw, 2.2rem);
   font-weight: 900;
   letter-spacing: .01em;
   color: var(--brand-ink);
-  line-height: 1.15;
 }
 .page-subtitle {
   font-size: clamp(.9rem, .85rem + .2vw, 1rem);
@@ -851,7 +799,7 @@ nav[aria-label="พจนานุกรม"]{
   align-items: center;
   justify-content: space-between;
   gap: .75rem;
-  padding: 1rem 1.25rem;
+  padding: .85rem 1rem;
   border-bottom: 1px solid var(--brand-border);
   background: color-mix(in srgb, var(--brand-gold) 6%, #fff);
 }
@@ -958,12 +906,7 @@ nav[aria-label="พจนานุกรม"]{
 }
 
 /* Section title */
-.section-title{
-  font-size: clamp(1.25rem, 1rem + 0.9vw, 1.6rem);
-  font-weight: 900;
-  letter-spacing: .01em;
-  line-height: 1.2;
-}
+.section-title{ font-size: clamp(1.6rem, 1.2rem + 1.8vw, 2.4rem); font-weight: 900; letter-spacing: .01em; }
 
 /* Search bar (select | input | button) */
 .searchbar{
@@ -1057,10 +1000,6 @@ nav[aria-label="พจนานุกรม"]{
 
 /* Alerts & card */
 .brand-card{ background:#fff; border:1px solid var(--brand-border); border-radius:16px; box-shadow: var(--shadow-elev-1); }
-.brand-card > .card-header + * { padding-top: 1rem; }
-.brand-card .padded,
-.brand-card > .card-body { padding: 1rem 1.25rem; }
-
 .alert{ padding: .9rem 1rem; border-radius: 10px; border:1px solid transparent; }
 .alert--danger{ background: color-mix(in srgb, #ef4444 15%, #fff); color:#7f1d1d; border-color:#fecaca; }
 

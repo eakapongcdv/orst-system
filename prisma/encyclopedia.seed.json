@@ -1,0 +1,31 @@
+{
+  "encyclopedias": [
+    {
+      "slug": "european-countries",
+      "titleTh": "สารานุกรมประเทศในทวีปยุโรป",
+      "titleEn": "Encyclopedia of European Countries",
+      "description": "รวมบทความสารานุกรมประเทศในทวีปยุโรป (จัดแบบ A–Z)",
+      "sourceUrl": "https://lst.nectec.or.th/encyclopedia/",
+      "publisher": "NECTEC LST",
+      "language": "th",
+      "tags": ["ยุโรป", "ประเทศ"],
+      "meta": { "source": "LST Encyclopedia" },
+      "articles": [
+        {
+          "slug": "france",
+          "titleTh": "ฝรั่งเศส",
+          "titleEn": "France; French Republic",
+          "altTitles": ["สาธารณรัฐฝรั่งเศส"],
+          "summary": "ประเทศในยุโรปตะวันตก เมืองหลวงปารีส",
+          "externalUrl": "https://lst.nectec.or.th/encyclopedia/?p=10935",
+          "contentHtml": "<p>…</p>",
+          "authors": ["LST (ref.)"],
+          "keywords": ["ยุโรป", "ฝรั่งเศส", "ประเทศ"],
+          "countryCode": "FR",
+          "publishedAt": "2025-08-06T00:00:00.000Z",
+          "orderIndex": 1
+        }
+      ]
+    }
+  ]
+}
