@@ -19,9 +19,9 @@ function isBlobLike(x: any): x is { arrayBuffer: () => Promise<ArrayBuffer>; typ
 }
 
 function collapseDuplicateThaiVowels(s: string): string {
-  // บีบสระไทยที่ผู้ใช้ระบุให้เหลือ 1 ตัว: ิ ี ึ ื ะ า
+  // บีบสระไทยที่ผู้ใช้ระบุให้เหลือ 1 ตัว: ิ ี ึ ื ะ า ำ ํ
   // เช่น "ีี" → "ี", "ะะ" → "ะ"
-  return s.replace(/([ิีึืะา])\1+/g, '$1');
+  return s.replace(/([ิีึืะาำ\u0E4D])\1+/g, '$1');
 }
 
 function stripHtmlToText(html: string): string {
@@ -30,6 +30,46 @@ function stripHtmlToText(html: string): string {
     return dom.window.document.body.textContent?.replace(/\s+/g, ' ').trim() || '';
   } catch {
     return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+}
+
+function cleanImportedHtml(html: string): string {
+  try {
+    const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
+    const { document } = dom.window;
+    const paras = Array.from(document.querySelectorAll('p'));
+    for (const p of paras) {
+      const text = (p.textContent || '')
+        .normalize('NFC')
+        .replace(/\u00A0/g, ' ')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\uFFFD/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const inner = (p.innerHTML || '').trim();
+
+      // Pattern 1: lines containing ".indd" often followed by a date/time stamp
+      if (/\.indd\b/i.test(text)) {
+        p.remove();
+        continue;
+      }
+
+      // Pattern 2: page number like "<p><strong>12 </strong></p>" (only number in strong)
+      if (/^\s*<strong>\s*\d+\s*<\/strong>\s*$/i.test(inner)) {
+        p.remove();
+        continue;
+      }
+    }
+    return document.body.innerHTML;
+  } catch {
+    // Fallback: regex remove obvious patterns if DOM parsing fails
+    return html
+      // remove <p><strong>12</strong></p> - only digits in strong
+      .replace(/&lt;p&gt;\s*&lt;strong&gt;\s*\d+\s*&lt;\/strong&gt;\s*&lt;\/p&gt;/gi, '')
+      .replace(/<p>\s*<strong>\s*\d+\s*<\/strong>\s*<\/p>/gi, '')
+      // remove .indd lines
+      .replace(/<p>[^<]*\.indd[^<]*<\/p>/gi, '');
   }
 }
 
@@ -83,6 +123,110 @@ function pickTitleFromChunk(nodes: Element[]): string {
 
 function serializeNodes(nodes: Element[]): string {
   return nodes.map(n => (n as any).outerHTML || '').join('');
+}
+
+function parseMetaFromHtml(html: string): {
+  official?: string;
+  scientific?: string;
+  genus?: string;
+  species?: string;
+  authorsDisplay?: string;
+} {
+  const out: any = {};
+  try {
+    const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
+    const doc = dom.window.document;
+
+    // Prefer a <strong> that contains <em>
+    let host: Element | null = null;
+    const strongWithEm = doc.querySelector('strong em')?.parentElement || null;
+    if (strongWithEm) host = strongWithEm;
+    else {
+      // fallback: any element containing <em>
+      host = doc.querySelector('em')?.parentElement || null;
+    }
+
+    if (host) {
+      const em = host.querySelector('em');
+      const hostText = (host.textContent || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+      const emText = (em?.textContent || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+
+      if (emText) {
+        // genus/species
+        const parts = emText.split(/\s+/);
+        if (parts[0]) out.genus = parts[0];
+        if (parts[1]) out.species = parts[1];
+
+        // scientific = italic + any trailing authors that appear after <em>
+        let tail = '';
+        if (em && host) {
+          const nodes = Array.from(host.childNodes);
+          let seen = false;
+          for (const n of nodes) {
+            if (n === em) { seen = true; continue; }
+            if (!seen) continue;
+            if (n.nodeType === 3) tail += (n.textContent || '');
+            else if ((n as Element).tagName) tail += (n as Element).textContent || '';
+          }
+        }
+        const sci = (emText + ' ' + tail).replace(/\s+/g, ' ').trim();
+        if (sci) out.scientific = sci;
+      }
+
+      // official (Thai common name) = hostText before the italic text
+      if (emText && hostText.includes(emText)) {
+        const before = hostText.split(emText)[0];
+        const th = (before || '').replace(/[^\u0E00-\u0E7F\s]/g, '').replace(/\s+/g, ' ').trim();
+        if (th) out.official = th;
+      }
+
+      // authorsDisplay = everything in hostText after the scientific core
+      if (emText && hostText.includes(emText)) {
+        const after = hostText.split(emText)[1] || '';
+        const auth = after.replace(/\s+/g, ' ').trim();
+        if (auth) out.authorsDisplay = auth;
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return out;
+}
+
+async function saveEntryMetaIfPossible(entryId: number, meta: {
+  official?: string;
+  scientific?: string;
+  genus?: string;
+  species?: string;
+  authorsDisplay?: string;
+}) {
+  // Try a JSON/meta column first
+  const jsonCandidates = ['meta', 'metaJson', 'metadata', 'summary', 'summaryJson'];
+  for (const key of jsonCandidates) {
+    try {
+      await prisma.taxonEntry.update({ where: { id: entryId }, data: { [key]: meta } as any });
+      return;
+    } catch {}
+  }
+  // Then try common flat fields one-by-one (ignore if a field doesn't exist)
+  const mappings: Array<[string, string | undefined]> = [
+    ['official', meta.official],
+    ['officialName', meta.official],
+    ['officialTh', meta.official],
+    ['thaiOfficialName', meta.official],
+    ['scientific', meta.scientific],
+    ['scientificName', meta.scientific],
+    ['genus', meta.genus],
+    ['species', meta.species],
+    ['authors', meta.authorsDisplay],
+    ['authorsDisplay', meta.authorsDisplay],
+  ];
+  for (const [k, v] of mappings) {
+    if (!v) continue;
+    try {
+      await prisma.taxonEntry.update({ where: { id: entryId }, data: { [k]: v } as any });
+    } catch {}
+  }
 }
 
 // Split entries whenever we encounter an element that *contains a STRONG*
@@ -187,7 +331,7 @@ export async function POST(req: NextRequest) {
 
     // Sanitize: remove all U+FFFD replacement characters to avoid corrupt glyphs
     const htmlOutRaw = html || '';
-    const htmlOut = collapseDuplicateThaiVowels(htmlOutRaw.replace(/\uFFFD/g, ''));
+    const htmlOut = cleanImportedHtml(collapseDuplicateThaiVowels(htmlOutRaw.replace(/\uFFFD/g, '')));
     const rawOut = collapseDuplicateThaiVowels((rawText || '').replace(/\uFFFD/g, '').trim());
     //
 
@@ -305,7 +449,7 @@ export async function POST(req: NextRequest) {
               for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 try {
-                  await prisma.taxonEntry.create({
+                  const createdEntry = await prisma.taxonEntry.create({
                     data: {
                       taxonId: createdTaxon.id,
                       title: part.title || `หัวข้อที่ ${i + 1}`,
@@ -315,6 +459,10 @@ export async function POST(req: NextRequest) {
                       orderIndex: i + 1,
                     },
                   });
+                  try {
+                    const meta = parseMetaFromHtml(part.html);
+                    await saveEntryMetaIfPossible(createdEntry.id, meta);
+                  } catch {}
                   entryCount++;
                 } catch {
                   // ignore individual entry errors to keep import resilient
