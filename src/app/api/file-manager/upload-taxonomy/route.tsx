@@ -1,3 +1,43 @@
+function extractFamilyByRegex(html: string): string | undefined {
+  const cleaned = normThaiBasic(html);
+  const re = /<p>\s*<strong>\s*วงศ์[\u0E00-\u0E7F\s\u200B-\u200D\uFEFF์]*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  const m = cleaned.match(re);
+  if (m) {
+    const dom = new JSDOM(`<!doctype html><html><body>${m[1]}</body></html>`);
+    const txt = dom.window.document.body.textContent || '';
+    const t = normThaiBasic(txt);
+    return t || undefined;
+  }
+  return undefined;
+}
+
+function extractSynonymsByRegex(html: string): string | undefined {
+  const cleaned = normThaiBasic(html);
+  // match: <p><strong>ชื่อพ้อง</strong> ... </p>
+  const re = /<p>\s*<strong>\s*ชื่อพ้อง\s*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  const m = cleaned.match(re);
+  if (m) {
+    const dom = new JSDOM(`<!doctype html><html><body>${m[1]}</body></html>`);
+    const txt = dom.window.document.body.textContent || '';
+    const t = normThaiBasic(txt);
+    return t || undefined;
+  }
+  return undefined;
+}
+
+function extractOtherNamesByRegex(html: string): string | undefined {
+  const cleaned = normThaiBasic(html);
+  // match: <p><strong>ชื่ออื่น ๆ</strong> ... </p>  (allow optional ฯลฯ variations of ๆ)
+  const re = /<p>\s*<strong>\s*ชื่ออื่น(?:\s*ๆ)?\s*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  const m = cleaned.match(re);
+  if (m) {
+    const dom = new JSDOM(`<!doctype html><html><body>${m[1]}</body></html>`);
+    const txt = dom.window.document.body.textContent || '';
+    const t = normThaiBasic(txt);
+    return t || undefined;
+  }
+  return undefined;
+}
 // src/app/api/file-manager/upload-taxonomy/route.tsx
 import { NextRequest, NextResponse } from 'next/server';
 import mammoth from 'mammoth';
@@ -19,10 +59,11 @@ function isBlobLike(x: any): x is { arrayBuffer: () => Promise<ArrayBuffer>; typ
 }
 
 function collapseDuplicateThaiVowels(s: string): string {
-  // บีบสระไทยที่ผู้ใช้ระบุให้เหลือ 1 ตัว: ิ ี ึ ื ะ า ำ ํ
-  // เช่น "ีี" → "ี", "ะะ" → "ะ"
-  return s.replace(/([ิีึืะาำ\u0E4D])\1+/g, '$1');
+  // บีบเครื่องหมายสระและวรรณยุกต์ไทยที่ซ้ำกันให้เหลือ 1 ตัว
+  // ครอบคลุม: ิ ี ึ ื ุ ู ั ็ ่ ้ ๊ ๋ ์ ํ ะ า ำ
+  return s.replace(/([\u0E31\u0E34-\u0E3A\u0E47-\u0E4D\u0E48-\u0E4B\u0E30\u0E32\u0E33])\1+/g, '$1');
 }
+
 
 function stripHtmlToText(html: string): string {
   try {
@@ -30,6 +71,125 @@ function stripHtmlToText(html: string): string {
     return dom.window.document.body.textContent?.replace(/\s+/g, ' ').trim() || '';
   } catch {
     return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+}
+
+function normThaiBasic(s: string): string {
+  return collapseDuplicateThaiVowels(
+    (s || '')
+      .normalize('NFC')
+      .replace(/\u00A0/g, ' ')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\uFFFD/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+function normThaiNoSpace(s: string): string {
+  return normThaiBasic(s).replace(/\s+/g, '');
+}
+
+/**
+ * Remove title/scientificName header and labeled paragraphs (ชื่อวิทยาศาสตร์, ชื่อพ้อง, ชื่ออื่น ๆ)
+ * from the entry content.
+ * meta?.removeSynonyms?: boolean — controls removal of synonyms paragraph.
+ */
+function sanitizeEntryContent(
+  html: string,
+  meta?: { official?: string | null; scientific?: string | null; removeSynonyms?: boolean }
+): { html: string; text: string } {
+  try {
+    const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
+    const { document } = dom.window;
+    const body = document.body;
+
+    const targetSci = meta?.scientific ? normThaiNoSpace(meta.scientific) : '';
+    const targetOfficial = meta?.official ? normThaiNoSpace(meta.official) : '';
+    const shouldRemoveSynonyms = meta?.removeSynonyms !== false;
+
+    // 1) Remove header line that contains the scientific name (usually a <strong> with <em>)
+    let headerRemoved = false;
+    if (targetSci) {
+      const headerEl = Array.from(body.children).find((el) => {
+        const em = el.querySelector('em');
+        if (!em) return false;
+        const emNorm = normThaiNoSpace(em.textContent || '');
+        const allNorm = normThaiNoSpace(el.textContent || '');
+        return (
+          emNorm &&
+          (targetSci.includes(emNorm) || emNorm.includes(targetSci) || allNorm.includes(targetSci))
+        );
+      });
+      if (headerEl) {
+        headerEl.remove();
+        headerRemoved = true;
+      }
+    }
+    // 1b) If not removed, try remove a first block that contains the official Thai name in <strong>
+    if (!headerRemoved && targetOfficial) {
+      const headerEl2 = Array.from(body.children).find((el) => {
+        const st = el.querySelector('strong');
+        if (!st) return false;
+        const stNorm = normThaiNoSpace(st.textContent || '');
+        return !!stNorm && targetOfficial && (stNorm.includes(targetOfficial) || targetOfficial.includes(stNorm));
+      });
+      if (headerEl2) headerEl2.remove();
+    }
+
+    // 2) Remove labeled paragraphs: ชื่อวิทยาศาสตร์, ชื่อพ้อง, ชื่ออื่น ๆ/ชื่ออื่นๆ, วงศ์
+    for (const p of Array.from(body.querySelectorAll('p'))) {
+      const strong = p.querySelector('strong');
+      if (!strong) continue;
+
+      const label = normThaiNoSpace(strong.textContent || '');
+      const labelNoTone = label.replace(/[\u0E48-\u0E4B]/g, '');
+
+      // Remove labeled paragraphs that should live in meta (not in contentHtml)
+      const isSynonymsLabel =
+        labelNoTone.includes('ชื่อพ้อง') || /^ชื่อพ้อง$/.test(labelNoTone);
+
+      const isOtherNamesLabel =
+        labelNoTone.startsWith('ชื่ออื่นๆ') || labelNoTone.startsWith('ชื่ออื่น');
+
+      const isScientificLabel = labelNoTone.startsWith('ชื่อวิทยาศาสตร์');
+
+      const isFamilyLabel =
+        labelNoTone.startsWith('วงศ์') || /^วงศ์์?$/.test(labelNoTone);
+
+      if (
+        isScientificLabel ||
+        isOtherNamesLabel ||
+        isFamilyLabel ||
+        (isSynonymsLabel && shouldRemoveSynonyms)
+      ) {
+        p.remove();
+        continue;
+      }
+    }
+
+    const cleanedHtml = body.innerHTML;
+    const cleanedText = stripHtmlToText(cleanedHtml);
+    return { html: cleanedHtml, text: cleanedText };
+  } catch {
+    // Fallback: if DOM parsing fails, strip simple labeled blocks via regex
+    let out = html;
+    // remove <p><strong>ชื่อวิทยาศาสตร์...</strong>...</p>
+    out = out.replace(/<p>\s*<strong>[^<]*ชื่อ\s*วิทยาศาสตร์[^<]*<\/strong>[\s\S]*?<\/p>/giu, '');
+    // remove <p><strong>ชื่อพ้อง...</strong>...</p> — only when allowed
+    const shouldRemoveSynonyms = meta?.removeSynonyms !== false;
+    if (shouldRemoveSynonyms) {
+      out = out.replace(/<p>\s*<strong>[^<]*ชื่อพ้อง[^<]*<\/strong>[\s\S]*?<\/p>/giu, '');
+      // remove synonyms blocks (ชื่อพ้อง) with possible tone marks
+      out = out.replace(/<p>\s*<strong>\s*ชื่อพ้อง\s*<\/strong>[\s\S]*?<\/p>/giu, '');
+    }
+    // remove ชื่ออื่น ๆ / ชื่ออื่นๆ
+    out = out.replace(/<p>\s*<strong>[^<]*ชื่ออื่น(?:\s*ๆ)?[^<]*<\/strong>[\s\S]*?<\/p>/giu, '');
+
+    // remove วงศ์ blocks (family)
+    out = out.replace(/&lt;p&gt;\s*&lt;strong&gt;[^&lt;]*วงศ์[^&lt;]*&lt;\/strong&gt;[\s\S]*?&lt;\/p&gt;/gi, '');
+    out = out.replace(/<p>\s*<strong>[^<]*วงศ์[^<]*<\/strong>[\s\S]*?<\/p>/gi, '');
+
+    return { html: out, text: stripHtmlToText(out) };
   }
 }
 
@@ -136,8 +296,10 @@ function parseMetaFromHtml(html: string): {
   author?: string;
   synonyms?: string; // ชื่อพ้อง
   family?: string;   // วงศ์
+  synonymsLabelPresent?: boolean;
 } {
   const out: any = {};
+  let foundSynonymsLabel = false;
   const norm = (s: string) =>
     collapseDuplicateThaiVowels(
       (s || '')
@@ -148,11 +310,34 @@ function parseMetaFromHtml(html: string): {
         .replace(/\s+/g, ' ')
         .trim()
     );
-  const normLabel = (s: string) =>
-    norm(s)
-      .replace(/\s+/g, '')
-      .replace(/[.:;、,]/g, '')
-      .replace(/ๆ/g, 'ๆ');
+  // Create both base and noTone forms for label matching
+  const makeLabels = (s: string) => {
+    const base = norm(s).replace(/\s+/g, '').replace(/[.:;、,]/g, '');
+    const noTone = base.replace(/[\u0E48-\u0E4B]/g, '');
+    return { base, noTone };
+  };
+
+  // Try regex-based family extraction early
+  try {
+    const fam = extractFamilyByRegex(html);
+    if (fam) out.family = fam;
+  } catch { /* ignore */ }
+
+  // Try regex-based synonyms and other names early (same pattern as family)
+  try {
+    const cleaned = normThaiBasic(html);
+    // If the label exists at all, remember so we can warn later if no value was extracted
+    if (/<p>\s*<strong>\s*ชื่อพ้อง\s*<\/strong>[\s\S]*?<\/p>/iu.test(cleaned)) {
+      foundSynonymsLabel = true;
+    }
+    const syn = extractSynonymsByRegex(html);
+    if (syn && !out.synonyms) out.synonyms = syn;
+  } catch { /* ignore */ }
+
+  try {
+    const other = extractOtherNamesByRegex(html);
+    if (other && !out.otherNames) out.otherNames = other;
+  } catch { /* ignore */ }
 
   try {
     const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
@@ -209,28 +394,32 @@ function parseMetaFromHtml(html: string): {
     for (const p of ps) {
       const strong = p.querySelector('strong');
       if (!strong) continue;
-      const label = normLabel(strong.textContent || '');
+      const { base: label, noTone: labelNoTone } = makeLabels(strong.textContent || '');
       const contentText = norm(p.textContent || '').replace(norm(strong.textContent || ''), '').trim();
       const emText = norm(p.querySelector('em')?.textContent || '');
 
       if (!label) continue;
 
-      if (/^ชื่อวิทยาศาสตร์$/.test(label) && (emText || contentText)) {
+      // ชื่อวิทยาศาสตร์
+      if ((/^ชื่อวิทยาศาสตร์$/.test(labelNoTone) || labelNoTone.startsWith('ชื่อวิทยาศาสตร์')) && (emText || contentText)) {
         out.scientific = emText || contentText;
         const parts = (emText || contentText).split(/\s+/);
         if (parts[0]) out.genus = out.genus || parts[0];
         if (parts[1]) out.species = out.species || parts[1];
         continue;
       }
-      if (/^ชื่อสกุล$/.test(label) && (emText || contentText)) {
+      // ชื่อสกุล
+      if ((/^ชื่อสกุล$/.test(labelNoTone) || labelNoTone.startsWith('ชื่อสกุล')) && (emText || contentText)) {
         out.genus = emText || contentText;
         continue;
       }
-      if (/^คำระบุชนิด$/.test(label) && (emText || contentText)) {
+      // คำระบุชนิด
+      if ((/^คำระบุชนิด$/.test(labelNoTone) || labelNoTone.startsWith('คำระบุชนิด')) && (emText || contentText)) {
         out.species = emText || contentText;
         continue;
       }
-      if (/^ชื่อผู้ตั้งพรรณพืช$/.test(label)) {
+      // ชื่อผู้ตั้งพรรณพืช
+      if ((/^ชื่อผู้ตั้งพรรณพืช$/.test(labelNoTone) || labelNoTone.includes('ชื่อผู้ตั้งพรรณพืช'))) {
         // เก็บเป็น HTML พร้อม <br>
         const htmlVal = p.innerHTML.replace(/<strong>[\s\S]*?<\/strong>/i, '');
         const withNewline = htmlVal
@@ -241,30 +430,49 @@ function parseMetaFromHtml(html: string): {
         if (val) out.authorsDisplay = val;
         continue;
       }
-      if (/^ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช$/.test(label)) {
+      // ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช
+      if ((/^ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช$/.test(labelNoTone) || labelNoTone.includes('ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช'))) {
         const htmlVal = p.innerHTML.replace(/<strong>[\s\S]*?<\/strong>/i, '');
         const withNewline = htmlVal.replace(/\s*<br\s*\/?\s*>\s*/gi, '\n');
         const val = norm(stripHtmlToText(withNewline)).replace(/\n/g, '<br>');
         if (val) out.authorsPeriod = val;
         continue;
       }
-      if (/^ชื่ออื่นๆ?$/.test(label) && contentText) {
+      // ชื่ออื่น ๆ
+      if ((/^ชื่ออื่นๆ?$/.test(labelNoTone) || labelNoTone.startsWith('ชื่ออื่น')) && contentText) {
         out.otherNames = contentText;
         continue;
       }
-      if (/^ผู้เขียนคำอธิบาย$/.test(label) && contentText) {
+      // ผู้เขียนคำอธิบาย
+      if ((/^ผู้เขียนคำอธิบาย$/.test(labelNoTone) || labelNoTone.includes('ผู้เขียนคำอธิบาย')) && contentText) {
         out.author = contentText;
         continue;
       }
-      if (/^ชื่อพ้อง$/.test(label)) {
-        // Keep punctuation and italics text; remove label only
-        const htmlVal = p.innerHTML.replace(/<strong>[\s\S]*?<\/strong>/i, '');
-        const val = norm(stripHtmlToText(htmlVal));
-        if (val) out.synonyms = val;
+      // ชื่อพ้อง (สำคัญ)
+      if ((/^ชื่อพ้อง$/.test(labelNoTone) || labelNoTone.includes('ชื่อพ้อง'))) {
+        foundSynonymsLabel = true;
+        // ตรวจให้แน่ใจว่า <strong>ชื่อพ้อง</strong> อยู่ต้น <p>
+        const innerRaw = p.innerHTML || '';
+        const innerClean = collapseDuplicateThaiVowels(
+          innerRaw
+            .normalize('NFC')
+            .replace(/\u00A0/g, ' ')
+            .replace(/[\u200B-\u200D\uFEFF]/g, '')
+            .replace(/\uFFFD/g, '')
+            .trim()
+        );
+
+        // จับเฉพาะรูปแบบ <strong>ชื่อพ้อง</strong> ตามด้วยค่า
+        const mSyn = innerClean.match(/^<strong>\s*ชื่อพ้อง\s*<\/strong>\s*([\s\S]+)$/i);
+        if (mSyn) {
+          const val = norm(stripHtmlToText(mSyn[1]));
+          if (val) out.synonyms = val;
+        }
         continue;
       }
-      if (/^วงศ์$/.test(label)) {
-        // Prefer content in <em> if present
+      
+      // วงศ์
+      if (/^วงศ์์?$/.test(labelNoTone) || labelNoTone.startsWith('วงศ์')) {
         out.family = emText || contentText || out.family;
         continue;
       }
@@ -272,6 +480,7 @@ function parseMetaFromHtml(html: string): {
   } catch {
     // ignore parse errors
   }
+  out.synonymsLabelPresent = foundSynonymsLabel;
   return out;
 }
 
@@ -396,8 +605,9 @@ export async function POST(req: NextRequest) {
     ];
 
     let savedTaxonomyId: number | null = null;
-    const created: Array<{ id: number; scientificName: string; entries?: number }> = [];
+    const created: Array<{ id: number; scientificName: string; entries?: number; synonymsDetected?: boolean; synonymsSaved?: boolean }> = [];
     let saveError: string | null = null;
+    const warnings: string[] = [];
 
     if (commit) {
       try {
@@ -497,14 +707,23 @@ export async function POST(req: NextRequest) {
                 const part = parts[i];
                 try {
                   const meta = parseMetaFromHtml(part.html);
+                  const hadSynLabel = !!meta.synonymsLabelPresent;
+                  const hasSynonyms = !!meta.synonyms;
+                  if (hadSynLabel && !hasSynonyms) {
+                    warnings.push(`ไม่สามารถ extract "ชื่อพ้อง" ในหัวข้อที่ ${i + 1} (taxonId: ${createdTaxon.id})`);
+                  }
+                  const cleaned = sanitizeEntryContent(
+                    part.html,
+                    { official: meta.official || null, scientific: meta.scientific || null, removeSynonyms: !!meta.synonyms }
+                  );
 
                   await prisma.taxonEntry.create({
                     data: {
                       taxonId: createdTaxon.id,
                       title: part.title || `หัวข้อที่ ${i + 1}`,
                       slug: slugifyBasic(part.title || `หัวข้อที่ ${i + 1}`),
-                      contentHtml: part.html,
-                      contentText: part.text,
+                      contentHtml: cleaned.html,
+                      contentText: cleaned.text,
                       orderIndex: i + 1,
 
                       // --- meta fields mapped to schema ---
@@ -535,6 +754,12 @@ export async function POST(req: NextRequest) {
               id: createdTaxon.id,
               scientificName: createdTaxon.scientificName,
               entries: entryCount,
+              // helpful flags to verify synonyms persistence
+              // (synonymsSaved is true if at least one entry extracted synonyms)
+              // NOTE: these flags are per taxon (aggregated); if you need per-entry,
+              // surface them above.
+              synonymsDetected: warnings.some(w => w.includes(`(taxonId: ${createdTaxon.id})`)),
+              synonymsSaved: warnings.every(w => !w.includes(`(taxonId: ${createdTaxon.id})`)),
             });
           }
         } catch (e: any) {
@@ -566,6 +791,7 @@ export async function POST(req: NextRequest) {
       commit,
       savedTaxonomyId,
       created,
+      warnings,
       error: saveError || undefined,
     });
   } catch (err: any) {

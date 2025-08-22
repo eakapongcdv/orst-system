@@ -12,6 +12,7 @@ interface UploadResult {
   filename: string;
   importedCount?: number;
   errors?: string[];
+  warnings?: string[]; // NEW: optional warnings from API
 }
 
 type HistoryRow = {
@@ -503,6 +504,32 @@ export default function UpdateDictionaryUploadPage() {
                       </ul>
                     ) : null}
                   </div>
+
+                  {/* Warnings (pretty + scrollable) */}
+                  {uploadResult.warnings?.length ? (
+                    <div className="mt-3">
+                      <div className="alert alert--warning" role="status" aria-live="polite">
+                        <div className="flex items-start gap-2">
+                          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v2h2v-2zm0-6h-2v5h2v-5z"/>
+                          </svg>
+                          <div className="min-w-0">
+                            <strong className="block mb-1">
+                              คำเตือน {uploadResult.warnings.length.toLocaleString()} รายการ
+                            </strong>
+                            <ul className="list-disc pl-5 text-sm mt-1 space-y-1 max-h-48 overflow-auto">
+                              {uploadResult.warnings.map((w, i) => (
+                                <li key={i} className="break-words">{w}</li>
+                              ))}
+                            </ul>
+                            <div className="text-xs text-ink-500 mt-2">
+                              ระบบนำเข้าข้อมูลที่เหลือเรียบร้อยแล้ว โปรดตรวจสอบรายการที่แจ้งเตือน
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -608,6 +635,15 @@ export default function UpdateDictionaryUploadPage() {
         .page .brand-subnav.brand-subnav--tabs .nav-link.tab {
           margin: 0 4px;
           border-radius: 10px; /* match global rounded style if any */
+        }
+        /* Warning alert look (matches brand tone) */
+        .page .alert--warning {
+          background: #FFF7E6;         /* soft amber */
+          border: 1px solid #F3C77A;   /* amber border */
+          color: #7A4E00;              /* readable brown */
+        }
+        .page .alert--warning svg {
+          color: #B26B00;
         }
       `}</style>
     </div>

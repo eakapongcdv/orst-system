@@ -21,6 +21,7 @@ type TaxonEntry = {
   scientificName?: string | null;
   genus?: string | null;
   species?: string | null;
+  family?: string | null;
   authorsDisplay?: string | null;
   authorsPeriod?: string | null;
   otherNames?: string | null;
@@ -247,7 +248,7 @@ export default function TaxonomyBrowserPage() {
     return results.find((r) => r.id === selectedId) || results[0] || null;
   }, [results, selectedId]);
 
-  // summary: schema-first
+  // summary: schema-first, only schema fields (no HTML extraction fallbacks)
   const summary = useMemo(() => {
     if (!selected) return null;
     const html = selected.contentHtml || '';
@@ -257,13 +258,10 @@ export default function TaxonomyBrowserPage() {
     const sci =
       selected.scientificName ||
       selected.taxon?.scientificName ||
-      extractScientificName(html) ||
       null;
 
-    const { genus, species } = splitGenusSpecies(sci || '');
-
     return {
-      author: selected.author || extractAuthorFromHtml(html) || '-',
+      author: selected.author || '-',
       updated: selected.updatedAt ? new Date(selected.updatedAt).toLocaleString('th-TH') : '-',
       chars: text.length,
       words,
@@ -271,15 +269,13 @@ export default function TaxonomyBrowserPage() {
       order: selected.orderIndex ?? undefined,
 
       scientific: sci || '-',
-      genus: selected.genus || genus || '-',
-      species: selected.species || species || '-',
+      genus: selected.genus || '-',
+      species: selected.species || '-',
       official: selected.officialNameTh || selected.title || '-',
-      otherNames: selected.otherNames || extractOtherNames(html) || '-',
-      authorsDisplay:
-        selected.authorsDisplay ||
-        extractPlantAuthorsFull(html) ||
-        (extractAuthorsShort(html) ? `- ${extractAuthorsShort(html)}` : '-') ,
-      authorsPeriod: selected.authorsPeriod || extractPlantAuthorsPeriod(html) || '-',
+      otherNames: selected.otherNames || '-',
+      authorsDisplay: selected.authorsDisplay || '-',
+      authorsPeriod: selected.authorsPeriod || '-',
+      family: selected.family || '-',
     };
   }, [selected]);
 
@@ -457,8 +453,8 @@ export default function TaxonomyBrowserPage() {
                             <dd><i>{selected.scientificName || summary?.scientific || '-'}</i></dd>
                           </dl>
                           <dl className="row">
-                            <dt>ชื่อวงศ์</dt>
-                            <dd><i>{selected.genus || summary?.genus || '-'}</i></dd>
+                            <dt>วงศ์</dt>
+                            <dd><i>{selected.family || summary?.family || '-'}</i></dd>
                           </dl>
                           <dl className="row">
                             <dt>ชื่ออื่น ๆ</dt>
