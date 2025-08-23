@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { toolbarStyles } from './toolbarStyles';
+import { taxonomyStyles } from './taxonomyStyles';
+import dynamic from 'next/dynamic';
 
 // === Types ===
 type TaxonEntry = {
@@ -69,14 +70,11 @@ function htmlToText(html: string): string {
 
 // --- Summary extraction helpers ---
 
-
-
-
-
-
-
-
-
+// TinyMCE Editor (dynamically loaded, client-side only)
+const Editor = dynamic(
+  () => import('@tinymce/tinymce-react').then(m => m.Editor as any),
+  { ssr: false }
+) as any;
 export default function TaxonomyBrowserPage() {
   const params = useParams<{ id: string }>();
   const taxonomyId = Number(params?.id || 0);
@@ -443,7 +441,6 @@ export default function TaxonomyBrowserPage() {
                               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                                 <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25Zm2.92 2.33h-.84v-.84l9.9-9.9.84.84-9.9 9.9ZM20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.59 1.59 3.75 3.75 1.59-1.59Z"/>
                               </svg>
-                              <span className="btn-info__label">แก้ไขเนื้อหา</span>
                             </button>
                           </div>
                         </div>
@@ -781,7 +778,26 @@ export default function TaxonomyBrowserPage() {
 
                     <label className="span-2">
                       <span>คำโปรย/คำอธิบายสั้น</span>
-                      <textarea value={(editForm.shortDescription as any) ?? ''} onChange={(e) => setField('shortDescription', e.target.value)} rows={3} />
+                      <div className="tinymce-wrap">
+                        <Editor
+                          id="edit-shortdesc"
+                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
+                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          value={(editForm.shortDescription as any) ?? ''}
+                          onEditorChange={(v: string) => setField('shortDescription', v)}
+                          init={{
+                            height: 220,
+                            menubar: false,
+                            branding: false,
+                            toolbar_mode: 'sliding',
+                            plugins: 'lists link table code',
+                            toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link | removeformat | code',
+                            content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.7}',
+                            block_unsupported_drop: false,
+                            statusbar: true,
+                          }}
+                        />
+                      </div>
                     </label>
 
                     <label className="span-2">
@@ -811,7 +827,28 @@ export default function TaxonomyBrowserPage() {
 
                     <label className="span-2">
                       <span>เนื้อหา (HTML)</span>
-                      <textarea value={(editForm.contentHtml as any) ?? ''} onChange={(e) => setField('contentHtml', e.target.value)} rows={12} />
+                      <div className="tinymce-wrap">
+                        <Editor
+                          id="edit-contenthtml"
+                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
+                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          value={(editForm.contentHtml as any) ?? ''}
+                          onEditorChange={(v: string) => setField('contentHtml', v)}
+                          init={{
+                            height: 520,
+                            menubar: 'file edit view insert format tools table help',
+                            branding: false,
+                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+                            toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat | code preview fullscreen',
+                            toolbar_sticky: true,
+                            toolbar_mode: 'sliding',
+                            content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.8}',
+                            paste_data_images: true,
+                            image_caption: true,
+                            table_default_attributes: { border: '1' },
+                          }}
+                        />
+                      </div>
                     </label>
                   </div>
 
@@ -931,7 +968,7 @@ export default function TaxonomyBrowserPage() {
 
           {/* Styles */}
           </div>
-          <style jsx>{toolbarStyles}</style>
+          <style jsx>{taxonomyStyles}</style>
           <style jsx>{`
             .modal-overlay{
               position: fixed;
@@ -989,6 +1026,8 @@ export default function TaxonomyBrowserPage() {
               margin-top: 6px;
               border-top: 1px dashed #e5e7eb;
             }
+            .tinymce-wrap :global(.tox-tinymce){ width: 100%; border-radius: 8px; }
+            .tinymce-wrap :global(.tox .tox-statusbar){ border-radius: 0 0 8px 8px; }
           `}</style>
         </section>
       </main>

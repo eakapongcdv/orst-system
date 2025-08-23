@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { toolbarStyles } from './toolbarStyles';
+import { taxonomyStyles } from './taxonomyStyles';
 
 // === Types ===
 type TaxonEntry = {
@@ -735,7 +735,7 @@ export default function TaxonomyBrowserPage() {
 
           {/* Styles */}
           </div>
-          <style jsx>{toolbarStyles}</style>
+          <style jsx>{taxonomyStyles}</style>
         </section>
       </main>
     </div>

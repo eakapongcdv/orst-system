@@ -1,6 +1,6 @@
-// components/toolbarStyles.ts
+// components/taxonomyStyles.ts
 
-export const toolbarStyles = `
+export const taxonomyStyles = `
             /* Bottom toolbar (sticky) */
             .bottom-toolbar{
               position: sticky;
