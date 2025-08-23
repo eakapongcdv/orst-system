@@ -1,32 +1,55 @@
+//dictionaries/[id]/preview/pages.tsx
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
+import {
+  DocumentArrowDownIcon,
+  ArrowDownTrayIcon,
+  MagnifyingGlassPlusIcon,
+  MagnifyingGlassMinusIcon,
+  ArrowPathIcon
+} from '@heroicons/react/24/solid';
 import { useRouter } from "next/navigation";
 
-// --- Utility: Replace all <img> with base64 data URI ---
-async function replaceImagesWithBase64(htmlString: string) {
+// --- Utility: Replace all <img> with base64 data URI (with progress) ---
+async function replaceImagesWithBase64(htmlString: string, onProgress?: (completed: number, total: number) => void) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = htmlString;
-  const imgEls = tempDiv.querySelectorAll('img');
-  await Promise.all(Array.from(imgEls).map(async (img) => {
+  const imgEls = Array.from(tempDiv.querySelectorAll('img'));
+  const total = imgEls.length || 1;
+  let completed = 0;
+
+  for (const img of imgEls) {
     const src = img.getAttribute('src');
-    if (!src || src.startsWith('data:')) return;
+    if (!src || src.startsWith('data:')) {
+      completed++;
+      onProgress?.(completed, total);
+      continue;
+    }
     try {
       const res = await fetch(src);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      img.setAttribute('src', base64);
-    } catch (err) {
-      // ถ้าโหลดรูปไม่ได้ จะข้ามไปเฉย ๆ
+      if (res.ok) {
+        const blob = await res.blob();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        img.setAttribute('src', base64);
+      }
+    } catch {
+      // ignore fetch/convert error for individual image
+    } finally {
+      completed++;
+      onProgress?.(completed, total);
     }
-  }));
+  }
   return tempDiv.innerHTML;
+}
+
+function isMeaningfulText(node: ChildNode) {
+  return node.nodeType === Node.TEXT_NODE && node.textContent && node.textContent.trim().length > 0;
 }
 
 const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) => {
@@ -36,7 +59,11 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
   const [htmlContent, setHtmlContent] = useState<string>("");
   const [dictId, setDictId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStage, setExportStage] = useState<'idle' | 'pdf' | 'doc'>('idle');
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   // --- Effect to unwrap params and set dictId ---
   useEffect(() => {
@@ -92,60 +119,259 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
     fetchPreview();
   }, [dictId]);
 
-  // Inject the HTML content
+  // Render paginated A4 pages
   useEffect(() => {
-    if (htmlContent && previewContainerRef.current) {
-      previewContainerRef.current.innerHTML = htmlContent;
-    }
+    if (!htmlContent || !previewContainerRef.current) return;
+
+    const host = previewContainerRef.current as HTMLDivElement;
+    // Reset container
+    host.innerHTML = "";
+    host.classList.add("preview-shell");
+    host.style.overflow = 'auto';
+
+    // Wrapper to center pages and add gaps
+    const wrapper = document.createElement("div");
+    wrapper.className = "a4-wrapper";
+    host.appendChild(wrapper);
+    wrapperRef.current = wrapper;
+    // initial zoom transform
+    wrapper.style.transformOrigin = 'top center';
+    wrapper.style.transform = `scale(${zoom})`;
+
+    // Helper to create a new page
+    let pageIndex = 0;
+    const newPage = () => {
+      const page = document.createElement("div");
+      page.className = "a4-page";
+
+      const content = document.createElement("div");
+      content.className = "a4-content";
+      page.appendChild(content);
+
+      const footer = document.createElement("div");
+      footer.className = "a4-footer";
+      footer.textContent = ""; // will set after pagination complete
+      page.appendChild(footer);
+
+      wrapper.appendChild(page);
+      return { page, content, footer };
+    };
+
+    const { content: firstContent } = newPage();
+    let currentContent = firstContent;
+
+    // Parse incoming HTML into nodes
+    const temp = document.createElement("div");
+    temp.innerHTML = htmlContent;
+
+    // Determine max content height in px from styled A4 content box
+    // Force layout by reading clientHeight (A4 height minus footer/padding set in CSS)
+    const getMax = () => currentContent.clientHeight;
+
+    const appendOrPaginate = (node: ChildNode) => {
+      // Normalize text nodes into <p> for better flow
+      let toAppend: Node = node;
+      if (isMeaningfulText(node)) {
+        const p = document.createElement("p");
+        p.textContent = (node.textContent || "").trim();
+        toAppend = p;
+      }
+
+      currentContent.appendChild(toAppend);
+
+      // If overflow, move node to a new page
+      const overflowed = currentContent.scrollHeight > currentContent.clientHeight;
+      if (overflowed) {
+        currentContent.removeChild(toAppend);
+
+        // Insert page separator between pages
+        const sep = document.createElement("hr");
+        sep.className = "page-sep";
+        wrapper.appendChild(sep);
+
+        const { content: nextContent } = newPage();
+        currentContent = nextContent;
+        currentContent.appendChild(toAppend);
+
+        // If a single element is taller than a page, allow overflow (edge case)
+        if (currentContent.scrollHeight > getMax()) {
+          currentContent.style.overflow = "hidden"; // visually contained
+        }
+      }
+    };
+
+    Array.from(temp.childNodes).forEach(appendOrPaginate);
+
+    // Set page numbers
+    const pages = wrapper.querySelectorAll<HTMLDivElement>(".a4-page");
+    pages.forEach((page, idx) => {
+      const footer = page.querySelector<HTMLDivElement>(".a4-footer");
+      if (footer) footer.textContent = `หน้า ${idx + 1}`;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [htmlContent]);
+
+  // Effect to apply zoom transform to wrapper when zoom changes
+  useEffect(() => {
+    if (wrapperRef.current) {
+      wrapperRef.current.style.transformOrigin = 'top center';
+      wrapperRef.current.style.transform = `scale(${zoom})`;
+    }
+  }, [zoom]);
 
   // --- PDF Export Handler ---
   const handleExportPdf = async () => {
-    if (!previewContainerRef.current || !dictId) {
+    if (!wrapperRef.current || !dictId) {
       alert("Preview content is not ready for export.");
       return;
     }
     setIsExporting(true);
+    setExportStage('pdf');
+    setExportProgress(5);
+
+    const originalTransform = wrapperRef.current.style.transform;
+    const originalTransformOrigin = wrapperRef.current.style.transformOrigin;
 
     try {
-      // Wait for any styles/fonts/layout to finish rendering
-      await new Promise((res) => setTimeout(res, 400));
-      const html2pdfModule = await import("html2pdf.js");
-      const html2pdfLib = html2pdfModule.default || html2pdfModule;
+      try {
+        // @ts-ignore
+        if (document.fonts && document.fonts.ready) {
+          // @ts-ignore
+          await document.fonts.ready;
+        }
+      } catch {}
 
-      const pdfOptions = {
-        margin: 10,
-        filename: `Dictionary_${dictId}.pdf`,
-        image: { type: "png", quality: 0.98 },
-        html2canvas: {
+      // Load libraries
+      await import("html2pdf.js").catch(() => null);
+      const w: any = typeof window !== "undefined" ? (window as any) : {};
+      const html2canvas: any =
+        w.html2canvas ||
+        (await import("html2canvas").then((m: any) => m.default).catch(() => null));
+      if (!html2canvas) throw new Error("html2canvas is not available.");
+
+      let jsPDFCtor: any =
+        (w.jspdf && w.jspdf.jsPDF) || (w as any).jsPDF;
+      if (!jsPDFCtor) {
+        try {
+          const jspdfMod: any = await import("jspdf");
+          jsPDFCtor = jspdfMod.jsPDF || jspdfMod.default;
+        } catch {
+          jsPDFCtor = (w as any).jsPDF;
+        }
+      }
+      if (!jsPDFCtor) throw new Error("jsPDF is not available.");
+
+      const pdf: any = new jsPDFCtor({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Temporarily neutralize transforms/effects that can confuse rasterization
+      wrapperRef.current.style.transform = "none";
+      wrapperRef.current.style.transformOrigin = "top left";
+
+      const cleanup: Array<() => void> = [];
+      const toHide = Array.from(document.querySelectorAll<HTMLElement>(".preview-toolbar, .page-sep"));
+      toHide.forEach(el => {
+        const prev = el.style.display;
+        el.style.display = "none";
+        cleanup.push(() => { el.style.display = prev; });
+      });
+
+      const toFlatten = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>(".a4-wrapper, .a4-page, .a4-content, .preview-shell"));
+      const prevStyles = toFlatten.map(el => ({
+        el,
+        background: el.style.background,
+        backgroundImage: el.style.backgroundImage,
+        backdropFilter: (el.style as any).backdropFilter,
+        webkitBackdropFilter: (el.style as any)["-webkit-backdrop-filter" as any],
+        boxShadow: el.style.boxShadow
+      }));
+      toFlatten.forEach(el => {
+        el.style.background = "#ffffff";
+        el.style.backgroundImage = "none";
+        (el.style as any).backdropFilter = "none";
+        (el.style as any)["-webkit-backdrop-filter" as any] = "none";
+        el.style.boxShadow = "none";
+      });
+      cleanup.push(() => {
+        prevStyles.forEach(s => {
+          s.el.style.background = s.background;
+          s.el.style.backgroundImage = s.backgroundImage;
+          (s.el.style as any).backdropFilter = s.backdropFilter || "";
+          (s.el.style as any)["-webkit-backdrop-filter" as any] = s.webkitBackdropFilter || "";
+          s.el.style.boxShadow = s.boxShadow;
+        });
+      });
+
+      const pages = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>(".a4-page"));
+      if (pages.length === 0) throw new Error("No pages to export.");
+
+      const total = pages.length;
+      for (let i = 0; i < total; i++) {
+        const pageEl = pages[i];
+        pageEl.scrollIntoView({ block: "center" });
+
+        const canvas = await html2canvas(pageEl, {
           scale: 2,
+          backgroundColor: "#ffffff",
           useCORS: true,
-          logging: false,
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      };
+          logging: false
+        });
 
-      await html2pdfLib().set(pdfOptions).from(previewContainerRef.current).save();
-    } catch (pdfError: any) {
-      alert(`Failed to generate PDF: ${pdfError.message || "An error occurred during PDF generation."}`);
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+
+        if (i === 0) {
+          pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+        } else {
+          pdf.addPage();
+          pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+        }
+
+        // Update progress — allocate 90% for page rasterization/adding
+        const pct = 5 + Math.round(((i + 1) / total) * 90);
+        setExportProgress(pct);
+      }
+
+      // Finalize (remaining ~5%)
+      setExportProgress(98);
+      pdf.save(`Dictionary_${dictId}.pdf`);
+      setExportProgress(100);
+
+      cleanup.forEach(fn => fn());
+    } catch (err: any) {
+      alert(`Failed to generate PDF: ${err?.message || "An error occurred during PDF generation."}`);
     } finally {
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transformOrigin = originalTransformOrigin;
+        wrapperRef.current.style.transform = originalTransform;
+      }
       setIsExporting(false);
+      setTimeout(() => { setExportStage('idle'); setExportProgress(0); }, 300);
     }
   };
 
-  // --- DOCX Export Handler (Now with image base64 support) ---
+  // --- DOCX Export Handler (Now with image base64 support and progress) ---
   const handleExportDocx = async () => {
     if (!previewContainerRef.current || !dictId) {
       alert("Preview content is not ready for export.");
       return;
     }
     setIsExporting(true);
+    setExportStage('doc');
+    setExportProgress(5);
+
     const element = previewContainerRef.current;
     let htmlString = element.innerHTML;
 
     try {
-      // เปลี่ยนทุก <img> เป็น base64 ก่อน
-      htmlString = await replaceImagesWithBase64(htmlString);
+      // เปลี่ยนทุก <img> เป็น base64 พร้อมอัปเดตความคืบหน้า (~90%)
+      htmlString = await replaceImagesWithBase64(htmlString, (completed, total) => {
+        const ratio = completed / Math.max(1, total);
+        const pct = 5 + Math.round(ratio * 85);
+        setExportProgress(pct);
+      });
+
+      setExportProgress(94);
 
       const fullHtml = `
       <!DOCTYPE html>
@@ -166,33 +392,92 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
       link.download = fileName;
       link.style.display = "none";
       document.body.appendChild(link);
+
+      setExportProgress(98);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
+
+      setExportProgress(100);
     } catch (docxError: any) {
       alert(`Failed to generate DOCX file: ${docxError.message || "An error occurred during file creation."}`);
     } finally {
       setIsExporting(false);
+      setTimeout(() => { setExportStage('idle'); setExportProgress(0); }, 300);
     }
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: "8px", marginBottom: 16 }}>
-        <button
-          onClick={handleExportDocx}
-          disabled={isLoading || !!error || !dictId || isExporting}
-          style={{ padding: "8px 16px", borderRadius: 4, border: "none", background: "#28a745", color: "white", fontWeight: "bold" }}
-        >
-          {isExporting ? "Exporting..." : "Export DOCX"}
-        </button>
-        <button
-          onClick={handleExportPdf}
-          disabled={isLoading || !!error || !dictId || isExporting}
-          style={{ padding: "8px 16px", borderRadius: 4, border: "none", background: "#dc3545", color: "white", fontWeight: "bold" }}
-        >
-          {isExporting ? "Exporting..." : "Export PDF"}
-        </button>
+    <div className="preview-page">
+      {isExporting && (
+        <div className="exporting-overlay" role="dialog" aria-live="polite" aria-label="กำลังส่งออกไฟล์">
+          <div className="exporting-box">
+            <div className="spinner" aria-hidden="true"></div>
+            <div className="exporting-text">{exportStage === 'pdf' ? 'กำลังสร้าง PDF…' : 'กำลังสร้าง DOCX…'}</div>
+            <div className="exporting-percent">{exportProgress}%</div>
+            <div className="exporting-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={exportProgress}>
+              <div className="bar" style={{ width: `${exportProgress}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="preview-toolbar">
+        <div className="toolbar-group">
+          <button
+            onClick={handleExportDocx}
+            disabled={isLoading || !!error || !dictId || isExporting}
+            className="btn-icon"
+            title="ส่งออกเป็น DOCX"
+            aria-label="ส่งออกเป็น DOCX"
+          >
+            {isExporting ? (
+              <span className="spinner" aria-hidden="true" />
+            ) : (
+              <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={isLoading || !!error || !dictId || isExporting}
+            className="btn-icon"
+            title="ส่งออกเป็น PDF"
+            aria-label="ส่งออกเป็น PDF"
+          >
+            {isExporting ? (
+              <span className="spinner" aria-hidden="true" />
+            ) : (
+              <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+        <div className="toolbar-sep" aria-hidden="true"></div>
+        <div className="toolbar-group">
+          <button
+            onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)))}
+            className="btn-icon"
+            title="ซูมออก"
+            aria-label="ซูมออก"
+          >
+            <MagnifyingGlassMinusIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <span className="zoom-label" aria-live="polite">{Math.round(zoom * 100)}%</span>
+          <button
+            onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.1).toFixed(2)))}
+            className="btn-icon"
+            title="ซูมเข้า"
+            aria-label="ซูมเข้า"
+          >
+            <MagnifyingGlassPlusIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            onClick={() => setZoom(1)}
+            className="btn-icon"
+            title="รีเซ็ตขนาด"
+            aria-label="รีเซ็ตขนาด"
+          >
+            <ArrowPathIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       {isLoading && (
         <div style={{ textAlign: "center", margin: "40px 0" }}>
@@ -202,13 +487,162 @@ const DictionaryPreviewPage = ({ params }: { params: Promise<{ id: string }> }) 
       {error && (
         <div style={{ textAlign: "center", margin: "40px 0" }}>
           <p style={{ color: "red" }}>Error: {error}</p>
-          <button onClick={() => window.location.reload()}>Retry</button>{" "}
-          <button onClick={() => router.back()}>Go Back</button>
+          <button onClick={() => window.location.reload()} className="btn-secondary">Retry</button>{" "}
+          <button onClick={() => router.back()} className="btn-ghost">Go Back</button>
         </div>
       )}
       {!isLoading && !error && (
         <div ref={previewContainerRef} />
       )}
+
+      {/* Page-specific global styles */}
+      <style jsx global>{`
+        /* Leather-green background like login-pane--left for the preview shell */
+        .preview-shell{
+          min-height: calc(100dvh - var(--header-h, 0px) - var(--footer-h, 0px));
+          width: 100%;
+          padding: 0; /* full width, no outer margin/padding */
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background-blend-mode: overlay, overlay, overlay, soft-light, multiply, normal;
+          background-repeat: no-repeat;
+          background-size: cover;
+          background-position: center;
+          overflow: auto; /* allow scrolling when zoomed */
+        }
+
+        .preview-toolbar{
+          position: sticky;
+          top: 0;
+          z-index: 5;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: .5rem;
+          padding: .5rem .75rem;
+          width: 100%;
+          background: color-mix(in srgb, #ffffff 80%, rgba(255,255,255,.3));
+          border-bottom: 1px solid var(--brand-border);
+          backdrop-filter: blur(6px) saturate(1.05);
+          -webkit-backdrop-filter: blur(6px) saturate(1.05);
+        }
+        .preview-toolbar .toolbar-group{ display: inline-flex; align-items: center; gap: .5rem; }
+        .preview-toolbar .toolbar-sep{
+          width: 1px; height: 26px;
+          background: color-mix(in srgb, var(--brand-gold) 45%, transparent);
+        }
+        .preview-toolbar .zoom-label{
+          min-width: 3.2ch;
+          text-align: center;
+          font-weight: 800;
+          color: #1f2937;
+        }
+
+        /* Center and separate pages */
+        .a4-wrapper{
+          width: 100%;
+          max-width: calc(210mm + 24px);
+          display: flex; flex-direction: column; align-items: center; gap: 8mm;
+          will-change: transform;
+          padding-top:30px;
+        }
+
+        /* A4 page box */
+        .a4-page{
+          position: relative;
+          width: 210mm;
+          min-height: 297mm;
+          background: #fff;
+          border-radius: var(--radius-md);
+          box-shadow: 0 10px 30px rgba(0,0,0,.35);
+          overflow: hidden;
+        }
+
+        /* Content area inside page; fixed height to measure overflow, with padding */
+        .a4-content{
+          position: relative;
+          height: calc(297mm - 18mm); /* reserve space for footer visually */
+          padding: 14mm 14mm 22mm 14mm; /* bottom padding so text won't overlap footer */
+          overflow: hidden; /* we control pagination in JS */
+          color: var(--brand-ink);
+        }
+
+        /* Page footer with page number (bottom-right) */
+        .a4-footer{
+          position: absolute;
+          bottom: 8mm;
+          right: 12mm;
+          font-size: .9rem;
+          color: #374151;
+        }
+
+        /* Separator (hr) between pages */
+        .page-sep{
+          height: 2px;
+          width: 210mm;
+          border: 0;
+          margin: 0;
+          background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-gold) 65%, transparent), transparent);
+          opacity: .9;
+        }
+
+        /* Print styles: remove shadows/background, force page breaks */
+        @media print{
+          body { background: #fff !important; }
+          .preview-shell { background: #fff !important; padding: 0; }
+          .a4-wrapper{ gap: 0; }
+          .a4-page{ box-shadow: none; page-break-after: always; border-radius: 0; width: 210mm; min-height: 297mm; }
+          .page-sep{ display: none; }
+          .a4-content{ height: auto; overflow: visible; }
+        }
+      `}</style>
+      <style jsx global>{`
+        /* Exporting overlay */
+        .exporting-overlay{
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255,255,255,.55);
+          backdrop-filter: blur(4px) saturate(1.05);
+          -webkit-backdrop-filter: blur(4px) saturate(1.05);
+        }
+        .exporting-box{
+          display: flex; flex-direction: column; align-items: center; gap: .5rem;
+          min-width: 280px; width: 360px; padding: 18px 22px;
+          background: #fff; border: 1px solid var(--brand-border);
+          border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,.15);
+        }
+        .exporting-text{ font-weight: 600; color: #1f2937; }
+        .exporting-percent{
+          font-weight: 700;
+          color: #111827;
+          margin-top: -4px;
+        }
+        .exporting-progress{
+          width: 100%;
+          height: 8px;
+          background: #eef2f7;
+          border: 1px solid var(--brand-border);
+          border-radius: 999px;
+          overflow: hidden;
+        }
+        .exporting-progress .bar{
+          height: 100%;
+          width: 0%;
+          background: linear-gradient(90deg, var(--brand-gold,#BD9425), #e3c35a);
+          transition: width .2s ease;
+        }
+        .spinner{
+          width: 28px; height: 28px; border-radius: 50%;
+          border: 3px solid #e5e7eb; border-top-color: var(--brand-gold,#BD9425);
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 };

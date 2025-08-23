@@ -481,6 +481,66 @@ export default function AdminTaxonomyPreviewPage() {
 
           {/* Styles */}
           <style jsx>{`
+            /* Bottom toolbar (sticky) */
+            .bottom-toolbar{
+              position: sticky;
+              bottom: 0;
+              background: #ffffffcc;
+              backdrop-filter: saturate(1.1) blur(6px);
+              border-top: 1px solid #e5e7eb;
+              padding: 8px 0;
+              z-index: 35;
+            }
+            .toolbar{
+              display: grid;
+              grid-template-columns: auto 1fr auto;
+              align-items: center;
+              gap: 12px;
+            }
+            .toolbar__section{
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              min-height: 40px;
+            }
+            .toolbar__section--left{ justify-content: flex-start; }
+            .toolbar__pager{
+              justify-content: center;
+              flex-wrap: wrap;
+            }
+            .toolbar__section--right{
+              justify-content: flex-end;
+              gap: 8px;
+            }
+            @media (max-width: 640px){
+              .toolbar{ grid-template-columns: 1fr auto; }
+              .toolbar__pager{ display: none; }
+            }
+            .tsep{ color:#9ca3af; padding: 0 2px; }
+            .tbtn{
+              height: 36px;
+              min-width: 36px;
+              padding: 0 10px;
+              border-radius: 10px;
+              border: 1px solid #e5e7eb;
+              background: #f9fafb;
+              color: #374151;
+              font-weight: 600;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+            }
+            .tbtn:hover{ background:#f3f4f6; border-color:#d1d5db; color:#111827; }
+            .tbtn:active{ transform: translateY(0.5px); }
+            .tbtn[disabled]{ opacity:.45; cursor: not-allowed; }
+            .tbtn-number{ min-width: 38px; padding: 0 12px; }
+            .tbtn-number.is-active{
+              background:#0c57d2; border-color:#0c57d2; color:#fff;
+              box-shadow: 0 1px 4px rgba(12,87,210,.25);
+            }
+            .toolbar__info{ font-size: .9rem; color:#6b7280; white-space: nowrap; }
+
             /* Layout & page styles */
             .fullpage { padding: 0; margin: 0; width: 100vw; }
             .a4-page { max-width: 100%; }

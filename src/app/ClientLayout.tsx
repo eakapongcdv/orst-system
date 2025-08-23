@@ -28,9 +28,11 @@ export default function ClientLayout({
   children: React.ReactNode; 
 }) {
   const pathname = usePathname();
-  
-  // Check if we're on a real full-screen page (editor/view, or /dictionaries/:id/preview)
-  const isEditorPage = (/^\/dictionaries\/[^\/]+\/preview(?:\/|$)/.test(pathname ?? ''));
+// Check if we're on a real full-screen page (editor/view, or /dictionaries/:id/preview or /admin/taxonomy/:id/preview)
+const isEditorPage = (
+  /^\/dictionaries\/[^\/]+\/preview(?:\/|$)/.test(pathname ?? '') ||
+  /^\/admin\/taxonomy\/[^\/]+\/preview(?:\/|$)/.test(pathname ?? '')
+);
   // Detect dictionary routes for subnav highlight
   const dictActive = pathname?.startsWith('/dictionaries');
   const translitActive = pathname?.startsWith('/search-transliteration');
