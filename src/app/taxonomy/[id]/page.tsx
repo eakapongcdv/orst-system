@@ -1,4 +1,4 @@
-// src/app/taxonomy/page.tsx
+// src/app/taxonomy/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -306,11 +306,7 @@ export default function TaxonomyBrowserPage() {
     setVersionsErr(null);
     try {
       // primary endpoint (recommended)
-      let res = await fetch(`/api/taxonomy/entry/${entryId}/versions`);
-      if (!res.ok) {
-        // fallback to query param style if versions route not available
-        res = await fetch(`/api/taxonomy/entry/${entryId}?versions=1`);
-      }
+      let res = await fetch(`/api/taxonomy/entry/${entryId}?versions=1`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const rows: EntryVersionRow[] = Array.isArray(data?.versions) ? data.versions : Array.isArray(data) ? data : [];
@@ -328,12 +324,7 @@ export default function TaxonomyBrowserPage() {
   // Fetch snapshot of a specific version and load into form (read-only view)
   const fetchVersionSnapshot = async (entryId: number, version: number) => {
     try {
-      // try RESTful nested route first
-      let res = await fetch(`/api/taxonomy/entry/${entryId}/versions/${version}`);
-      if (!res.ok) {
-        // fallback to query param variant
-        res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
-      }
+      let res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const snap = await res.json();
       // If the response wraps snapshot
