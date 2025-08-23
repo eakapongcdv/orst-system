@@ -378,9 +378,9 @@ export default function AdminTaxonomyPreviewPage() {
     }
   };
 
-  // --- DOC Export Handler ---
+  // --- DOC Export Handler (bitmap-perfect) ---
   const handleExportDocx = async () => {
-    if (!previewRef.current) {
+    if (!wrapperRef.current) {
       alert('Preview content is not ready for export.');
       return;
     }
@@ -388,38 +388,66 @@ export default function AdminTaxonomyPreviewPage() {
     setExportStage('doc');
     setExportProgress(5);
 
-    // Clone current preview DOM and inline computed styles for Word
-    const cloned = clonePreviewWithInlineStyles(previewRef.current);
-    const tmpHolder = document.createElement('div');
-    tmpHolder.appendChild(cloned);
-    let htmlString = tmpHolder.innerHTML;
+    const originalTransform = wrapperRef.current.style.transform;
+    const originalTransformOrigin = wrapperRef.current.style.transformOrigin;
 
     try {
-      // Convert all images to base64 for a single-file .doc
-      htmlString = await replaceImagesWithBase64(htmlString, (completed, total) => {
-        const ratio = completed / Math.max(1, total);
-        const pct = 5 + Math.round(ratio * 85);
+      const html2canvasMod: any = await import('html2canvas')
+        .then(m => m.default || m)
+        .catch(() => null);
+      if (!html2canvasMod) throw new Error('html2canvas is not available.');
+
+      // Neutralize transforms & hide toolbar during capture
+      wrapperRef.current.style.transform = 'none';
+      wrapperRef.current.style.transformOrigin = 'top left';
+      const toolbar = document.querySelector<HTMLElement>('.preview-toolbar');
+      const prevToolbarDisplay = toolbar?.style.display || '';
+      if (toolbar) toolbar.style.display = 'none';
+
+      // Ensure web fonts are fully loaded before capturing
+      await waitForWebFonts(wrapperRef.current, 7000);
+
+      const pages = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>('.a4-page'));
+      if (pages.length === 0) throw new Error('No pages to export.');
+
+      const images: string[] = [];
+      for (let i = 0; i < pages.length; i++) {
+        const pageEl = pages[i];
+        pageEl.scrollIntoView({ block: 'center' });
+
+        // Double-check fonts for this page
+        await waitForWebFonts(pageEl, 4000);
+
+        const canvas = await html2canvasMod(pageEl, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          logging: false
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        images.push(imgData);
+
+        // progress (allocate ~90% here)
+        const pct = 5 + Math.round(((i + 1) / pages.length) * 90);
         setExportProgress(pct);
-      });
+      }
 
-      setExportProgress(94);
-
-      // Gather runtime CSS (styled-jsx included) + add export-specific rules
-      const cssText = buildDocExportCss();
-
-      // Compose full self-contained HTML document (Word will open .doc as HTML)
-      const fullHtml =
-        `<!DOCTYPE html>
+      // Compose Word-compatible HTML document with full-page images
+      const fullHtml = `<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Taxonomy_${taxonomyId || ''}</title>
-  <style>${cssText}</style>
+  <style>
+    @page { size: A4; margin: 0; }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    .page { width: 210mm; margin: 0 auto; page-break-after: always; }
+    .page img { display: block; width: 100%; height: auto; image-rendering: -webkit-optimize-contrast; }
+  </style>
 </head>
 <body>
-  ${htmlString}
+  ${images.map(src => `<div class="page"><img src="${src}" alt="page" /></div>`).join('')}
 </body>
 </html>`;
 
@@ -437,9 +465,81 @@ export default function AdminTaxonomyPreviewPage() {
       URL.revokeObjectURL(link.href);
 
       setExportProgress(100);
+
+      if (toolbar) toolbar.style.display = prevToolbarDisplay;
     } catch (docxError: any) {
       alert(`Failed to generate DOC file: ${docxError?.message || 'An error occurred during file creation.'}`);
     } finally {
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transformOrigin = originalTransformOrigin;
+        wrapperRef.current.style.transform = originalTransform;
+      }
+      setIsExporting(false);
+      setTimeout(() => { setExportStage('idle'); setExportProgress(0); }, 300);
+    }
+  };
+
+  // --- DOC Export Handler (editable text) ---
+  const handleExportDocxText = async () => {
+    if (!wrapperRef.current) {
+      alert('Preview content is not ready for export.');
+      return;
+    }
+    setIsExporting(true);
+    setExportStage('doc');
+    setExportProgress(5);
+
+    const originalTransform = wrapperRef.current.style.transform;
+    const originalTransformOrigin = wrapperRef.current.style.transformOrigin;
+
+    try {
+      // hide toolbar during preparation
+      wrapperRef.current.style.transform = 'none';
+      wrapperRef.current.style.transformOrigin = 'top left';
+      const toolbar = document.querySelector<HTMLElement>('.preview-toolbar');
+      const prevToolbarDisplay = toolbar?.style.display || '';
+      if (toolbar) toolbar.style.display = 'none';
+
+      // Ensure fonts are ready
+      await waitForWebFonts(wrapperRef.current, 7000);
+
+      // Clone preview DOM and inline styles for Word fidelity
+      const cloned = clonePreviewWithInlineStyles(wrapperRef.current);
+
+      // Replace image src with base64 to embed resources in the .doc
+      let htmlBody = cloned.outerHTML;
+      htmlBody = await replaceImagesWithBase64(htmlBody, (completed, total) => {
+        const ratio = completed / Math.max(1, total);
+        const pct = 5 + Math.round(ratio * 85);
+        setExportProgress(pct);
+      });
+
+      const css = buildDocExportCss();
+      const fullHtml = `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8" /><title>Taxonomy_${taxonomyId || ''}</title><style>${css}</style></head><body>${htmlBody}</body></html>`;
+
+      const blob = new Blob([fullHtml], { type: 'application/msword' });
+      const fileName = `Taxonomy_${taxonomyId || ''}_editable.doc`;
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+
+      setExportProgress(98);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      setExportProgress(100);
+
+      if (toolbar) toolbar.style.display = prevToolbarDisplay;
+    } catch (err: any) {
+      alert(`Failed to generate DOC file: ${err?.message || 'An error occurred during file creation.'}`);
+    } finally {
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transformOrigin = originalTransformOrigin;
+        wrapperRef.current.style.transform = originalTransform;
+      }
       setIsExporting(false);
       setTimeout(() => { setExportStage('idle'); setExportProgress(0); }, 300);
     }
@@ -466,11 +566,24 @@ export default function AdminTaxonomyPreviewPage() {
             <div className="preview-toolbar">
               <div className="toolbar-group">
                 <button
+                  onClick={handleExportDocxText}
+                  disabled={loading || !!err || isExporting || results.length === 0}
+                  className="btn-icon"
+                  title="ส่งออกเป็น DOC (แก้ไขได้)"
+                  aria-label="ส่งออกเป็น DOC (แก้ไขได้)"
+                >
+                  {isExporting ? (
+                    <span className="spinner" aria-hidden="true" />
+                  ) : (
+                    <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </button>
+                <button
                   onClick={handleExportDocx}
                   disabled={loading || !!err || isExporting || results.length === 0}
                   className="btn-icon"
-                  title="ส่งออกเป็น DOC"
-                  aria-label="ส่งออกเป็น DOC"
+                  title="ส่งออกเป็น DOC (ภาพ 100%)"
+                  aria-label="ส่งออกเป็น DOC (ภาพ 100%)"
                 >
                   {isExporting ? (
                     <span className="spinner" aria-hidden="true" />
