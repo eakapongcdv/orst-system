@@ -79,6 +79,62 @@ async function replaceImagesWithBase64(htmlString: string, onProgress?: (complet
   return tempDiv.innerHTML;
 }
 
+// --- Helpers: wait for web fonts to load before rasterization (html2canvas) ---
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+async function waitForWebFonts(root?: HTMLElement | null, timeoutMs = 7000) {
+  try {
+    const start = Date.now();
+    // 1) Await document.fonts.ready if available (best effort, time-bounded)
+    const fontsObj: any = (document as any).fonts;
+    if (fontsObj?.ready) {
+      await Promise.race([
+        fontsObj.ready,
+        new Promise((_resolve, reject) => setTimeout(() => reject(new Error('fonts.ready timeout')), timeoutMs)),
+      ]).catch(() => {});
+    }
+    // Preload the target Thai family explicitly (common weights) so html2canvas uses it
+    if (fontsObj?.load) {
+      try {
+        await Promise.race([
+          Promise.allSettled([
+            fontsObj.load(`400 16px "TH Sarabun PSK"`),
+            fontsObj.load(`700 16px "TH Sarabun PSK"`),
+            fontsObj.load(`400 16px "TH Sarabun New"`),
+            fontsObj.load(`700 16px "TH Sarabun New"`),
+          ]),
+          sleep(Math.max(500, Math.floor(timeoutMs / 2)))
+        ]).catch(() => {});
+      } catch {}
+    }
+    // 2) Explicitly request loads for font families observed inside the root tree (first 150 elements to cap cost)
+    if (root && fontsObj?.load) {
+      const els = Array.from(root.querySelectorAll<HTMLElement>('*')).slice(0, 150);
+      const loads: Promise<any>[] = [];
+      const seen = new Set<string>();
+      for (const el of els) {
+        const cs = getComputedStyle(el);
+        const famRaw = cs.fontFamily || '';
+        const fam = famRaw.split(',')[0]?.replace(/["']/g, '').trim();
+        const weight = cs.fontWeight || '400';
+        const size = cs.fontSize || '16px';
+        const key = `${weight}|${size}|${fam}`;
+        if (fam && !seen.has(key)) {
+          seen.add(key);
+          try { loads.push(fontsObj.load(`${weight} ${size} ${fam}`)); } catch { /* ignore individual load errors */ }
+        }
+      }
+      if (loads.length) {
+        const timeLeft = Math.max(500, timeoutMs - (Date.now() - start));
+        await Promise.race([Promise.allSettled(loads), sleep(timeLeft)]).catch(() => {});
+      }
+    }
+    // Short settle
+    await sleep(120);
+  } catch {
+    /* noop */
+  }
+}
+
 export default function AdminTaxonomyPreviewPage() {
   const params = useParams<{ id: string }>();
   const taxonomyId = Number(params?.id || 0);
@@ -177,6 +233,9 @@ export default function AdminTaxonomyPreviewPage() {
       const prevToolbarDisplay = toolbar?.style.display || '';
       if (toolbar) toolbar.style.display = 'none';
 
+      // Ensure web fonts are fully loaded before capturing
+      await waitForWebFonts(wrapperRef.current, 7000);
+
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -187,6 +246,8 @@ export default function AdminTaxonomyPreviewPage() {
       for (let i = 0; i < pages.length; i++) {
         const pageEl = pages[i];
         pageEl.scrollIntoView({ block: 'center' });
+        // Double-check fonts for this page (defensive, in case of late subfont splits)
+        await waitForWebFonts(pageEl, 4000);
         const canvas = await html2canvasMod(pageEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 1.0);
 
@@ -476,6 +537,23 @@ export default function AdminTaxonomyPreviewPage() {
               padding: 14mm 14mm 22mm 14mm; /* bottom padding so text won't overlap footer */
               overflow: hidden; /* avoid overflow across pages */
               color: #111827;
+              /* Default Thai font for A4 content and export */
+              font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif;
+            }
+            /* Ensure all descendants use the same Thai font (screen & PDF) */
+            .a4-content *{
+              font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif !important;
+            }
+            /* Force <p> and text descendants to always use TH Sarabun PSK in screen & PDF */
+            .a4-content p,
+            .a4-content p *,
+            .a4-content .prose p,
+            .a4-content .prose p *{
+              font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif !important;
+            }
+            /* Override any inline font-family coming from pasted HTML */
+            .a4-content [style*="font-family"]{
+              font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif !important;
             }
             .a4-footer{
               position: absolute;
@@ -483,6 +561,7 @@ export default function AdminTaxonomyPreviewPage() {
               right: 12mm;
               font-size: .9rem;
               color: #374151;
+              font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif;
             }
             .page-sep{
               height: 2px;
@@ -562,6 +641,22 @@ export default function AdminTaxonomyPreviewPage() {
             .preview-toolbar .toolbar-group{ display: inline-flex; align-items: center; gap: .5rem; }
             .preview-toolbar .toolbar-sep{ width: 1px; height: 26px; background: color-mix(in srgb, var(--brand-gold, #BD9425) 45%, transparent); }
             .preview-toolbar .zoom-label{ min-width: 3.2ch; text-align: center; font-weight: 800; color: #1f2937; }
+
+            /* Force Thai fonts for all A4 content (screen, export, and dynamic HTML) */
+            .a4-content,
+            .a4-content *,
+            .a4-content p,
+            .a4-content p *,
+            .a4-content .prose p,
+            .a4-content .prose p *,
+            .a4-content [style*="font-family"],
+            .taxon-shortdescription,
+            .taxon-shortdescription *,
+            .taxon-article,
+            .taxon-article *,
+            .a4-footer{
+              font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif !important;
+            }
 
             /* Exporting overlay */
             .exporting-overlay{ position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.55); backdrop-filter: blur(4px) saturate(1.05); -webkit-backdrop-filter: blur(4px) saturate(1.05); }
