@@ -27,11 +27,11 @@ type HistoryRow = {
 interface SpecializedDictionary {
   id: number;
   title: string;
-  category: string;
-  subcategory?: string | null;
+  domain?: string | null;
+  kingdom?: string | null;
   year_published?: number | null;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** ----------------------------------------------------------------
@@ -79,10 +79,10 @@ export default function UpdateDictionaryUploadPage() {
       setLoadingSpecs(true);
       setSpecError(null);
       try {
-        const r = await fetch("/api/specialized-dictionary/list");
+        const r = await fetch("/api/admin/taxonomy?page=1&pageSize=1000");
         if (!r.ok) throw new Error(`โหลดรายการล้มเหลว (HTTP ${r.status})`);
         const j = await r.json();
-        const list: SpecializedDictionary[] = Array.isArray(j?.data) ? j.data : (Array.isArray(j) ? j : []);
+        const list: SpecializedDictionary[] = Array.isArray(j?.items) ? j.items : (Array.isArray(j) ? j : []);
         if (!ignore) {
           setSpecOptions(list);
           if (list.length && !specializedDictionaryId) {
@@ -90,7 +90,7 @@ export default function UpdateDictionaryUploadPage() {
           }
         }
       } catch (e: any) {
-        if (!ignore) setSpecError(e?.message || "ไม่สามารถโหลดรายการอนุกรมวิธานเฉพาะสาขาได้");
+        if (!ignore) setSpecError(e?.message || "ไม่สามารถโหลดรายการอนุกรมวิธานได้");
       } finally {
         if (!ignore) setLoadingSpecs(false);
       }
@@ -188,7 +188,7 @@ export default function UpdateDictionaryUploadPage() {
       return;
     }
     if (!specializedDictionaryId) {
-      setError("กรุณาเลือกพจนานุกรมเฉพาะสาขาวิชาก่อนอัปโหลด");
+      setError("กรุณาเลือกอนุกรมวิธานก่อนอัปโหลด");
       return;
     }
     setUploading(true);
@@ -202,11 +202,12 @@ export default function UpdateDictionaryUploadPage() {
         // Build API URL with commit flag and optional metadata
         const apiUrl = new URL("/api/file-manager/upload-taxonomy", window.location.origin);
         apiUrl.searchParams.set("commit", "1");
-        // Pass title/domain based on selected SpecializedDictionary (if any)
+        // Pass title/domain/kingdom based on selected taxonomy (if any)
         const sel = specOptions.find(o => String(o.id) === specializedDictionaryId);
         if (sel) {
           apiUrl.searchParams.set("title", sel.title);
-          if (sel.category) apiUrl.searchParams.set("domain", sel.category);
+          if (sel.domain) apiUrl.searchParams.set("domain", String(sel.domain));
+          if (sel.kingdom) apiUrl.searchParams.set("kingdom", String(sel.kingdom));
         }
         xhr.open("POST", apiUrl.toString());
         xhr.responseType = "json";
@@ -235,7 +236,7 @@ export default function UpdateDictionaryUploadPage() {
 
         const fd = new FormData();
         fd.append("file", selectedFile);
-        fd.append("specializedDictionaryId", specializedDictionaryId);
+        fd.append("taxonomyId", specializedDictionaryId);
         xhr.send(fd);
       }).then((res) => {
         setProgress(100);
@@ -339,14 +340,14 @@ export default function UpdateDictionaryUploadPage() {
           <div>
             <h1 className="page-title">นำเข้าอนุกรมวิธาน</h1>
             <div className="mt-2 flex items-center gap-2">
-              <label htmlFor="specSelect" className="sr-only">เลือกอนุกรมวิธานเฉพาะสาขาวิชา</label>
+              <label htmlFor="specSelect" className="sr-only">เลือกชุดอนุกรมวิธาน</label>
               <select
                 id="specSelect"
                 className="select"
                 value={specializedDictionaryId}
                 onChange={(e) => setSpecializedDictionaryId(e.target.value)}
                 disabled={loadingSpecs || !specOptions.length}
-                aria-label="เลือกอนุกรมวิธานเฉพาะสาขาวิชา"
+                aria-label="เลือกชุดอนุกรมวิธาน"
               >
                 {loadingSpecs && <option value="">กำลังโหลด...</option>}
                 {!loadingSpecs && specOptions.length === 0 && <option value="">ไม่มีรายการ</option>}

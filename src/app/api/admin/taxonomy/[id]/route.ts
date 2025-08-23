@@ -24,6 +24,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const data: any = {};
     if (typeof body?.title === 'string') data.title = body.title.trim();
     if (typeof body?.domain === 'string') data.domain = body.domain.trim();
+    if (typeof body?.kingdom === 'string') {
+      const k = body.kingdom.trim();
+      if (!k) return NextResponse.json({ error: 'กรุณาระบุราชอาณาจักร (Kingdom)' }, { status: 400 });
+      data.kingdom = k;
+    }
 
     const updated = await prisma.taxonomy.update({ where: { id }, data });
     return NextResponse.json({ ok: true, item: updated });

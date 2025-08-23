@@ -1,14 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
+
+const DOMAIN_OPTIONS = ['Bacteria', 'Archaea', 'Eukarya'];
+const KINGDOM_OPTIONS = ['Animalia', 'Plantae', 'Fungi', 'Protista', 'Monera'];
 
 type Taxonomy = {
   id: number;
   title: string;
   domain: string;
-  created_at?: string;
-  updated_at?: string;
-  _count?: { taxa: number };
+  kingdom: string;
+  createdAt?: string;
+  updatedAt?: string;
+  _entryCount?: number; // NEW: count of TaxonEntry
 };
 
 type Pagination = {
@@ -17,6 +21,9 @@ type Pagination = {
   total: number;
   totalPages: number;
 };
+
+type SortBy = 'id' | 'title' | 'domain' | 'kingdom' | 'updatedAt' | 'entryCount';
+type SortDir = 'asc' | 'desc';
 
 export default function AdminTaxonomyPage() {
   const [q, setQ] = useState('');
@@ -27,23 +34,29 @@ export default function AdminTaxonomyPage() {
   const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState<Pagination | null>(null);
 
+  const [sortBy, setSortBy] = useState<SortBy>('id');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Taxonomy | null>(null);
-  const [form, setForm] = useState<{ title: string; domain: string }>({ title: '', domain: '' });
+  const [form, setForm] = useState<{ title: string; domain: string; kingdom: string }>({ title: '', domain: '', kingdom: '' });
   const submitBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const fetchData = async (_page = page, _pageSize = pageSize, _q = q) => {
+  const fetchData = async (_page = page, _pageSize = pageSize, _q = q, _sortBy = sortBy, _sortDir = sortDir) => {
     setLoading(true);
     setErr(null);
     try {
       const params = new URLSearchParams();
       params.set('page', String(_page));
       params.set('pageSize', String(_pageSize));
+      params.set('sortBy', String(_sortBy));
+      params.set('sortDir', String(_sortDir));
       if (_q.trim()) params.set('q', _q.trim());
       const r = await fetch(`/api/admin/taxonomy?${params.toString()}`, { cache: 'no-store' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
-      setList(j.items || []);
+      const items: Taxonomy[] = j.items || [];
+      setList(items);
       setPagination(j.pagination || null);
     } catch (e: any) {
       setErr(e?.message || 'โหลดข้อมูลไม่สำเร็จ');
@@ -58,27 +71,28 @@ export default function AdminTaxonomyPage() {
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchData(1, pageSize, q);
+    fetchData(1, pageSize, q, sortBy, sortDir);
   };
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ title: '', domain: '' });
+    setForm({ title: '', domain: DOMAIN_OPTIONS[2], kingdom: KINGDOM_OPTIONS[1] });
     setModalOpen(true);
   };
 
   const openEdit = (row: Taxonomy) => {
     setEditing(row);
-    setForm({ title: row.title, domain: row.domain });
+    setForm({ title: row.title, domain: row.domain, kingdom: (row as any).kingdom || '' });
     setModalOpen(true);
   };
 
   const onSave = async () => {
     try {
       submitBtnRef.current?.setAttribute('disabled', 'true');
-      const payload = { title: form.title?.trim(), domain: form.domain?.trim() };
+      const payload = { title: form.title?.trim(), domain: form.domain?.trim(), kingdom: form.kingdom?.trim() };
       if (!payload.title) throw new Error('กรุณาระบุชื่อชุดอนุกรมวิธาน');
-      if (!payload.domain) throw new Error('กรุณาระบุโดเมน');
+      if (!payload.domain) throw new Error('กรุณาเลือกโดเมน');
+      if (!payload.kingdom) throw new Error('กรุณาเลือกอาณาจักร');
 
       let r: Response;
       if (editing) {
@@ -97,7 +111,7 @@ export default function AdminTaxonomyPage() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       setModalOpen(false);
-      await fetchData();
+      await fetchData(page, pageSize, q, sortBy, sortDir);
     } catch (e: any) {
       alert(e?.message || 'บันทึกไม่สำเร็จ');
     } finally {
@@ -111,7 +125,7 @@ export default function AdminTaxonomyPage() {
       const r = await fetch(`/api/admin/taxonomy/${row.id}`, { method: 'DELETE' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      await fetchData();
+      await fetchData(page, pageSize, q, sortBy, sortDir);
     } catch (e: any) {
       alert(e?.message || 'ลบไม่สำเร็จ (อาจมีข้อมูลที่เกี่ยวข้องอยู่)');
     }
@@ -137,6 +151,42 @@ export default function AdminTaxonomyPage() {
     return out;
   }, [pagination]);
 
+  // Group: level 1 by domain, level 2 by kingdom (preserve order within inners)
+  type DomainGroup = { domain: string; groups: Array<{ kingdom: string; items: Taxonomy[] }> };
+  const grouped = useMemo<DomainGroup[]>(() => {
+    const out: Record<string, Record<string, Taxonomy[]>> = {};
+    for (const it of list) {
+      const d = it.domain || 'ไม่ระบุโดเมน';
+      const k = it.kingdom || 'ไม่ระบุ Kingdom';
+      if (!out[d]) out[d] = {};
+      if (!out[d][k]) out[d][k] = [];
+      out[d][k].push(it);
+    }
+    const domains = Object.keys(out).sort((a, b) => a.localeCompare(b, 'th'));
+    return domains.map((domain) => {
+      const kingdoms = Object.keys(out[domain]).sort((a, b) => a.localeCompare(b, 'th'));
+      return { domain, groups: kingdoms.map((kingdom) => ({ kingdom, items: out[domain][kingdom] })) };
+    });
+  }, [list]);
+
+  // Sorting handler
+  const applySort = (col: SortBy) => {
+    let dir: SortDir = 'asc';
+    if (sortBy === col) {
+      dir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      dir = (col === 'updatedAt' || col === 'entryCount') ? 'desc' : 'asc';
+    }
+    setSortBy(col);
+    setSortDir(dir);
+    fetchData(1, pageSize, q, col, dir);
+  };
+
+  const sortIcon = (col: SortBy) => {
+    if (sortBy !== col) return <span className="sort-caret">↕</span>;
+    return <span className="sort-caret active">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   return (
     <div className="adm-wrap">
       <header className="adm-head">
@@ -156,7 +206,7 @@ export default function AdminTaxonomyPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหาชื่่อ หรือโดเมน"
+              placeholder="ค้นหาชื่อ / Domain / Kingdom"
             />
           </div>
           <div className="toolbar-right">
@@ -175,34 +225,68 @@ export default function AdminTaxonomyPage() {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th style={{width: 72}}>ID</th>
-                  <th>ชื่อ</th>
-                  <th style={{width: 220}}>โดเมน</th>
-                  <th style={{width: 140}}>จำนวน Taxa</th>
-                  <th style={{width: 220}}>อัปเดตล่าสุด</th>
+                  <th style={{width: 72}}>
+                    <button type="button" className="th-sort" onClick={() => applySort('id')}>ID {sortIcon('id')}</button>
+                  </th>
+                  <th>
+                    <button type="button" className="th-sort" onClick={() => applySort('title')}>ชื่ออนุกรมวิธาน {sortIcon('title')}</button>
+                  </th>
+                  <th style={{width: 200}}>
+                    <button type="button" className="th-sort" onClick={() => applySort('kingdom')}>อาณาจักร {sortIcon('kingdom')}</button>
+                  </th>
+                  <th style={{width: 120}}>
+                    <button type="button" className="th-sort" onClick={() => applySort('entryCount')}>จำนวนข้อมูล {sortIcon('entryCount')}</button>
+                  </th>
+                  <th style={{width: 200}}>
+                    <button type="button" className="th-sort" onClick={() => applySort('updatedAt')}>อัปเดตล่าสุด {sortIcon('updatedAt')}</button>
+                  </th>
                   <th style={{width: 160}}></th>
                 </tr>
               </thead>
               <tbody>
-                {list.length === 0 && (
-                  <tr><td colSpan={6} style={{textAlign:'center', color:'#777'}}>ไม่พบข้อมูล</td></tr>
+                {grouped.length === 0 && (
+                  <tr><td colSpan={7} style={{textAlign:'center', color:'#777'}}>ไม่พบข้อมูล</td></tr>
                 )}
-                {list.map(it => (
-                  <tr key={it.id}>
-                    <td>#{it.id}</td>
-                    <td>{it.title}</td>
-                    <td><code>{it.domain}</code></td>
-                    <td>{it._count?.taxa ?? 0}</td>
-                    <td>{new Date(it.updated_at ?? it.created_at ?? Date.now()).toLocaleString('th-TH')}</td>
-                    <td className="row-actions">
-                      <button className="btn btn-ghost" title="แก้ไข" onClick={() => openEdit(it)}>
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 18.25V21h2.75l8.1-8.1-2.75-2.75L5 18.25Zm13.71-10.21a1.003 1.003 0 0 0 0-1.42l-1.33-1.33a1.003 1.003 0 0 0-1.42 0l-1.12 1.12 2.75 2.75 1.12-1.12Z"/></svg>
-                      </button>
-                      <button className="btn btn-ghost danger" title="ลบ" onClick={() => onDelete(it)}>
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.8l.86 12.09A2 2 0 0 0 7.65 21h8.7a2 2 0 0 0 1.99-1.91L19.2 7H20a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9Zm2 3h2v-.5h-2V6Z"/></svg>
-                      </button>
-                    </td>
-                  </tr>
+                {grouped.map((dg) => (
+                  <Fragment key={`domain-${dg.domain}`}>
+                    <tr className="domain-row">
+                      <td colSpan={7}>
+                        <div className="group-tab group-tab--domain">
+                          <span className="group-tab__label">โดเมน</span>
+                          <span className="group-tab__text">{dg.domain}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {dg.groups.map((kg) => (
+                      <Fragment key={`kg-${dg.domain}::${kg.kingdom}`}>
+                        <tr className="kingdom-row">
+                          <td colSpan={7}>
+                            <div className="group-tab group-tab--kingdom">
+                              <span className="group-tab__label">อาณาจักร</span>
+                              <span className="group-tab__text">{kg.kingdom}</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {kg.items.map((it) => (
+                          <tr key={it.id}>
+                            <td>#{it.id}</td>
+                            <td>{it.title}</td>
+                            <td>{it.kingdom}</td>
+                            <td>{it._entryCount ?? 0}</td>
+                            <td>{new Date(it.updatedAt ?? it.createdAt ?? Date.now()).toLocaleString('th-TH')}</td>
+                            <td className="row-actions">
+                              <button className="btn btn-ghost" title="แก้ไข" onClick={() => openEdit(it)}>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 18.25V21h2.75l8.1-8.1-2.75-2.75L5 18.25Zm13.71-10.21a1.003 1.003 0 0 0 0-1.42l-1.33-1.33a1.003 1.003 0 0 0-1.42 0l-1.12 1.12 2.75 2.75 1.12-1.12Z"/></svg>
+                              </button>
+                              <button className="btn btn-ghost danger" title="ลบ" onClick={() => onDelete(it)}>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.8l.86 12.09A2 2 0 0 0 7.65 21h8.7a2 2 0 0 0 1.99-1.91L19.2 7H20a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9Zm2 3h2v-.5h-2V6Z"/></svg>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -211,40 +295,49 @@ export default function AdminTaxonomyPage() {
 
         {/* Toolbar-style pagination bottom */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="pager">
+          <div className="pager" role="toolbar" aria-label="เปลี่ยนหน้า">
             <div className="pager-left">
               <button
                 className="icon-btn"
                 disabled={pagination.page <= 1}
-                onClick={() => { setPage(1); fetchData(1); }}
+                onClick={() => { setPage(1); fetchData(1, pageSize, q, sortBy, sortDir); }}
                 title="หน้าแรก"
+                aria-label="หน้าแรก"
               >
                 «
               </button>
               <button
                 className="icon-btn"
                 disabled={pagination.page <= 1}
-                onClick={() => { const p = Math.max(1, pagination.page - 1); setPage(p); fetchData(p); }}
+                onClick={() => { const p = Math.max(1, pagination.page - 1); setPage(p); fetchData(p, pageSize, q, sortBy, sortDir); }}
                 title="ก่อนหน้า"
+                aria-label="ก่อนหน้า"
               >
                 ‹
               </button>
             </div>
-            <div className="pager-mid">
+
+            <div className="pager-mid" aria-label="เลือกหน้า">
               {pageNumbers.map((p, i) => p === '…'
                 ? <span key={i} className="ellipsis">…</span>
                 : <button
                     key={i}
                     className={`page-num ${p === pagination.page ? 'active' : ''}`}
-                    onClick={() => { setPage(p as number); fetchData(p as number); }}
+                    onClick={() => { setPage(p as number); fetchData(p as number, pageSize, q, sortBy, sortDir); }}
+                    aria-current={p === pagination.page ? 'page' : undefined}
                   >{p}</button>
               )}
             </div>
+
             <div className="pager-right">
+              <span className="pager-info">หน้า {pagination.page}/{pagination.totalPages} • รวม {pagination.total} รายการ</span>
+              <label htmlFor="pageSize" className="sr-only">ต่อหน้า</label>
               <select
+                id="pageSize"
                 value={pageSize}
-                onChange={(e) => { const s = parseInt(e.target.value, 10); setPageSize(s); fetchData(1, s); }}
+                onChange={(e) => { const s = parseInt(e.target.value, 10); setPageSize(s); fetchData(1, s, q, sortBy, sortDir); }}
                 title="ต่อหน้า"
+                aria-label="จำนวนต่อหน้า"
               >
                 <option value={10}>10/หน้า</option>
                 <option value={20}>20/หน้า</option>
@@ -253,16 +346,18 @@ export default function AdminTaxonomyPage() {
               <button
                 className="icon-btn"
                 disabled={pagination.page >= pagination.totalPages}
-                onClick={() => { const p = Math.min(pagination.totalPages, pagination.page + 1); setPage(p); fetchData(p); }}
+                onClick={() => { const p = Math.min(pagination.totalPages, pagination.page + 1); setPage(p); fetchData(p, pageSize, q, sortBy, sortDir); }}
                 title="ถัดไป"
+                aria-label="ถัดไป"
               >
                 ›
               </button>
               <button
                 className="icon-btn"
                 disabled={pagination.page >= pagination.totalPages}
-                onClick={() => { const p = pagination.totalPages; setPage(p); fetchData(p); }}
+                onClick={() => { const p = pagination.totalPages; setPage(p); fetchData(p, pageSize, q, sortBy, sortDir); }}
                 title="หน้าสุดท้าย"
+                aria-label="หน้าสุดท้าย"
               >
                 »
               </button>
@@ -282,7 +377,7 @@ export default function AdminTaxonomyPage() {
             </div>
             <div className="modal-body">
               <label className="fld">
-                <span>ชื่อ</span>
+                <span>ชื่ออนุกรมวิธาน</span>
                 <input
                   value={form.title}
                   onChange={(e) => setForm(v => ({ ...v, title: e.target.value }))}
@@ -290,12 +385,28 @@ export default function AdminTaxonomyPage() {
                 />
               </label>
               <label className="fld">
-                <span>โดเมน</span>
-                <input
+                <span>โดเมน (Domain)</span>
+                <select
                   value={form.domain}
                   onChange={(e) => setForm(v => ({ ...v, domain: e.target.value }))}
-                  placeholder="เช่น พืช / สัตว์ / แร่ธาตุ"
-                />
+                  aria-label="เลือกโดเมน"
+                >
+                  {DOMAIN_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="fld">
+                <span>อาณาจักร (Kingdom)</span>
+                <select
+                  value={form.kingdom}
+                  onChange={(e) => setForm(v => ({ ...v, kingdom: e.target.value }))}
+                  aria-label="เลือก Kingdom"
+                >
+                  {KINGDOM_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </label>
             </div>
             <div className="modal-foot">
@@ -327,6 +438,17 @@ export default function AdminTaxonomyPage() {
         .tbl thead th{background:#f9fafb; text-align:left; font-weight:700; font-size:.92rem;}
         .row-actions{display:flex; gap:6px; justify-content:flex-end;}
 
+        .th-sort{display:inline-flex; align-items:center; gap:6px; background:transparent; border:0; font-weight:700; cursor:pointer; color:#111827;}
+        .sort-caret{opacity:.4;}
+        .sort-caret.active{opacity:1;}
+
+        .domain-row td,
+        .kingdom-row td{
+          background:transparent;
+          border-bottom:none;
+          padding:8px 10px;
+        }
+
         .btn{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; cursor:pointer;}
         .btn:hover{background:#f8fafc;}
         .btn-primary{background:#0c57d2; color:#fff; border-color:#0c57d2;}
@@ -339,21 +461,80 @@ export default function AdminTaxonomyPage() {
 
         .alert.error{background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:10px; border-radius:8px; margin:10px 0;}
 
-        .pager{display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:10px; border-top:1px solid #eee; margin-top:10px;}
+        .pager{position:sticky; bottom:0; left:0; right:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; margin-top:10px; border-top:1px solid #eee; background:#fff; box-shadow: 0 -6px 16px rgba(15,23,42,.04); z-index: 5;}
         .pager-left,.pager-right{display:flex; align-items:center; gap:6px;}
         .pager-mid{display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:center;}
         .page-num{min-width:36px; height:36px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; cursor:pointer;}
         .page-num.active{background:#0c57d2; border-color:#0c57d2; color:#fff;}
         .ellipsis{padding:0 6px; color:#6b7280;}
 
+        .pager-info{color:#6b7280; font-size:.9rem; margin-right:8px;}
+        .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
+
         .overlay{position:fixed; inset:0; background:rgba(15,23,42,.35); backdrop-filter: blur(2px); z-index:30;}
-        .modal{position:fixed; inset:auto 0 0 0; margin:auto; top:10%; max-width:520px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:0; z-index:40; box-shadow:0 12px 40px rgba(15,23,42,.15);}
-        .modal-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e5e7eb;}
+        .modal{
+          position:fixed;
+          top:50%;
+          left:50%;
+          transform:translate(-50%, -50%);
+          width:min(560px, 92vw);
+          max-height:85vh;
+          background:#fff;
+          border:1px solid #e5e7eb;
+          border-radius:14px;
+          padding:0;
+          z-index:40;
+          box-shadow:0 12px 40px rgba(15,23,42,.15);
+          display:flex;
+          flex-direction:column;
+        }
+        .modal-head{
+          display:flex; align-items:center; justify-content:space-between;
+          padding:12px 16px; border-bottom:1px solid #e5e7eb;
+        }
         .modal-head h3{margin:0; font-weight:800;}
-        .modal-body{padding:16px; display:grid; gap:12px;}
+        .modal-body{
+          padding:16px; display:grid; gap:12px;
+          overflow:auto; flex:1;
+        }
         .fld{display:grid; gap:6px;}
         .fld input{border:1px solid #e5e7eb; border-radius:10px; padding:10px;}
-        .modal-foot{display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e5e7eb;}
+        .fld select{border:1px solid #e5e7eb; border-radius:10px; padding:10px; background:#fff;}
+        .modal-foot{
+          display:flex; justify-content:flex-end; gap:8px;
+          padding:12px 16px; border-top:1px solid #e5e7eb;
+        }
+
+        .group-tab{
+          display:flex; align-items:center; gap:10px;
+          padding:10px 12px;
+          border-radius:12px;
+          border:1px solid #e5e7eb;
+        }
+        .group-tab__label{
+          font-weight:800;
+          border-radius:999px;
+          padding:6px 10px;
+          line-height:1;
+          color:#fff;
+        }
+        .group-tab__text{
+          font-weight:700; color:#111827;
+        }
+        .group-tab--domain{
+          background:#F4F7FF;
+          border-left:4px solid #0c57d2;
+        }
+        .group-tab--domain .group-tab__label{
+          background:#0c57d2;
+        }
+        .group-tab--kingdom{
+          background:#F2FEF6;
+          border-left:4px solid #16a34a;
+        }
+        .group-tab--kingdom .group-tab__label{
+          background:#16a34a;
+        }
       `}</style>
     </div>
   );

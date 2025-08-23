@@ -477,8 +477,9 @@ enum TaxonRank {
 // หมวด 4: อนุกรมวิธาน
 model Taxonomy {
   id          Int      @id @default(autoincrement())
-  title       String // เช่น "อนุกรมวิธานพืช", "อนุกรมวิธานสัตว์"
-  domain      String // "plant" | "animal" | อื่น ๆ
+  title       String // เช่น "อนุกรมวิธานพืช อักษร ต เล่ม ๑", "อนุกรมวิธานสัตว์ อักษร ก"
+  domain      String? // Bacteria, Archaea, Eukarya
+  kingdom     String? // Animalia, Plantae, Fungi, Protista ,Monera
   version     String?
   description String?
   sourceUrl   String?
@@ -489,6 +490,7 @@ model Taxonomy {
   taxa Taxon[]
 
   @@index([domain])
+  @@index([kingdom])
 }
 
 model Taxon {

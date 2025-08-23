@@ -19,7 +19,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("admin@orst.go.th");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -166,7 +166,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 rounded-xl border border-gray-300 placeholder-gray-400 focus:border-[var(--brand-gold)] focus:ring-[var(--brand-gold)]"
-                  placeholder="you@example.com"
+                  placeholder="admin@orst.go.th"
                 />
               </div>
             </div>
