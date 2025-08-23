@@ -157,6 +157,13 @@ function inlineAllStyles(root: HTMLElement) {
     // Text layout
     if (cs.textAlign && cs.textAlign !== 'start') el.style.textAlign = cs.textAlign;
 
+    // Thai line breaking + Word compatibility
+    el.style.setProperty('word-break', 'break-word');
+    el.style.setProperty('-ms-word-break', 'break-all'); // legacy/Word HTML engine
+    el.style.setProperty('overflow-wrap', 'anywhere');
+    el.style.setProperty('word-wrap', 'break-word');
+    el.style.setProperty('line-break', 'auto');
+
     // A4 page sizing + breaks (ensure Word respects it)
     if (el.classList.contains('a4-page')) {
       el.style.width = '210mm';
@@ -166,11 +173,13 @@ function inlineAllStyles(root: HTMLElement) {
       el.style.border = 'none';
       el.style.borderRadius = '0';
       el.style.boxShadow = 'none';
+      (el.style as any).margin = '0';
     }
     if (el.classList.contains('a4-content')) {
       el.style.height = 'auto';
       el.style.overflow = 'visible';
       el.style.padding = '14mm 14mm 22mm 14mm';
+      // padding already set as required
     }
 
     // Ensure 2-column article in Word (fallback via inline)
@@ -181,6 +190,9 @@ function inlineAllStyles(root: HTMLElement) {
       (el.style as any).WebkitColumnGap = '36px';
       (el.style as any).MozColumnCount = '2';
       (el.style as any).MozColumnGap = '36px';
+      // MS Office specific
+      el.style.setProperty('mso-column-count', '2');
+      el.style.setProperty('mso-column-gap', '36pt');
     }
   }
 }
@@ -207,29 +219,48 @@ function clonePreviewWithInlineStyles(srcRoot: HTMLElement): HTMLElement {
 // --- Build CSS for DOC export: Word-friendly subset to match preview ---
 function buildDocExportCss(): string {
   return `
-/* Force A4 page and zero margins in Word */
-@page { size: A4; margin: 0; }
-html, body { background: #fff !important; margin:0; padding:0; }
+/* Word: A4 and margins (customizable) */
+@page WordSection1 { size:595.3pt 841.9pt; margin:39.7pt 39.7pt 62.4pt 39.7pt; } /* ~14mm 14mm 22mm 14mm */
+.WordSection1 { page: WordSection1; }
+
+html, body { background:#fff !important; margin:0; padding:0; }
 
 /* Hide UI */
-.preview-toolbar, .exporting-overlay { display: none !important; }
+.preview-toolbar, .exporting-overlay { display:none !important; }
 
-/* Ensure each visual page becomes a real page in Word */
-.a4-page { page-break-after: always; width:210mm; min-height:297mm; background:#fff; border:none; border-radius:0; box-shadow:none; }
+/* Each visual page becomes a Word page */
+.a4-page { page-break-after:always; width:210mm; min-height:297mm; background:#fff; border:none; border-radius:0; box-shadow:none; }
 .a4-content { height:auto; overflow:visible; padding:14mm 14mm 22mm 14mm; }
 
-/* Images: keep within content width */
-.a4-content img { max-width: 100% !important; height: auto !important; }
+/* Images must not overflow page width */
+.a4-content img { max-width:100% !important; height:auto !important; }
 
-/* Typography fallback (inline styles already applied but keep here as safety) */
+/* Thai text flow: better default wrapping in Word */
+body, .a4-content, .taxon-article, .a4-content p, .a4-content div, .a4-content li {
+  word-break: break-word;
+  -ms-word-break: break-all;
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+  line-break: auto;
+}
+
+/* Typography fallback (inline styles already applied) */
 .a4-content,
 .a4-content *, .taxon-shortdescription, .taxon-shortdescription *,
 .taxon-article, .taxon-article *, .a4-footer{
   font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif !important;
 }
 
-/* Two columns in article (supported in some Word builds; inline also set) */
-.taxon-article { column-count:2; column-gap:36px; -webkit-column-count:2; -webkit-column-gap:36px; -moz-column-count:2; -moz-column-gap:36px; }
+/* Two-column article: include MSO hints */
+.taxon-article {
+  column-count:2; column-gap:36px;
+  -webkit-column-count:2; -webkit-column-gap:36px;
+  -moz-column-count:2; -moz-column-gap:36px;
+  mso-column-count:2; mso-column-gap:36pt;
+}
+
+/* Basic paragraph spacing for Word */
+p { margin: 0 0 8pt; }
 `;
 }
 
@@ -515,7 +546,25 @@ export default function AdminTaxonomyPreviewPage() {
       });
 
       const css = buildDocExportCss();
-      const fullHtml = `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8" /><title>Taxonomy_${taxonomyId || ''}</title><style>${css}</style></head><body>${htmlBody}</body></html>`;
+      const fullHtml = `<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Taxonomy_${taxonomyId || ''}</title>
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml><![endif]-->
+  <style>${css}</style>
+</head>
+<body class="WordSection1">
+  ${htmlBody}
+</body>
+</html>`;
 
       const blob = new Blob([fullHtml], { type: 'application/msword' });
       const fileName = `Taxonomy_${taxonomyId || ''}_editable.doc`;
