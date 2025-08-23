@@ -79,6 +79,7 @@ async function replaceImagesWithBase64(htmlString: string, onProgress?: (complet
   return tempDiv.innerHTML;
 }
 
+
 // --- Helpers: wait for web fonts to load before rasterization (html2canvas) ---
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 async function waitForWebFonts(root?: HTMLElement | null, timeoutMs = 7000) {
@@ -133,6 +134,103 @@ async function waitForWebFonts(root?: HTMLElement | null, timeoutMs = 7000) {
   } catch {
     /* noop */
   }
+}
+
+// --- Inline computed styles for Word fidelity (fonts, colors, columns, page size) ---
+function inlineAllStyles(root: HTMLElement) {
+  const family = `"TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif`;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  while (walker.nextNode()) {
+    const el = walker.currentNode as HTMLElement;
+    const cs = getComputedStyle(el);
+
+    // Base typography
+    el.style.fontFamily = family;
+    if (cs.fontSize) el.style.fontSize = cs.fontSize;
+    if (cs.fontWeight) el.style.fontWeight = cs.fontWeight as any;
+    if (cs.fontStyle) el.style.fontStyle = cs.fontStyle;
+    if (cs.lineHeight && cs.lineHeight !== 'normal') el.style.lineHeight = cs.lineHeight;
+    if (cs.color) el.style.color = cs.color;
+    // backgrounds that matter (e.g. .taxon-shortdescription)
+    if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') el.style.backgroundColor = cs.backgroundColor;
+
+    // Text layout
+    if (cs.textAlign && cs.textAlign !== 'start') el.style.textAlign = cs.textAlign;
+
+    // A4 page sizing + breaks (ensure Word respects it)
+    if (el.classList.contains('a4-page')) {
+      el.style.width = '210mm';
+      el.style.minHeight = '297mm';
+      el.style.background = '#fff';
+      el.style.pageBreakAfter = 'always';
+      el.style.border = 'none';
+      el.style.borderRadius = '0';
+      el.style.boxShadow = 'none';
+    }
+    if (el.classList.contains('a4-content')) {
+      el.style.height = 'auto';
+      el.style.overflow = 'visible';
+      el.style.padding = '14mm 14mm 22mm 14mm';
+    }
+
+    // Ensure 2-column article in Word (fallback via inline)
+    if (el.classList.contains('taxon-article')) {
+      (el.style as any).columnCount = '2';
+      (el.style as any).columnGap = '36px';
+      (el.style as any).WebkitColumnCount = '2';
+      (el.style as any).WebkitColumnGap = '36px';
+      (el.style as any).MozColumnCount = '2';
+      (el.style as any).MozColumnGap = '36px';
+    }
+  }
+}
+
+// Clone the preview subtree and inline styles, also add explicit page breaks
+function clonePreviewWithInlineStyles(srcRoot: HTMLElement): HTMLElement {
+  const clone = srcRoot.cloneNode(true) as HTMLElement;
+
+  // remove toolbars if any are inside the clone (defensive)
+  const tb = clone.querySelector('.preview-toolbar');
+  if (tb) tb.remove();
+
+  inlineAllStyles(clone);
+
+  // be explicit about page breaks between A4 pages for Word
+  const pages = Array.from(clone.querySelectorAll<HTMLElement>('.a4-page'));
+  pages.forEach((p, i) => {
+    p.style.pageBreakAfter = i === pages.length - 1 ? 'auto' : 'always';
+  });
+
+  return clone;
+}
+
+// --- Build CSS for DOC export: Word-friendly subset to match preview ---
+function buildDocExportCss(): string {
+  return `
+/* Force A4 page and zero margins in Word */
+@page { size: A4; margin: 0; }
+html, body { background: #fff !important; margin:0; padding:0; }
+
+/* Hide UI */
+.preview-toolbar, .exporting-overlay { display: none !important; }
+
+/* Ensure each visual page becomes a real page in Word */
+.a4-page { page-break-after: always; width:210mm; min-height:297mm; background:#fff; border:none; border-radius:0; box-shadow:none; }
+.a4-content { height:auto; overflow:visible; padding:14mm 14mm 22mm 14mm; }
+
+/* Images: keep within content width */
+.a4-content img { max-width: 100% !important; height: auto !important; }
+
+/* Typography fallback (inline styles already applied but keep here as safety) */
+.a4-content,
+.a4-content *, .taxon-shortdescription, .taxon-shortdescription *,
+.taxon-article, .taxon-article *, .a4-footer{
+  font-family: "TH Sarabun PSK","TH Sarabun New",Sarabun,"Tahoma","Leelawadee UI","Leelawadee",sans-serif !important;
+}
+
+/* Two columns in article (supported in some Word builds; inline also set) */
+.taxon-article { column-count:2; column-gap:36px; -webkit-column-count:2; -webkit-column-gap:36px; -moz-column-count:2; -moz-column-gap:36px; }
+`;
 }
 
 export default function AdminTaxonomyPreviewPage() {
@@ -290,8 +388,14 @@ export default function AdminTaxonomyPreviewPage() {
     setExportStage('doc');
     setExportProgress(5);
 
-    let htmlString = previewRef.current.innerHTML;
+    // Clone current preview DOM and inline computed styles for Word
+    const cloned = clonePreviewWithInlineStyles(previewRef.current);
+    const tmpHolder = document.createElement('div');
+    tmpHolder.appendChild(cloned);
+    let htmlString = tmpHolder.innerHTML;
+
     try {
+      // Convert all images to base64 for a single-file .doc
       htmlString = await replaceImagesWithBase64(htmlString, (completed, total) => {
         const ratio = completed / Math.max(1, total);
         const pct = 5 + Math.round(ratio * 85);
@@ -300,7 +404,25 @@ export default function AdminTaxonomyPreviewPage() {
 
       setExportProgress(94);
 
-      const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Taxonomy_${taxonomyId || ''}</title></head><body>${htmlString}</body></html>`;
+      // Gather runtime CSS (styled-jsx included) + add export-specific rules
+      const cssText = buildDocExportCss();
+
+      // Compose full self-contained HTML document (Word will open .doc as HTML)
+      const fullHtml =
+        `<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Taxonomy_${taxonomyId || ''}</title>
+  <style>${cssText}</style>
+</head>
+<body>
+  ${htmlString}
+</body>
+</html>`;
+
       const blob = new Blob([fullHtml], { type: 'application/msword' });
       const fileName = `Taxonomy_${taxonomyId || ''}.doc`;
       const link = document.createElement('a');
