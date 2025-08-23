@@ -42,7 +42,6 @@ type TaxonEntry = {
 
   updatedAt?: string;
   taxon?: { id: number; scientificName: string | null };
-  version?: number;
 };
 
 type Pagination = {
@@ -90,10 +89,6 @@ export default function TaxonomyBrowserPage() {
   // selection state
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rightOpen, setRightOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<TaxonEntry>>({});
-  const [saving, setSaving] = useState(false);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -141,73 +136,6 @@ export default function TaxonomyBrowserPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await fetchData(1);
-  };
-
-  const openEdit = () => {
-    if (!selected) return;
-    setEditForm({
-      id: selected.id,
-      taxonId: selected.taxonId,
-      title: selected.title ?? '',
-      officialNameTh: selected.officialNameTh ?? '',
-      scientificName: selected.scientificName ?? '',
-      genus: selected.genus ?? '',
-      species: selected.species ?? '',
-      family: selected.family ?? '',
-      authorsDisplay: selected.authorsDisplay ?? '',
-      authorsPeriod: selected.authorsPeriod ?? '',
-      otherNames: selected.otherNames ?? '',
-      synonyms: selected.synonyms ?? '',
-      author: selected.author ?? '',
-      shortDescription: selected.shortDescription ?? '',
-      contentHtml: selected.contentHtml ?? '',
-      slug: selected.slug ?? '',
-      orderIndex: selected.orderIndex ?? null,
-      version: (selected as any).version ?? 0,
-    });
-    setSaveErr(null);
-    setEditOpen(true);
-  };
-
-  const setField = (key: keyof TaxonEntry, value: any) => {
-    setEditForm((f) => ({ ...f, [key]: value }));
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selected) return;
-    setSaving(true);
-    setSaveErr(null);
-    const payload: any = {
-      ...editForm,
-      orderIndex:
-        typeof editForm.orderIndex === 'string'
-          ? parseInt(editForm.orderIndex as any, 10)
-          : editForm.orderIndex,
-      version: ((selected as any).version ?? 0) + 1,
-    };
-    try {
-      const res = await fetch(`/api/taxonomy/entry/${selected.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        let m = `HTTP ${res.status}`;
-        try {
-          const j = await res.json();
-          m = j.error || m;
-        } catch {}
-        throw new Error(m);
-      }
-      // refresh current page and close modal
-      await fetchData(pagination?.currentPage ?? 1);
-      setEditOpen(false);
-    } catch (err: any) {
-      setSaveErr(err?.message || 'บันทึกไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const pageNumbers = useMemo(() => {
@@ -429,22 +357,6 @@ export default function TaxonomyBrowserPage() {
                                 <em>{selected.scientificName || selected.taxon?.scientificName}</em>
                               </div>
                             ) : null}
-                          </div>
-
-                          {/* Actions (visible when there is a selected record) */}
-                          <div className="taxon-actions">
-                            <button
-                              type="button"
-                              className="btn-info"
-                              title="แก้ไขเนื้อหา"
-                              aria-label="แก้ไขเนื้อหา"
-                              onClick={openEdit}
-                            >
-                              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25Zm2.92 2.33h-.84v-.84l9.9-9.9.84.84-9.9 9.9ZM20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.59 1.59 3.75 3.75 1.59-1.59Z"/>
-                              </svg>
-                              <span className="btn-info__label">แก้ไขเนื้อหา</span>
-                            </button>
                           </div>
                         </div>
 
@@ -724,114 +636,6 @@ export default function TaxonomyBrowserPage() {
             )
             )}
             
-          {/* Edit Modal */}
-          {editOpen && (
-            <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-              <div className="modal">
-                <div className="modal-head">
-                  <h4 id="editTitle">แก้ไขข้อมูลรายการ</h4>
-                  <button className="btn-icon" aria-label="ปิด" onClick={() => setEditOpen(false)}>
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                      <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-
-                <form className="modal-body" onSubmit={handleSave}>
-                  <div className="form-grid">
-                    <label>
-                      <span>ชื่อทางการ (ไทย)</span>
-                      <input type="text" value={(editForm.officialNameTh as any) ?? ''} onChange={(e) => setField('officialNameTh', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>Title</span>
-                      <input type="text" value={(editForm.title as any) ?? ''} onChange={(e) => setField('title', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>ชื่อวิทยาศาสตร์</span>
-                      <input type="text" value={(editForm.scientificName as any) ?? ''} onChange={(e) => setField('scientificName', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>ชื่อสกุล (Genus)</span>
-                      <input type="text" value={(editForm.genus as any) ?? ''} onChange={(e) => setField('genus', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>คำระบุชนิด (Species)</span>
-                      <input type="text" value={(editForm.species as any) ?? ''} onChange={(e) => setField('species', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>วงศ์ (Family)</span>
-                      <input type="text" value={(editForm.family as any) ?? ''} onChange={(e) => setField('family', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ชื่อพ้อง (Synonyms)</span>
-                      <textarea value={(editForm.synonyms as any) ?? ''} onChange={(e) => setField('synonyms', e.target.value)} rows={3} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ชื่ออื่น ๆ</span>
-                      <input type="text" value={(editForm.otherNames as any) ?? ''} onChange={(e) => setField('otherNames', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>คำโปรย/คำอธิบายสั้น</span>
-                      <textarea value={(editForm.shortDescription as any) ?? ''} onChange={(e) => setField('shortDescription', e.target.value)} rows={3} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ผู้เขียนคำอธิบาย</span>
-                      <input type="text" value={(editForm.author as any) ?? ''} onChange={(e) => setField('author', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ผู้ตั้งพรรณพืช (แสดงผล)</span>
-                      <textarea value={(editForm.authorsDisplay as any) ?? ''} onChange={(e) => setField('authorsDisplay', e.target.value)} rows={2} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</span>
-                      <textarea value={(editForm.authorsPeriod as any) ?? ''} onChange={(e) => setField('authorsPeriod', e.target.value)} rows={2} />
-                    </label>
-
-                    <label>
-                      <span>Slug</span>
-                      <input type="text" value={(editForm.slug as any) ?? ''} onChange={(e) => setField('slug', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>ลำดับ (orderIndex)</span>
-                      <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>เนื้อหา (HTML)</span>
-                      <textarea value={(editForm.contentHtml as any) ?? ''} onChange={(e) => setField('contentHtml', e.target.value)} rows={12} />
-                    </label>
-                  </div>
-
-                  {saveErr && (
-                    <div className="alert alert--danger" role="alert" style={{ marginTop: 8 }}>
-                      <strong>ผิดพลาด:</strong> {saveErr}
-                    </div>
-                  )}
-
-                  <div className="modal-actions">
-                    <button type="button" className="tbtn" onClick={() => setEditOpen(false)}>ยกเลิก</button>
-                    <button type="submit" className="tbtn tbtn-number is-active" disabled={saving}>
-                      {saving ? 'กำลังบันทึก…' : 'บันทึก (เพิ่มเวอร์ชัน +1)'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
           {/* Bottom toolbar (pagination) */}
           {!loading && !err && pagination && pagination.totalPages > 1 && (
             <footer className="bottom-toolbar" role="navigation" aria-label="เลขหน้า">
@@ -932,64 +736,6 @@ export default function TaxonomyBrowserPage() {
           {/* Styles */}
           </div>
           <style jsx>{toolbarStyles}</style>
-          <style jsx>{`
-            .modal-overlay{
-              position: fixed;
-              inset: 0;
-              background: rgba(15,23,42,.35);
-              backdrop-filter: blur(2px);
-              z-index: 60;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 16px;
-            }
-            .modal{
-              width: min(1100px, 96vw);
-              max-height: 92vh;
-              overflow: auto;
-              background: #fff;
-              border: 1px solid #e5e7eb;
-              border-radius: 12px;
-              box-shadow: 0 20px 60px rgba(0,0,0,.22);
-            }
-            .modal-head{
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 8px;
-              padding: 12px 14px;
-              border-bottom: 1px solid #e5e7eb;
-            }
-            .modal-head h4{ margin: 0; font-weight: 800; color: #111827; }
-            .modal-body{ padding: 14px; }
-            .form-grid{
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 12px;
-            }
-            .form-grid .span-2{ grid-column: span 2; }
-            .form-grid label{ display: grid; gap: 6px; font-size: .95rem; color: #374151; }
-            .form-grid input,
-            .form-grid textarea{
-              width: 100%;
-              border: 1px solid #e5e7eb;
-              border-radius: 8px;
-              padding: 8px 10px;
-              font-size: 1rem;
-              background: #fff;
-              color: #111827;
-            }
-            .form-grid textarea{ resize: vertical; }
-            .modal-actions{
-              display: flex;
-              justify-content: flex-end;
-              gap: 8px;
-              padding-top: 10px;
-              margin-top: 6px;
-              border-top: 1px dashed #e5e7eb;
-            }
-          `}</style>
         </section>
       </main>
     </div>

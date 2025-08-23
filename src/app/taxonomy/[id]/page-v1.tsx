@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { toolbarStyles } from './toolbarStyles';
 
 // === Types ===
 type TaxonEntry = {
@@ -42,7 +41,6 @@ type TaxonEntry = {
 
   updatedAt?: string;
   taxon?: { id: number; scientificName: string | null };
-  version?: number;
 };
 
 type Pagination = {
@@ -66,16 +64,111 @@ function htmlToText(html: string): string {
 }
 
 // Extract author from \n<strong>ผู้…เขียน …</strong>\nAllow corrupted Thai glyphs / zero-width joiners etc.
+function extractAuthorFromHtml(html: string | null | undefined): string | null {
+  if (!html) return null;
+  const cleaned = html.replace(/\uFFFD/g, '');
+  const THAI_ANY = '[\\u0E00-\\u0E7F\\s\\u200B\\u200C\\u200D\\uFEFF]*';
+  const re = new RegExp(
+    `<strong>\\s*ผู้${THAI_ANY}เขียน\\s*(?:[:\\-–—])?\\s*([^<]+?)\\s*<\\/strong>`,
+    'iu'
+  );
+  const m = cleaned.match(re);
+  return m ? m[1].trim() : null;
+}
 
 // --- Summary extraction helpers ---
+function sanitizeThai(s: string): string {
+  return (s || '')
+    .replace(/\uFFFD/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '');
+}
 
+function firstStrongBlock(html?: string | null): string | null {
+  if (!html) return null;
+  const m = html.match(/<strong>([\s\S]*?)<\/strong>/i);
+  return m ? m[1] : null;
+}
 
+function extractThaiOfficialName(html?: string | null): string | null {
+  const blk = firstStrongBlock(html || '');
+  if (!blk) return null;
+  const withoutTags = blk.replace(/<em>[\s\S]*?<\/em>/ig, '').replace(/\([^)]*\)/g, '');
+  const t = sanitizeThai(withoutTags).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return t || null;
+}
 
+function extractScientificName(html?: string | null): string | null {
+  const m = (html || '').match(/<em>([^<]+)<\/em>/i);
+  return m ? m[1].trim() : null;
+}
 
+function splitGenusSpecies(sci?: string | null): { genus: string | null; species: string | null } {
+  if (!sci) return { genus: null, species: null };
+  const parts = sci.split(/\s+/).filter(Boolean);
+  return { genus: parts[0] || null, species: parts[1] || null };
+}
 
+function extractAuthorsShort(html?: string | null): string | null {
+  const blk = firstStrongBlock(html || '');
+  if (!blk) return null;
+  const afterEm = blk.match(/<\/em>([^<]+)$/i);
+  let s = afterEm ? afterEm[1] : blk;
+  s = sanitizeThai(s).replace(/\s+/g, ' ').trim();
+  s = s.replace(/^[\s\(\)\-–—:]+|[\s\(\)]+$/g, '');
+  return s || null;
+}
 
+function extractOtherNames(html?: string | null): string | null {
+  if (!html) return null;
+  const cleaned = sanitizeThai(html);
+  // Match the paragraph that begins with "<strong>ชื่ออื่น ๆ</strong>"
+  const re = /<p>\s*<strong>\s*ชื่อ[\s\u200B-\u200D\uFEFF]*อื่[่น][\s\u200B-\u200D\uFEFF]*ๆ?\s*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  const m = cleaned.match(re);
+  if (m) return htmlToText(m[1]);
+  return null;
+}
 
+function extractPlantAuthorsFull(html?: string | null): string | null {
+  const cleaned = sanitizeThai(html || '');
+  // explicit block "ชื่อผู้ตั้งพรรณพืช"
+  const re = /<p>\s*<strong>\s*ชื่อ[\s\u200B-\u200D\uFEFF]*ผู้[\s\u200B-\u200D\uFEFF]*ตั้ง[\s\u200B-\u200D\uFEFF]*พรรณ[\s\u200B-\u200D\uFEFF]*พืช\s*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  const m = cleaned.match(re);
+  if (m) {
+    // Keep line breaks
+    return sanitizeThai(m[1])
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n\s+/g, '\n')
+      .replace(/\s+/g, ' ')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => (s.startsWith('-') ? s : `- ${s}`))
+      .join('\n');
+  }
+  return null;
+}
 
+function extractPlantAuthorsPeriod(html?: string | null): string | null {
+  const cleaned = sanitizeThai(html || '');
+  const re = /<p>\s*<strong>\s*ช่วง[\s\u200B-\u200D\uFEFF]*เวลา[\s\u200B-\u200D\uFEFF]*เกี่ยวกับ[\s\u200B-\u200D\uFEFF]*ผู้[\s\u200B-\u200D\uFEFF]*ตั้ง[\s\u200B-\u200D\uFEFF]*พรรณ[\s\u200B-\u200D\uFEFF]*พืช\s*<\/strong>\s*([\s\S]*?)<\/p>/iu;
+  const m = cleaned.match(re);
+  if (m) {
+    return sanitizeThai(m[1])
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n\s+/g, '\n')
+      .replace(/\s+/g, ' ')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => (s.startsWith('-') ? s : `- ${s}`))
+      .join('\n');
+  }
+  return null;
+}
 
 export default function TaxonomyBrowserPage() {
   const params = useParams<{ id: string }>();
@@ -90,10 +183,6 @@ export default function TaxonomyBrowserPage() {
   // selection state
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rightOpen, setRightOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<TaxonEntry>>({});
-  const [saving, setSaving] = useState(false);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -141,73 +230,6 @@ export default function TaxonomyBrowserPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await fetchData(1);
-  };
-
-  const openEdit = () => {
-    if (!selected) return;
-    setEditForm({
-      id: selected.id,
-      taxonId: selected.taxonId,
-      title: selected.title ?? '',
-      officialNameTh: selected.officialNameTh ?? '',
-      scientificName: selected.scientificName ?? '',
-      genus: selected.genus ?? '',
-      species: selected.species ?? '',
-      family: selected.family ?? '',
-      authorsDisplay: selected.authorsDisplay ?? '',
-      authorsPeriod: selected.authorsPeriod ?? '',
-      otherNames: selected.otherNames ?? '',
-      synonyms: selected.synonyms ?? '',
-      author: selected.author ?? '',
-      shortDescription: selected.shortDescription ?? '',
-      contentHtml: selected.contentHtml ?? '',
-      slug: selected.slug ?? '',
-      orderIndex: selected.orderIndex ?? null,
-      version: (selected as any).version ?? 0,
-    });
-    setSaveErr(null);
-    setEditOpen(true);
-  };
-
-  const setField = (key: keyof TaxonEntry, value: any) => {
-    setEditForm((f) => ({ ...f, [key]: value }));
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selected) return;
-    setSaving(true);
-    setSaveErr(null);
-    const payload: any = {
-      ...editForm,
-      orderIndex:
-        typeof editForm.orderIndex === 'string'
-          ? parseInt(editForm.orderIndex as any, 10)
-          : editForm.orderIndex,
-      version: ((selected as any).version ?? 0) + 1,
-    };
-    try {
-      const res = await fetch(`/api/taxonomy/entry/${selected.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        let m = `HTTP ${res.status}`;
-        try {
-          const j = await res.json();
-          m = j.error || m;
-        } catch {}
-        throw new Error(m);
-      }
-      // refresh current page and close modal
-      await fetchData(pagination?.currentPage ?? 1);
-      setEditOpen(false);
-    } catch (err: any) {
-      setSaveErr(err?.message || 'บันทึกไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const pageNumbers = useMemo(() => {
@@ -429,22 +451,6 @@ export default function TaxonomyBrowserPage() {
                                 <em>{selected.scientificName || selected.taxon?.scientificName}</em>
                               </div>
                             ) : null}
-                          </div>
-
-                          {/* Actions (visible when there is a selected record) */}
-                          <div className="taxon-actions">
-                            <button
-                              type="button"
-                              className="btn-info"
-                              title="แก้ไขเนื้อหา"
-                              aria-label="แก้ไขเนื้อหา"
-                              onClick={openEdit}
-                            >
-                              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25Zm2.92 2.33h-.84v-.84l9.9-9.9.84.84-9.9 9.9ZM20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.59 1.59 3.75 3.75 1.59-1.59Z"/>
-                              </svg>
-                              <span className="btn-info__label">แก้ไขเนื้อหา</span>
-                            </button>
                           </div>
                         </div>
 
@@ -724,114 +730,6 @@ export default function TaxonomyBrowserPage() {
             )
             )}
             
-          {/* Edit Modal */}
-          {editOpen && (
-            <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-              <div className="modal">
-                <div className="modal-head">
-                  <h4 id="editTitle">แก้ไขข้อมูลรายการ</h4>
-                  <button className="btn-icon" aria-label="ปิด" onClick={() => setEditOpen(false)}>
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                      <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-
-                <form className="modal-body" onSubmit={handleSave}>
-                  <div className="form-grid">
-                    <label>
-                      <span>ชื่อทางการ (ไทย)</span>
-                      <input type="text" value={(editForm.officialNameTh as any) ?? ''} onChange={(e) => setField('officialNameTh', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>Title</span>
-                      <input type="text" value={(editForm.title as any) ?? ''} onChange={(e) => setField('title', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>ชื่อวิทยาศาสตร์</span>
-                      <input type="text" value={(editForm.scientificName as any) ?? ''} onChange={(e) => setField('scientificName', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>ชื่อสกุล (Genus)</span>
-                      <input type="text" value={(editForm.genus as any) ?? ''} onChange={(e) => setField('genus', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>คำระบุชนิด (Species)</span>
-                      <input type="text" value={(editForm.species as any) ?? ''} onChange={(e) => setField('species', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>วงศ์ (Family)</span>
-                      <input type="text" value={(editForm.family as any) ?? ''} onChange={(e) => setField('family', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ชื่อพ้อง (Synonyms)</span>
-                      <textarea value={(editForm.synonyms as any) ?? ''} onChange={(e) => setField('synonyms', e.target.value)} rows={3} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ชื่ออื่น ๆ</span>
-                      <input type="text" value={(editForm.otherNames as any) ?? ''} onChange={(e) => setField('otherNames', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>คำโปรย/คำอธิบายสั้น</span>
-                      <textarea value={(editForm.shortDescription as any) ?? ''} onChange={(e) => setField('shortDescription', e.target.value)} rows={3} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ผู้เขียนคำอธิบาย</span>
-                      <input type="text" value={(editForm.author as any) ?? ''} onChange={(e) => setField('author', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ผู้ตั้งพรรณพืช (แสดงผล)</span>
-                      <textarea value={(editForm.authorsDisplay as any) ?? ''} onChange={(e) => setField('authorsDisplay', e.target.value)} rows={2} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</span>
-                      <textarea value={(editForm.authorsPeriod as any) ?? ''} onChange={(e) => setField('authorsPeriod', e.target.value)} rows={2} />
-                    </label>
-
-                    <label>
-                      <span>Slug</span>
-                      <input type="text" value={(editForm.slug as any) ?? ''} onChange={(e) => setField('slug', e.target.value)} />
-                    </label>
-
-                    <label>
-                      <span>ลำดับ (orderIndex)</span>
-                      <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} />
-                    </label>
-
-                    <label className="span-2">
-                      <span>เนื้อหา (HTML)</span>
-                      <textarea value={(editForm.contentHtml as any) ?? ''} onChange={(e) => setField('contentHtml', e.target.value)} rows={12} />
-                    </label>
-                  </div>
-
-                  {saveErr && (
-                    <div className="alert alert--danger" role="alert" style={{ marginTop: 8 }}>
-                      <strong>ผิดพลาด:</strong> {saveErr}
-                    </div>
-                  )}
-
-                  <div className="modal-actions">
-                    <button type="button" className="tbtn" onClick={() => setEditOpen(false)}>ยกเลิก</button>
-                    <button type="submit" className="tbtn tbtn-number is-active" disabled={saving}>
-                      {saving ? 'กำลังบันทึก…' : 'บันทึก (เพิ่มเวอร์ชัน +1)'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
           {/* Bottom toolbar (pagination) */}
           {!loading && !err && pagination && pagination.totalPages > 1 && (
             <footer className="bottom-toolbar" role="navigation" aria-label="เลขหน้า">
@@ -931,64 +829,394 @@ export default function TaxonomyBrowserPage() {
 
           {/* Styles */}
           </div>
-          <style jsx>{toolbarStyles}</style>
           <style jsx>{`
-            .modal-overlay{
-              position: fixed;
-              inset: 0;
-              background: rgba(15,23,42,.35);
-              backdrop-filter: blur(2px);
-              z-index: 60;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 16px;
+            /* Bottom toolbar (sticky) */
+            .bottom-toolbar{
+              position: sticky;
+              bottom: 0;
+              background: #ffffffcc;
+              backdrop-filter: saturate(1.1) blur(6px);
+              border-top: 1px solid #e5e7eb;
+              padding: 8px 0;
+              z-index: 35;
             }
-            .modal{
-              width: min(1100px, 96vw);
-              max-height: 92vh;
-              overflow: auto;
-              background: #fff;
-              border: 1px solid #e5e7eb;
-              border-radius: 12px;
-              box-shadow: 0 20px 60px rgba(0,0,0,.22);
-            }
-            .modal-head{
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 8px;
-              padding: 12px 14px;
-              border-bottom: 1px solid #e5e7eb;
-            }
-            .modal-head h4{ margin: 0; font-weight: 800; color: #111827; }
-            .modal-body{ padding: 14px; }
-            .form-grid{
+            .toolbar{
               display: grid;
-              grid-template-columns: 1fr 1fr;
+              grid-template-columns: auto 1fr auto; /* left: size, center: numbers, right: info+nav */
+              align-items: center;
               gap: 12px;
             }
-            .form-grid .span-2{ grid-column: span 2; }
-            .form-grid label{ display: grid; gap: 6px; font-size: .95rem; color: #374151; }
-            .form-grid input,
-            .form-grid textarea{
-              width: 100%;
-              border: 1px solid #e5e7eb;
-              border-radius: 8px;
-              padding: 8px 10px;
-              font-size: 1rem;
-              background: #fff;
-              color: #111827;
-            }
-            .form-grid textarea{ resize: vertical; }
-            .modal-actions{
+            .toolbar__section{
               display: flex;
+              align-items: center;
+              gap: 8px;
+              min-height: 40px;
+            }
+            .toolbar__section--left{ justify-content: flex-start; }
+            .toolbar__pager{
+              justify-content: center;
+              flex-wrap: wrap;
+            }
+            .toolbar__section--right{
               justify-content: flex-end;
               gap: 8px;
-              padding-top: 10px;
-              margin-top: 6px;
-              border-top: 1px dashed #e5e7eb;
             }
+            @media (max-width: 640px){
+              .toolbar{
+                grid-template-columns: 1fr auto; /* hide numbers on small screens */
+              }
+              .toolbar__pager{ display: none; }
+            }
+            .tsep{ color:#9ca3af; padding: 0 2px; }
+            .tbtn{
+              height: 36px;
+              min-width: 36px;
+              padding: 0 10px;
+              border-radius: 10px;
+              border: 1px solid #e5e7eb;
+              background: #f9fafb;
+              color: #374151;
+              font-weight: 600;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+            }
+            .tbtn:hover{ background:#f3f4f6; border-color:#d1d5db; color:#111827; }
+            .tbtn:active{ transform: translateY(0.5px); }
+            .tbtn[disabled]{ opacity:.45; cursor: not-allowed; }
+            .tbtn-number{ min-width: 38px; padding: 0 12px; }
+            .tbtn-number.is-active{
+              background:#0c57d2; border-color:#0c57d2; color:#fff;
+              box-shadow: 0 1px 4px rgba(12,87,210,.25);
+            }
+            .toolbar__info{
+              font-size: .9rem;
+              color:#6b7280;
+              white-space: nowrap;
+            }
+            .select-wrap{
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              padding: 2px 8px;
+              border: 1px solid #e5e7eb;
+              border-radius: 10px;
+              background:#fff;
+            }
+            .select-label{ font-size: .85rem; color:#6b7280; }
+            .select--sm{
+              height: 28px;
+              padding: 2px 8px;
+              font-size: .9rem;
+              line-height: 1;
+            }
+            .sr-only{
+              position: absolute;
+              width: 1px; height: 1px;
+              padding: 0; margin: -1px;
+              overflow: hidden; clip: rect(0,0,0,0);
+              white-space: nowrap; border: 0;
+            }
+            /* Layout */
+            /* Make page full width on this screen */
+            .fullpage { padding: 0; margin: 0; width: 100vw; }
+            .a4-page { max-width: 100%; }
+            /* Breadcrumbs */
+            .breadcrumbs-bar {
+              width: 100%;
+              background: linear-gradient(180deg, #f9fafb, #f3f4f6);
+              border-bottom: 1px solid #e5e7eb;
+              position: sticky;
+              top: 0;
+              z-index: 10;
+            }
+            .bc-list {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              list-style: none;
+              margin: 0;
+              padding: 10px 0;
+              font-size: .95rem;
+              color: #475569;
+              white-space: nowrap;           /* keep one line */
+              flex-wrap: nowrap;             /* never wrap to next row */
+              overflow-x: auto;              /* allow horizontal scroll when needed */
+              overflow-y: hidden;
+              -webkit-overflow-scrolling: touch;
+            }
+            .bc-list > * { flex: 0 0 auto; }
+            .bc-item {
+              display: inline-flex;
+              align-items: center;
+              gap: .5rem;
+              padding: .35rem .65rem;
+              border-radius: 999px;
+              background: #fff;
+              border: 1px solid #e5e7eb;
+              color: #334155;
+              font-weight: 700;
+              white-space: nowrap;
+            }
+            .bc-item.bc-current {
+              color: #111827;
+              border-color: #c7d2fe;
+              background: #eef2ff;
+            }
+            .bc-sep { color: #94a3b8; padding-inline: .25rem; flex: 0 0 auto; }
+
+
+            .taxon-layout{
+              display: grid;
+              grid-template-columns:
+                minmax(220px, 16%)              /* left index */
+                minmax(0, 1fr)                  /* main column */
+                clamp(240px, 22vw, 360px);      /* reserved right space */
+              gap: 20px;
+              align-items: start;
+            }
+            @media (max-width: 1280px){
+              .taxon-layout{
+                grid-template-columns:
+                  minmax(200px, 20%)
+                  1fr
+                  clamp(160px, 16vw, 240px);
+              }
+            }
+            @media (max-width: 1024px){
+              .taxon-layout{ grid-template-columns: 1fr; }
+              .taxon-aside--left,
+              .taxon-aside--right{ display: none; }
+            }
+            .taxon-aside--right{
+              position: sticky;
+              top: 94px;
+              max-height: calc(100vh - 120px);
+              overflow: auto;
+              background: #e5e7eb !important;
+            }
+            /* Reserved right column (kept blank) */
+            .taxon-spacer-right{ background: transparent; min-height: 1px; }
+
+            /* A4 responsive plate: no min-width, just cap max width & center */
+            .taxon-card.taxon-card--a4{ width: min(100%, 900px); margin-inline: auto; }
+
+            .taxon-aside {
+              background: #fff;
+              border: 1px solid var(--border, #e5e7eb);
+              border-radius: 12px;
+              padding: 14px;
+              box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+              height: fit-content;
+              position: sticky;
+              top: 94px; /* stay visible while reading */
+              max-height: calc(100vh - 120px);
+              overflow: auto;
+            }
+            .aside-title { font-weight: 700; margin-bottom: 10px; }
+            .aside-list { display: grid; gap: 6px; }
+            .aside-link { width: 100%; text-align: left; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; transition: background .2s, border-color .2s; }
+            .aside-link:hover { background: #f3f4f6; }
+            .aside-link.is-active { background: #eef2ff; border-color: #c7d2fe; }
+            .aside-link__title { font-weight: 600; line-height: 1.2; color: #111827; }
+            .aside-link__sci { font-size: .85rem; color: #6b7280; margin-top: 2px; }
+
+            .summary-card { background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 12px; }
+            .summary-dl { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 8px; }
+            .summary-dl dt { color: #6b7280; }
+            .summary-dl dd { color: #111827; }
+
+            /* Card & header (main) */
+            .taxon-card {
+              background: #fff;
+              border: 1px solid var(--border, #e5e7eb);
+              border-radius: 14px;
+              padding: 30px;
+              box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+            }
+            .taxon-header {
+              display: grid;
+              grid-template-columns: 1fr auto; /* headline + actions */
+              gap: 16px;
+              align-items: baseline;
+              margin-bottom: 8px;
+            }
+            .taxon-headline { display: flex; align-items: baseline; gap: clamp(12px, 1.5vw, 18px); flex-wrap: wrap; }
+            .taxon-sci { font-size: clamp(1.5rem, 1.5vw, 1.5rem); line-height: 1.2; color: #6b2a34; opacity: .9; }
+            .taxon-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+            .btn-info {
+              display: inline-flex; align-items: center; gap: 8px;
+              background: #0c57d2; color: #fff; padding: 8px 12px; border-radius: 10px; border: 0; cursor: pointer;
+            }
+            .btn-info:hover { background: #0a4dbb; }
+            .btn-info__label { font-weight: 600; }
+            .taxon-title {
+              font-size: clamp(2.5rem, 2.5vw, 2.5rem);
+              line-height: 1.15;
+              font-weight: 800;
+              color: #50151d;
+              margin: 0;
+            }
+            
+            .taxon-sci em { font-style: italic; }
+            .taxon-updated { font-size: 0.85rem; color: #6b7280; text-align: right; }
+            .taxon-updated--bottom { padding-top: .5rem; margin-top: .5rem; border-top: 1px dashed var(--border, #e5e7eb); }
+            .taxon-metaheader {
+              display: grid;
+              grid-template-columns: 4rem 1fr;
+              column-gap: 14px;
+              row-gap: 6px;
+              margin: 12px 0 12px;
+            }
+            .taxon-metaheader .row { display: contents; }
+            .taxon-metaheader dt { color: #111827; font-weight: 900; }
+            .taxon-metaheader dd { margin: 0; color: #111827; }
+
+            .taxon-shortdescription {
+              margin: 1rem 0 1rem;
+              font-size: 1rem;
+              line-height: 1.5rem;
+              color: #111827;
+              background: #c1a58c;
+              padding: 0.5rem 1rem 0.5rem 1rem;
+              border-radius: 15px;
+            }
+            .taxon-shortdescription p { margin: 0; }
+
+            /* Article: two-column layout on wide screens */
+            .taxon-article { text-align: justify; }
+            @media (min-width: 1024px) { .taxon-article { column-count: 2; column-gap: 36px; } }
+
+            /* Paragraph with only a <strong> becomes a section label */
+            .taxon-article p:has(> strong:only-child) {
+              background: #f3eee6;
+              padding: 10px 14px;
+              border-radius: 10px;
+              display: inline-block;
+              margin: 6px 0 10px;
+              color: #374151;
+            }
+            .taxon-article p > strong { color: #111827; }
+            .taxon-article p { line-height: 1.85; }
+            .taxon-article em { font-style: italic; }
+
+            /* Searchbar */
+            .searchbar-wrap { width: 100%; max-width: 1100px; margin: 0 auto 1rem; }
+            @media (max-width: 1024px) { .searchbar-wrap { max-width: 720px; } }
+
+            .searchbar {
+            display: grid;
+            grid-template-columns: 24px 1fr auto auto;
+            align-items: center;
+            background: #fff;
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 9999px;
+            padding: 2px 10px;
+            box-shadow: 0 2px 8px rgba(15,23,42,.06);
+            transition: box-shadow .2s ease;
+            }
+            .searchbar:focus-within { box-shadow: 0 4px 16px rgba(15,23,42,.08); }
+
+            .searchbar__icon { width: 20px; height: 20px; color: #6b7280; }
+            .searchbar__input {
+            width: 100%;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            padding: 8px 0;
+            background: transparent;
+            }
+            .searchbar__clear {
+            border: 0;
+            background: transparent;
+            padding: 6px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            }
+            .searchbar__clear:hover { background: #f3f4f6; color: #111827; }
+
+            .searchbar__submit {
+            border: 0;
+            background: #0c57d2;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            }
+            .searchbar__submit svg { width: 20px; height: 20px; }
+
+            /* Summary panel (right) */
+            .summary-box.jumbotron {
+              background: #fff;
+              border: 1px solid var(--border, #e5e7eb);
+              border-radius: 12px;
+              padding: 24px;
+              box-shadow: 0 2px 6px rgba(15,23,42,.04);
+            }
+
+            .summary-grid .row {
+              display: grid;
+              grid-template-columns: 4rem 1fr; /* narrower dt, wider dd */
+              column-gap: 12px;
+              row-gap: 2px;
+              margin: 0 0 12px 0;
+            }
+
+            .summary-grid .row:last-child { margin-bottom: 0; }
+
+            .summary-grid .col-sm-3 {
+              color: #6b7280;
+              font-weight: 600;
+            }
+
+            .summary-grid .col-sm-9 {
+              color: #111827;
+              word-break: break-word;
+            }
+
+            /* Slide-out panel and overlay */
+            .slide-overlay {
+              position: fixed;
+              inset: 0;
+              background: rgba(15,23,42,.25);
+              backdrop-filter: blur(2px);
+              opacity: 0;
+              transition: opacity .25s ease;
+              pointer-events: none;
+              z-index: 40;
+            }
+            .slide-overlay.is-open { opacity: 1; pointer-events: auto; }
+
+            .slide-panel {
+              position: fixed;
+              top: 0;
+              right: 0;
+              bottom: 0;
+              width: 40vw;
+              max-width: 720px;
+              min-width: 320px;
+              background: #fff;
+              border-left: 1px solid #e5e7eb;
+              box-shadow: -8px 0 24px rgba(15,23,42,.08);
+              transform: translateX(100%);
+              transition: transform .3s ease;
+              z-index: 50;
+              display: flex;
+              flex-direction: column;
+            }
+            .slide-panel.is-open { transform: translateX(0); }
+            .slide-panel__head {
+              display: flex; align-items: center; justify-content: space-between;
+              padding: 14px 16px; border-bottom: 1px solid #e5e7eb;
+            }
+            .slide-panel__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #111827; }
+            .slide-panel__body { padding: 16px; overflow: auto; }
           `}</style>
         </section>
       </main>
