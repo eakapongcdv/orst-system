@@ -56,31 +56,42 @@ export async function GET(req: NextRequest) {
     const q = (searchParams.get('q') || '').trim();
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '10', 10)));
+    // NEW: optional taxonomy filter
+    const taxonomyIdRaw = searchParams.get('taxonomyId');
+    const taxonomyId = taxonomyIdRaw ? parseInt(taxonomyIdRaw, 10) : NaN;
+    const hasTaxonomyId = Number.isFinite(taxonomyId) && taxonomyId > 0;
 
-    const where = q
-      ? {
-          OR: [
-            { title: { contains: q, mode: 'insensitive' } },
-            { officialNameTh: { contains: q, mode: 'insensitive' } },
-            { official: { contains: q, mode: 'insensitive' } },
-            { scientificName: { contains: q, mode: 'insensitive' } },
-            { genus: { contains: q, mode: 'insensitive' } },
-            { species: { contains: q, mode: 'insensitive' } },
-            { family: { contains: q, mode: 'insensitive' } },
-            { synonyms: { contains: q, mode: 'insensitive' } },
-            { authorsDisplay: { contains: q, mode: 'insensitive' } },
-            { otherNames: { contains: q, mode: 'insensitive' } },
-            { author: { contains: q, mode: 'insensitive' } },
-            { contentText: { contains: q, mode: 'insensitive' } },
-            { contentHtml: { contains: q, mode: 'insensitive' } },
-            { taxon: { is: { scientificName: { contains: q, mode: 'insensitive' } } } },
-          ],
-        }
-      : {};
+    // Build filters
+    const filters: any[] = [];
+    if (hasTaxonomyId) {
+      // Filter entries whose parent taxon belongs to this taxonomy
+      filters.push({ taxon: { is: { taxonomyId } } });
+    }
+    if (q) {
+      filters.push({
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { officialNameTh: { contains: q, mode: 'insensitive' } },
+          { official: { contains: q, mode: 'insensitive' } },
+          { scientificName: { contains: q, mode: 'insensitive' } },
+          { genus: { contains: q, mode: 'insensitive' } },
+          { species: { contains: q, mode: 'insensitive' } },
+          { family: { contains: q, mode: 'insensitive' } },
+          { synonyms: { contains: q, mode: 'insensitive' } },
+          { authorsDisplay: { contains: q, mode: 'insensitive' } },
+          { otherNames: { contains: q, mode: 'insensitive' } },
+          { author: { contains: q, mode: 'insensitive' } },
+          { contentText: { contains: q, mode: 'insensitive' } },
+          { contentHtml: { contains: q, mode: 'insensitive' } },
+          { taxon: { is: { scientificName: { contains: q, mode: 'insensitive' } } } },
+        ],
+      });
+    }
+    const where = filters.length ? { AND: filters } : {};
 
     const orderBy = q
       ? [{ updatedAt: 'desc' }, { id: 'desc' }]
-      : [{ id: 'asc' }];
+      : [{ orderIndex: 'asc' }, { id: 'asc' }];
 
     const total = await prisma.taxonEntry.count({ where });
     const results = await prisma.taxonEntry.findMany({

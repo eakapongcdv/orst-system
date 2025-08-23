@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 // === Types ===
 type TaxonEntry = {
@@ -170,6 +171,8 @@ function extractPlantAuthorsPeriod(html?: string | null): string | null {
 }
 
 export default function TaxonomyBrowserPage() {
+  const params = useParams<{ id: string }>();
+  const taxonomyId = Number(params?.id || 0);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<TaxonEntry[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -184,6 +187,7 @@ export default function TaxonomyBrowserPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchData = async (page = 1, size = pageSize) => {
+    if (!taxonomyId) { setResults([]); setPagination(null); return; }
     setLoading(true);
     setErr(null);
     try {
@@ -191,6 +195,7 @@ export default function TaxonomyBrowserPage() {
       if (q.trim()) params.set('q', q.trim());
       params.set('page', String(page));
       params.set('pageSize', String(size));
+      params.set('taxonomyId', String(taxonomyId));
 
       const r = await fetch(`/api/taxonomy/search?${params.toString()}`);
       if (!r.ok) {
@@ -220,7 +225,7 @@ export default function TaxonomyBrowserPage() {
     }
   };
 
-  useEffect(() => { fetchData(1); /* load initial */ }, []);
+  useEffect(() => { fetchData(1); }, [taxonomyId]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

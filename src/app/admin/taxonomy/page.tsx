@@ -276,22 +276,41 @@ export default function AdminTaxonomyPage() {
                             <td>{it._entryCount ?? 0}</td>
                             <td>{new Date(it.updatedAt ?? it.createdAt ?? Date.now()).toLocaleString('th-TH')}</td>
                             <td className="row-actions">
-                              <Link
-                                href={`/admin/taxonomy/${it.id}/preview`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="btn btn-ghost"
-                                title="พรีวิว"
-                              >
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                  <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 9Z"/>
-                                </svg>
-                              </Link>
+                              {(it._entryCount ?? 0) > 0 && (
+                                <>
+                                  <Link
+                                    href={`/taxonomy/${it.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-ghost"
+                                    title="ค้นหา"
+                                  >
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                                      <path d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z"/>
+                                    </svg>
+                                  </Link>
+                                  <Link
+                                    href={`/admin/taxonomy/${it.id}/preview`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-ghost"
+                                    title="พรีวิว"
+                                  >
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                                      <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 9Z"/>
+                                    </svg>
+                                  </Link>
+                                </>
+                              )}
                               <button className="btn btn-ghost" title="แก้ไข" onClick={() => openEdit(it)}>
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 18.25V21h2.75l8.1-8.1-2.75-2.75L5 18.25Zm13.71-10.21a1.003 1.003 0 0 0 0-1.42l-1.33-1.33a1.003 1.003 0 0 0-1.42 0l-1.12 1.12 2.75 2.75 1.12-1.12Z"/></svg>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                  <path d="M5 18.25V21h2.75l8.1-8.1-2.75-2.75L5 18.25Zm13.71-10.21a1.003 1.003 0 0 0 0-1.42l-1.33-1.33a1.003 1.003 0 0 0-1.42 0l-1.12 1.12 2.75 2.75 1.12-1.12Z"/>
+                                </svg>
                               </button>
                               <button className="btn btn-ghost danger" title="ลบ" onClick={() => onDelete(it)}>
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.8l.86 12.09A2 2 0 0 0 7.65 21h8.7a2 2 0 0 0 1.99-1.91L19.2 7H20a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9Zm2 3h2v-.5h-2V6Z"/></svg>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                  <path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.8l.86 12.09A2 2 0 0 0 7.65 21h8.7a2 2 0 0 0 1.99-1.91L19.2 7H20a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9Zm2 3h2v-.5h-2V6Z"/>
+                                </svg>
                               </button>
                             </td>
                           </tr>
