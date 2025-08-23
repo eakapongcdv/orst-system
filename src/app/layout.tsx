@@ -43,8 +43,9 @@ export default async function RootLayout({
   const isAuthenticated = !!payload;
 
   const navItems = [
-    { name: "ค้นหาคำศัพท์", href: "/dictionaries" },
-    { name: "ค้นหาคำทับศัพท์", href: "/search-transliteration" },
+    { name: "พจนานุกรม", href: "/dictionaries/0" },
+    { name: "อนุกรมวิธาน", href: "/taxonomy/9" },
+    { name: "คำทับศัพท์", href: "/search-transliteration" },
     //{ name: "ค้นหาเอกสารวิชาการ", href: "/search" },
     //{ name: "คลังเอกสาร", href: "/file-manager" },
     //{ name: "นำเข้าคำศัพท์", href: "/file-manager/upload-dictionary" },

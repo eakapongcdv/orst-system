@@ -328,23 +328,45 @@ function elementContainsStrongAuthor(el: Element): boolean {
 }
 
 function pickTitleFromChunk(nodes: Element[]): string {
-  // 1) prefer heading tags
-  const heading = nodes.find(n => /H[1-6]/.test(n.tagName));
+  // helper: is this element a "ชื่อพ้อง" label paragraph?
+  const isSynonymsLabelEl = (el: Element): boolean => {
+    const strong = el.querySelector('strong');
+    if (!strong) return false;
+    const labelKey = thaiKey(strong.textContent || '');
+    return labelKey.startsWith(thaiKey('ชื่อพ้อง'));
+  };
+
+  // Consider only nodes **before** the first "ชื่อพ้อง" block (if present)
+  const cutAt = nodes.findIndex(isSynonymsLabelEl);
+  const scan = cutAt >= 0 ? nodes.slice(0, cutAt) : nodes;
+
+  // 1) prefer heading tags within the scan window
+  const heading = scan.find(n => /H[1-6]/.test(n.tagName));
   if (heading) {
     const t = heading.textContent?.trim();
     if (t) return t;
   }
-  // 2) first strong text
-  for (const n of nodes) {
+
+  // 2) first strong text within the scan window
+  for (const n of scan) {
     const st = n.querySelector('strong');
     const t = (st?.textContent || '').trim();
     if (t) return t;
   }
-  // 3) fallback first non-empty paragraph text
-  for (const n of nodes) {
-    const t = n.textContent?.trim();
-    if (t) return t.slice(0, 120);
+
+  // 3) fallback: first non-empty paragraph text in the scan window
+  for (const n of scan) {
+    const t = (n.textContent || '').trim();
+    if (t) return t.slice(0, 200);
   }
+
+  // 4) ultimate fallback: collapse all nodes before synonyms into a single line (up to 200 chars)
+  if (scan.length) {
+    const html = serializeNodes(scan);
+    const text = stripHtmlToText(html);
+    if (text) return text.slice(0, 200);
+  }
+
   return 'หัวข้อ';
 }
 
