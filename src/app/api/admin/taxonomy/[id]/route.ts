@@ -3,8 +3,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const id = Number(params.id);
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   if (!id) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
 
   const item = await prisma.taxonomy.findUnique({
@@ -15,9 +16,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ item });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = Number(params.id);
+    const { id: idStr } = await params;
+    const id = Number(idStr);
     if (!id) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
 
     const body = await req.json();
@@ -37,16 +39,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = Number(params.id);
+    const { id: idStr } = await params;
+    const id = Number(idStr);
     if (!id) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
 
-    // อาจล้มเหลวถ้ามี foreign keys ชี้มายัง taxonomy นี้
+    const { searchParams } = new URL(req.url);
+    const mode = searchParams.get('mode');
+
+    if (mode === 'entries') {
+      // ลบเฉพาะ TaxonEntry ที่เกี่ยวข้องกับ Taxonomy นี้
+      const taxonIds = await prisma.taxon.findMany({
+        where: { taxonomyId: id },
+        select: { id: true },
+      });
+      const ids = taxonIds.map(t => t.id);
+      let deletedCount = 0;
+      if (ids.length) {
+        const delRes = await prisma.taxonEntry.deleteMany({ where: { taxonId: { in: ids } } });
+        deletedCount = delRes.count;
+      }
+      return NextResponse.json({ ok: true, deletedCount, message: `ลบรายการ TaxonEntry ที่เกี่ยวข้อง ${deletedCount} รายการแล้ว` });
+    }
+
+    // พฤติกรรมเดิม: ลบ taxonomy (อาจล้มเหลวถ้ามี FK)
     await prisma.taxonomy.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    // ส่ง 409 เมื่อมีความขัดแย้งจาก FK
     return NextResponse.json({ error: e?.message || 'ลบไม่สำเร็จ อาจมีข้อมูลที่เกี่ยวข้องอยู่' }, { status: 409 });
   }
 }

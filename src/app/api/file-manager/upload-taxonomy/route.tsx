@@ -639,8 +639,21 @@ export async function POST(req: NextRequest) {
     const commit = searchParams.get('commit') === '1';
     const taxonomyTitle = searchParams.get('title') || 'อนุกรมวิธานพืช (อัปโหลดจาก DOCX)';
     const taxonomyDomain = searchParams.get('domain') || 'พืช';
+    const taxonomyKingdom = searchParams.get('kingdom') || undefined;
 
     const form = await req.formData();
+
+    // PRIMARY SOURCE: taxonomyId from form (string or File-like)
+    const taxonomyIdRaw = form.get('taxonomyId');
+    const taxonomyId =
+      typeof taxonomyIdRaw === 'string'
+        ? Number(taxonomyIdRaw)
+        : (taxonomyIdRaw ? Number(String(taxonomyIdRaw)) : undefined);
+
+    if (taxonomyIdRaw != null && (taxonomyId == null || Number.isNaN(taxonomyId))) {
+      return NextResponse.json({ ok: false, error: 'taxonomyId ไม่ถูกต้อง' }, { status: 400 });
+    }
+
     const fileAny = form.get('file') as any;
     if (!isBlobLike(fileAny)) {
       return NextResponse.json({ ok: false, error: 'ไม่พบไฟล์สำหรับอัปโหลด (field: file)' }, { status: 400 });
@@ -705,11 +718,24 @@ export async function POST(req: NextRequest) {
 
     if (commit) {
       try {
-          // Ensure a taxonomy record exists
-          let taxonomy = await prisma.taxonomy.findFirst({ where: { title: taxonomyTitle } });
-          if (!taxonomy) {
-            // Some schemas require a non-null domain
-            taxonomy = await prisma.taxonomy.create({ data: { title: taxonomyTitle, domain: taxonomyDomain } });
+          // Ensure a taxonomy record exists (PRIMARY: taxonomyId from form). Fallback to title/domain/kingdom.
+          let taxonomy: any = null;
+          if (typeof taxonomyId === 'number' && !Number.isNaN(taxonomyId)) {
+            taxonomy = await prisma.taxonomy.findUnique({ where: { id: taxonomyId } });
+            if (!taxonomy) {
+              return NextResponse.json(
+                { ok: false, error: `ไม่พบอนุกรมวิธาน (taxonomyId=${taxonomyId})` },
+                { status: 400 }
+              );
+            }
+          } else {
+            // Back-compat fallback: find or create from query params
+            taxonomy = await prisma.taxonomy.findFirst({ where: { title: taxonomyTitle } });
+            if (!taxonomy) {
+              taxonomy = await prisma.taxonomy.create({
+                data: { title: taxonomyTitle, domain: taxonomyDomain, kingdom: taxonomyKingdom }
+              });
+            }
           }
           savedTaxonomyId = taxonomy.id;
 

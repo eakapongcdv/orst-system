@@ -120,9 +120,9 @@ export default function AdminTaxonomyPage() {
   };
 
   const onDelete = async (row: Taxonomy) => {
-    if (!confirm(`ลบ "${row.title}"?`)) return;
+    if (!confirm(`ลบรายการ TaxonEntry ทั้งหมดที่อยู่ใน "${row.title}" ? (Taxonomy จะไม่ถูกลบ)`)) return;
     try {
-      const r = await fetch(`/api/admin/taxonomy/${row.id}`, { method: 'DELETE' });
+      const r = await fetch(`/api/admin/taxonomy/${row.id}?mode=entries`, { method: 'DELETE' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       await fetchData(page, pageSize, q, sortBy, sortDir);
