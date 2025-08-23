@@ -1,9 +1,8 @@
 // src/app/admin/taxonomy/[id]/preview/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
-
 import { DocumentArrowDownIcon, ArrowDownTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 
 // === Types ===
@@ -43,26 +42,6 @@ type TaxonEntry = {
   taxon?: { id: number; scientificName: string | null };
 };
 
-type Pagination = {
-  currentPage: number;
-  totalPages: number;
-  pageSize: number;
-  total: number;
-  hasPrevPage: boolean;
-  hasNextPage: boolean;
-  prevPage?: number;
-  nextPage?: number;
-};
-
-// === Helpers ===
-function htmlToText(html: string): string {
-  return html
-    .replace(/\uFFFD/g, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 // --- Utility: Replace all <img> with base64 data URI (with progress) ---
 async function replaceImagesWithBase64(htmlString: string, onProgress?: (completed: number, total: number) => void) {
   const tempDiv = document.createElement('div');
@@ -91,7 +70,7 @@ async function replaceImagesWithBase64(htmlString: string, onProgress?: (complet
         img.setAttribute('src', base64);
       }
     } catch {
-      // ignore fetch/convert error for individual image
+      // ignore per-image error
     } finally {
       completed++;
       onProgress?.(completed, total);
@@ -105,13 +84,8 @@ export default function AdminTaxonomyPreviewPage() {
   const taxonomyId = Number(params?.id || 0);
 
   const [results, setResults] = useState<TaxonEntry[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  // selection state
-  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   // Preview/export refs & states
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -121,62 +95,53 @@ export default function AdminTaxonomyPreviewPage() {
   const [exportStage, setExportStage] = useState<'idle' | 'pdf' | 'doc'>('idle');
   const [zoom, setZoom] = useState(1);
 
-  const fetchData = async (page = 1, size = pageSize) => {
-    if (!taxonomyId) {
-      setResults([]);
-      setPagination(null);
-      return;
-    }
+  // Fetch ALL entries for the taxonomy (no pagination)
+  const fetchAll = async () => {
+    if (!taxonomyId) { setResults([]); return; }
     setLoading(true);
     setErr(null);
     try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('pageSize', String(size));
-      params.set('taxonomyId', String(taxonomyId)); // สำคัญ: filter ตาม taxonomy
-
-      const r = await fetch(`/api/taxonomy/search?${params.toString()}`);
-      if (!r.ok) {
-        let m = `HTTP ${r.status}`;
-        try { const j = await r.json(); m = j.error || m; } catch {}
-        throw new Error(m);
+      const pageSize = 50; // API maximum
+      const all: TaxonEntry[] = [];
+      let page = 1;
+      // loop until no next page
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const sp = new URLSearchParams();
+        sp.set('page', String(page));
+        sp.set('pageSize', String(pageSize));
+        sp.set('taxonomyId', String(taxonomyId));
+        const r = await fetch(`/api/taxonomy/search?${sp.toString()}`);
+        if (!r.ok) {
+          let m = `HTTP ${r.status}`;
+          try { const j = await r.json(); m = j.error || m; } catch {}
+          throw new Error(m);
+        }
+        const j = await r.json();
+        const chunk: TaxonEntry[] = Array.isArray(j.results) ? j.results : [];
+        all.push(...chunk);
+        if (!j.pagination?.hasNextPage) break;
+        page = (j.pagination?.nextPage || (page + 1));
       }
-      const j = await r.json();
-      const arr: TaxonEntry[] = Array.isArray(j.results) ? j.results : [];
-      setResults(arr);
-      setPagination(j.pagination || null);
 
-      if (arr.length) {
-        const exists = arr.some((x) => x.id === selectedId);
-        if (!exists) setSelectedId(arr[0].id);
-      } else {
-        setSelectedId(null);
-      }
+      // Always sort by orderIndex ascending; missing orderIndex goes last, tie-break by id
+      all.sort((a, b) => {
+        const A = typeof a.orderIndex === 'number' ? a.orderIndex : Number.MAX_SAFE_INTEGER;
+        const B = typeof b.orderIndex === 'number' ? b.orderIndex : Number.MAX_SAFE_INTEGER;
+        if (A !== B) return A - B;
+        return (a.id ?? 0) - (b.id ?? 0);
+      });
+
+      setResults(all);
     } catch (e: any) {
       setErr(e?.message || 'เกิดข้อผิดพลาด');
       setResults([]);
-      setPagination(null);
-      setSelectedId(null);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(1); }, [taxonomyId]);
-
-  const total = pagination?.total ?? results.length;
-  const pageSizeEff = pagination?.pageSize ?? pageSize;
-  const rangeStart = pagination ? Math.min(total, (pagination.currentPage - 1) * pageSizeEff + 1) : 0;
-  const rangeEnd = pagination ? Math.min(total, pagination.currentPage * pageSizeEff) : 0;
-
-  const selected = useMemo(() => {
-    if (!results.length) return null;
-    return results.find((r) => r.id === selectedId) || results[0] || null;
-  }, [results, selectedId]);
-
-  const hasSynonyms = !!(selected?.synonymsMarked || selected?.synonyms);
-  const hasFamily = !!(selected?.familyMarked || selected?.family);
-  const hasOtherNames = !!(selected?.otherNames);
+  useEffect(() => { fetchAll(); /* load all entries once */ }, [taxonomyId]);
 
   // Apply zoom transform to wrapper when zoom changes
   useEffect(() => {
@@ -186,7 +151,7 @@ export default function AdminTaxonomyPreviewPage() {
     }
   }, [zoom]);
 
-  // --- PDF Export Handler ---
+  // --- PDF Export Handler: render each A4 page individually ---
   const handleExportPdf = async () => {
     if (!wrapperRef.current) {
       alert('Preview content is not ready for export.');
@@ -200,46 +165,40 @@ export default function AdminTaxonomyPreviewPage() {
     const originalTransformOrigin = wrapperRef.current.style.transformOrigin;
 
     try {
-      // Load libraries lazily
       const html2canvasMod: any = await import('html2canvas').then(m => m.default || m).catch(() => null);
       if (!html2canvasMod) throw new Error('html2canvas is not available.');
       const { jsPDF }: any = await import('jspdf').catch(() => ({ jsPDF: (window as any).jsPDF }));
       if (!jsPDF) throw new Error('jsPDF is not available.');
 
-      // Temporarily neutralize transforms/effects that can confuse rasterization
+      // Neutralize transforms & hide toolbar during capture
       wrapperRef.current.style.transform = 'none';
       wrapperRef.current.style.transformOrigin = 'top left';
-
-      // Hide toolbar during capture
       const toolbar = document.querySelector<HTMLElement>('.preview-toolbar');
       const prevToolbarDisplay = toolbar?.style.display || '';
       if (toolbar) toolbar.style.display = 'none';
 
-      const targetEl = wrapperRef.current;
-      const canvas = await html2canvasMod(targetEl, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      const pages = Array.from(wrapperRef.current.querySelectorAll<HTMLElement>('.a4-page'));
+      if (pages.length === 0) throw new Error('No pages to export.');
 
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight; // move up for the next slice
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
+      for (let i = 0; i < pages.length; i++) {
+        const pageEl = pages[i];
+        pageEl.scrollIntoView({ block: 'center' });
+        const canvas = await html2canvasMod(pageEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+        if (i === 0) {
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+        } else {
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+        }
+        // progress (allocate ~90% here)
+        const pct = 5 + Math.round(((i + 1) / pages.length) * 90);
+        setExportProgress(pct);
       }
 
       setExportProgress(98);
@@ -379,99 +338,106 @@ export default function AdminTaxonomyPreviewPage() {
                 </button>
               </div>
             </div>
+
             {err && (
               <div className="alert alert--danger" role="alert">
                 <strong>เกิดข้อผิดพลาด:</strong> {err}
               </div>
             )}
 
-            {/* Main content (centered) */}
+            {/* Main content: ALL entries, one A4 page per entry, separated by hr */}
             {!loading && !err && (
               results.length === 0 ? (
                 <div className="brand-card p-6 text-center text-gray-600">ไม่พบผลการค้นหา</div>
               ) : (
                 <div className="preview-shell" ref={previewRef}>
                   <div className="a4-wrapper" ref={wrapperRef}>
-                    <section className="taxon-main">
-                      {!!selected && (
-                        <div className="taxon-card taxon-card--a4">
-                          <div className="taxon-header">
-                            {/* Headline (title + scientific name inline, flexible) */}
-                            <div className="taxon-headline">
-                              <h3
-                                className="taxon-title"
-                                dangerouslySetInnerHTML={{
-                                  __html:
-                                    selected.officialNameThMarked ||
-                                    selected.officialNameTh ||
-                                    selected.titleMarked ||
-                                    selected.title ||
-                                    `หัวข้อ #${selected.id}`,
-                                }}
-                              />
-                              {(selected.scientificName || selected.taxon?.scientificName) ? (
-                                <div className="taxon-sci">
-                                  <em>{selected.scientificName || selected.taxon?.scientificName}</em>
+                    {results.map((r, idx) => {
+                      const hasSynonyms = !!(r.synonymsMarked || r.synonyms);
+                      const hasFamily = !!(r.familyMarked || r.family);
+                      const hasOtherNames = !!(r.otherNames);
+                      return (
+                        <div key={r.id} style={{ width: '100%' }}>
+                          <div className="a4-page">
+                            <div className="a4-content">
+                              <section className="taxon-main">
+                                <div className="taxon-header">
+                                  <div className="taxon-headline">
+                                    <h3
+                                      className="taxon-title"
+                                      dangerouslySetInnerHTML={{
+                                        __html:
+                                          r.officialNameThMarked ||
+                                          r.officialNameTh ||
+                                          r.titleMarked ||
+                                          r.title ||
+                                          `หัวข้อ #${r.id}`,
+                                      }}
+                                    />
+                                    {(r.scientificName || r.taxon?.scientificName) ? (
+                                      <div className="taxon-sci">
+                                        <em>{r.scientificName || r.taxon?.scientificName}</em>
+                                      </div>
+                                    ) : null}
+                                  </div>
                                 </div>
-                              ) : null}
-                            </div>
-                          </div>
 
-                          {/* Meta header */}
-                          <div className="taxon-metaheader">
-                            {hasSynonyms && (
-                              <dl className="row">
-                                <dt>ชื่อพ้อง</dt>
-                                <dd>
-                                  <i
-                                    dangerouslySetInnerHTML={{
-                                      __html: (selected.synonymsMarked ?? selected.synonyms) as string,
-                                    }}
+                                {/* Meta header */}
+                                <div className="taxon-metaheader">
+                                  {hasSynonyms && (
+                                    <dl className="row">
+                                      <dt>ชื่อพ้อง</dt>
+                                      <dd>
+                                        <i
+                                          dangerouslySetInnerHTML={{
+                                            __html: (r.synonymsMarked ?? r.synonyms) as string,
+                                          }}
+                                        />
+                                      </dd>
+                                    </dl>
+                                  )}
+                                  {hasFamily && (
+                                    <dl className="row">
+                                      <dt>วงศ์</dt>
+                                      <dd>
+                                        <i
+                                          dangerouslySetInnerHTML={{
+                                            __html: (r.familyMarked ?? r.family) as string,
+                                          }}
+                                        />
+                                      </dd>
+                                    </dl>
+                                  )}
+                                  {hasOtherNames && (
+                                    <dl className="row">
+                                      <dt>ชื่ออื่น ๆ</dt>
+                                      <dd>{r.otherNames}</dd>
+                                    </dl>
+                                  )}
+                                </div>
+
+                                {(r.shortDescriptionMarked || r.shortDescription) && (
+                                  <div
+                                    className="taxon-shortdescription"
+                                    dangerouslySetInnerHTML={{ __html: r.shortDescriptionMarked || r.shortDescription || '' }}
                                   />
-                                </dd>
-                              </dl>
-                            )}
-                            {hasFamily && (
-                              <dl className="row">
-                                <dt>วงศ์</dt>
-                                <dd>
-                                  <i
-                                    dangerouslySetInnerHTML={{
-                                      __html: (selected.familyMarked ?? selected.family) as string,
-                                    }}
-                                  />
-                                </dd>
-                              </dl>
-                            )}
-                            {hasOtherNames && (
-                              <dl className="row">
-                                <dt>ชื่ออื่น ๆ</dt>
-                                <dd>{selected.otherNames}</dd>
-                              </dl>
-                            )}
-                          </div>
+                                )}
 
-                          {(selected.shortDescriptionMarked || selected.shortDescription) && (
-                            <div
-                              className="taxon-shortdescription"
-                              dangerouslySetInnerHTML={{ __html: selected.shortDescriptionMarked || selected.shortDescription || '' }}
-                            />
-                          )}
-
-                          <article
-                            className="taxon-article prose prose-sm max-w-none"
-                            dangerouslySetInnerHTML={{
-                              __html: selected.contentHtmlMarked || selected.contentHtml || '',
-                            }}
-                          />
-                          {selected.updatedAt && (
-                            <div className="taxon-updated taxon-updated--bottom">
-                              อัปเดตล่าสุด: {new Date(selected.updatedAt).toLocaleString('th-TH')}
+                                <article
+                                  className="taxon-article prose prose-sm max-w-none"
+                                  dangerouslySetInnerHTML={{
+                                    __html: r.contentHtmlMarked || r.contentHtml || '',
+                                  }}
+                                />
+                              </section>
                             </div>
-                          )}
+                            {/* Footer shows page number */}
+                            <div className="a4-footer">หน้า {idx + 1}</div>
+                          </div>
+                          {idx < results.length - 1 && <hr className="page-sep" />}
                         </div>
-                      )}
-                    </section>
+                      );
+                    })}
                   </div>
                 </div>
               )
@@ -484,15 +450,51 @@ export default function AdminTaxonomyPreviewPage() {
             /* Layout & page styles */
             .fullpage { padding: 0; margin: 0; width: 100vw; }
             .a4-page { max-width: 100%; }
-            .taxon-main { width: min(100%, 900px); margin: 0 auto; }
 
-            .taxon-card {
-              background: #fff;
-              border: 1px solid var(--border, #e5e7eb);
-              border-radius: 14px;
-              padding: 30px;
-              box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+            .preview-shell{ width: 100%; display: flex; flex-direction: column; align-items: center; }
+            .a4-wrapper{
+              width: 100%;
+              max-width: calc(210mm + 24px);
+              display: flex; flex-direction: column; align-items: center; gap: 8mm;
+              will-change: transform;
+              padding-top: 10px;
             }
+
+            .a4-page{
+              position: relative;
+              width: 210mm;
+              min-height: 297mm;
+              background: #fff;
+              border-radius: 12px;
+              box-shadow: 0 10px 30px rgba(0,0,0,.10);
+              overflow: hidden;
+              border: 1px solid #e5e7eb;
+            }
+            .a4-content{
+              position: relative;
+              height: calc(297mm - 18mm);
+              padding: 14mm 14mm 22mm 14mm; /* bottom padding so text won't overlap footer */
+              overflow: hidden; /* avoid overflow across pages */
+              color: #111827;
+            }
+            .a4-footer{
+              position: absolute;
+              bottom: 8mm;
+              right: 12mm;
+              font-size: .9rem;
+              color: #374151;
+            }
+            .page-sep{
+              height: 2px;
+              width: 210mm;
+              border: 0;
+              margin: 6mm 0 0;
+              background: linear-gradient(90deg, transparent, rgba(189,148,37,.65), transparent);
+              opacity: .9;
+            }
+
+            /* Typography blocks inside page */
+            .taxon-main { width: 100%; margin: 0 auto; }
             .taxon-header {
               display: grid;
               grid-template-columns: 1fr auto;
@@ -502,16 +504,8 @@ export default function AdminTaxonomyPreviewPage() {
             }
             .taxon-headline { display: flex; align-items: baseline; gap: clamp(12px, 1.5vw, 18px); flex-wrap: wrap; }
             .taxon-sci { font-size: clamp(1.5rem, 1.5vw, 1.5rem); line-height: 1.2; color: #6b2a34; opacity: .9; }
-            .taxon-title {
-              font-size: clamp(2.5rem, 2.5vw, 2.5rem);
-              line-height: 1.15;
-              font-weight: 800;
-              color: #50151d;
-              margin: 0;
-            }
+            .taxon-title { font-size: clamp(2.1rem, 2.2vw, 2.6rem); line-height: 1.15; font-weight: 800; color: #50151d; margin: 0; }
             .taxon-sci em { font-style: italic; }
-            .taxon-updated { font-size: 0.85rem; color: #6b7280; text-align: right; }
-            .taxon-updated--bottom { padding-top: .5rem; margin-top: .5rem; border-top: 1px dashed var(--border, #e5e7eb); }
 
             .taxon-metaheader {
               display: grid;
@@ -531,13 +525,12 @@ export default function AdminTaxonomyPreviewPage() {
               color: #111827;
               background: #c1a58c;
               padding: 0.5rem 1rem 0.5rem 1rem;
-              border-radius: 15px;
+              border-radius: 12px;
             }
             .taxon-shortdescription p { margin: 0; }
 
             .taxon-article { text-align: justify; }
             @media (min-width: 1024px) { .taxon-article { column-count: 2; column-gap: 36px; } }
-
             .taxon-article p:has(> strong:only-child) {
               background: #f3eee6;
               padding: 10px 14px;
@@ -570,9 +563,6 @@ export default function AdminTaxonomyPreviewPage() {
             .preview-toolbar .toolbar-sep{ width: 1px; height: 26px; background: color-mix(in srgb, var(--brand-gold, #BD9425) 45%, transparent); }
             .preview-toolbar .zoom-label{ min-width: 3.2ch; text-align: center; font-weight: 800; color: #1f2937; }
 
-            .preview-shell{ width: 100%; display: flex; flex-direction: column; align-items: center; }
-            .a4-wrapper{ width: 100%; max-width: calc(900px + 24px); display: flex; flex-direction: column; align-items: center; gap: 16px; will-change: transform; }
-
             /* Exporting overlay */
             .exporting-overlay{ position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.55); backdrop-filter: blur(4px) saturate(1.05); -webkit-backdrop-filter: blur(4px) saturate(1.05); }
             .exporting-box{ display: flex; flex-direction: column; align-items: center; gap: .5rem; min-width: 280px; width: 360px; padding: 18px 22px; background: #fff; border: 1px solid var(--brand-border, #e5e7eb); border-radius: var(--radius-md, 10px); box-shadow: 0 10px 30px rgba(0,0,0,.15); }
@@ -582,6 +572,16 @@ export default function AdminTaxonomyPreviewPage() {
             .exporting-progress .bar{ height: 100%; width: 0%; background: linear-gradient(90deg, var(--brand-gold,#BD9425), #e3c35a); transition: width .2s ease; }
             .spinner{ width: 28px; height: 28px; border-radius: 50%; border: 3px solid #e5e7eb; border-top-color: var(--brand-gold,#BD9425); animation: spin 1s linear infinite; }
             @keyframes spin { to { transform: rotate(360deg); } }
+
+            /* Print styles */
+            @media print{
+              body { background: #fff !important; }
+              .preview-toolbar { display: none !important; }
+              .a4-wrapper{ gap: 0; }
+              .a4-page{ box-shadow: none; page-break-after: always; border-radius: 0; width: 210mm; min-height: 297mm; }
+              .page-sep{ display: none; }
+              .a4-content{ height: auto; overflow: visible; }
+            }
           `}</style>
         </section>
       </main>
