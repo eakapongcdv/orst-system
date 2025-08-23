@@ -92,6 +92,18 @@ export default function TaxonomyBrowserPage() {
   const [editForm, setEditForm] = useState<Partial<TaxonEntry>>({});
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  // Clone modal state
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneForm, setCloneForm] = useState<Partial<TaxonEntry>>({});
+  const [cloning, setCloning] = useState(false);
+  const [cloneErr, setCloneErr] = useState<string | null>(null);
+
+  // Versioning state for edit modal
+  type EntryVersionRow = { version: number; changed_at?: string; updatedAt?: string; changed_by_user_id?: number | null };
+  const [versions, setVersions] = useState<EntryVersionRow[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsErr, setVersionsErr] = useState<string | null>(null);
+  const [selectedVersionNum, setSelectedVersionNum] = useState<number | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -163,8 +175,81 @@ export default function TaxonomyBrowserPage() {
       orderIndex: selected.orderIndex ?? null,
       version: (selected as any).version ?? 0,
     });
+    // set current version as selected in dropdown
+    const currVer = (selected as any).version ?? null;
+    setSelectedVersionNum(currVer);
     setSaveErr(null);
     setEditOpen(true);
+    // load versions list (best-effort)
+    if (selected?.id) {
+      void fetchVersionsList(selected.id);
+    }
+  };
+
+  const openClone = () => {
+    if (!selected) return;
+    const baseTitle = selected.title || selected.officialNameTh || 'รายการใหม่';
+    const suggestedTitle = `${baseTitle} (สำเนา)`;
+    const suggestedSlug = selected.slug ? `${selected.slug}-copy` : '';
+    setCloneForm({
+      taxonId: selected.taxonId,
+      title: suggestedTitle,
+      officialNameTh: selected.officialNameTh ?? '',
+      scientificName: selected.scientificName ?? '',
+      genus: selected.genus ?? '',
+      species: selected.species ?? '',
+      family: selected.family ?? '',
+      authorsDisplay: selected.authorsDisplay ?? '',
+      authorsPeriod: selected.authorsPeriod ?? '',
+      otherNames: selected.otherNames ?? '',
+      synonyms: selected.synonyms ?? '',
+      author: selected.author ?? '',
+      shortDescription: selected.shortDescription ?? '',
+      contentHtml: selected.contentHtml ?? '',
+      slug: suggestedSlug,
+      orderIndex: selected.orderIndex ?? null,
+    });
+    setCloneErr(null);
+    setCloneOpen(true);
+  };
+
+  const setCloneField = (key: keyof TaxonEntry, value: any) => {
+    setCloneForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const handleCloneSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) return;
+    setCloning(true);
+    setCloneErr(null);
+    const payload: any = {
+      ...cloneForm,
+      orderIndex:
+        typeof cloneForm.orderIndex === 'string'
+          ? parseInt(cloneForm.orderIndex as any, 10)
+          : cloneForm.orderIndex,
+    };
+    try {
+      const res = await fetch(`/api/taxonomy/entry/${selected.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        let m = `HTTP ${res.status}`;
+        try { const j = await res.json(); m = j.error || m; } catch {}
+        throw new Error(m);
+      }
+      const j = await res.json();
+      const newId = j?.entry?.id || j?.id;
+      await fetchData(pagination?.currentPage ?? 1);
+      if (newId) setSelectedId(newId);
+      setCloneOpen(false);
+    } catch (e: any) {
+      setCloneErr(e?.message || 'คัดลอกไม่สำเร็จ');
+    } finally {
+      setCloning(false);
+    }
   };
 
   const setField = (key: keyof TaxonEntry, value: any) => {
@@ -174,6 +259,13 @@ export default function TaxonomyBrowserPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) return;
+    // Prevent saving when viewing non-latest version
+    const latestVersion = (selected as any).version ?? null;
+    if (selectedVersionNum !== null && latestVersion !== null && selectedVersionNum !== latestVersion) {
+      setSaveErr('ขณะนี้กำลังดูเวอร์ชันเก่า โปรดสลับเป็นเวอร์ชันล่าสุดก่อนบันทึก');
+      setSaving(false);
+      return;
+    }
     setSaving(true);
     setSaveErr(null);
     const payload: any = {
@@ -205,6 +297,69 @@ export default function TaxonomyBrowserPage() {
       setSaveErr(err?.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Fetch list of versions for the selected entry
+  const fetchVersionsList = async (entryId: number) => {
+    setVersionsLoading(true);
+    setVersionsErr(null);
+    try {
+      // primary endpoint (recommended)
+      let res = await fetch(`/api/taxonomy/entry/${entryId}/versions`);
+      if (!res.ok) {
+        // fallback to query param style if versions route not available
+        res = await fetch(`/api/taxonomy/entry/${entryId}?versions=1`);
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows: EntryVersionRow[] = Array.isArray(data?.versions) ? data.versions : Array.isArray(data) ? data : [];
+      // sort desc (latest first)
+      rows.sort((a, b) => (b.version || 0) - (a.version || 0));
+      setVersions(rows);
+    } catch (e: any) {
+      setVersions([]);
+      setVersionsErr(e?.message || 'โหลดเวอร์ชันไม่สำเร็จ');
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
+
+  // Fetch snapshot of a specific version and load into form (read-only view)
+  const fetchVersionSnapshot = async (entryId: number, version: number) => {
+    try {
+      // try RESTful nested route first
+      let res = await fetch(`/api/taxonomy/entry/${entryId}/versions/${version}`);
+      if (!res.ok) {
+        // fallback to query param variant
+        res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const snap = await res.json();
+      // If the response wraps snapshot
+      const payload = snap?.entry || snap?.snapshot || snap;
+      if (payload && typeof payload === 'object') {
+        setEditForm((f) => ({
+          ...f,
+          title: payload.title ?? '',
+          officialNameTh: payload.officialNameTh ?? '',
+          scientificName: payload.scientificName ?? '',
+          genus: payload.genus ?? '',
+          species: payload.species ?? '',
+          family: payload.family ?? '',
+          authorsDisplay: payload.authorsDisplay ?? '',
+          authorsPeriod: payload.authorsPeriod ?? '',
+          otherNames: payload.otherNames ?? '',
+          synonyms: payload.synonyms ?? '',
+          author: payload.author ?? '',
+          shortDescription: payload.shortDescription ?? '',
+          contentHtml: payload.contentHtml ?? '',
+          slug: payload.slug ?? '',
+          orderIndex: payload.orderIndex ?? null,
+        }));
+      }
+    } catch (e: any) {
+      setSaveErr(e?.message || 'ไม่สามารถโหลดข้อมูลเวอร์ชัน');
     }
   };
 
@@ -431,6 +586,17 @@ export default function TaxonomyBrowserPage() {
 
                           {/* Actions (visible when there is a selected record) */}
                           <div className="taxon-actions">
+                            <button
+                              type="button"
+                              className="btn-info"
+                              title="ทำสำเนา (Clone)"
+                              aria-label="ทำสำเนา"
+                              onClick={openClone}
+                            >
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                                <path d="M7 7a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V7Zm-4 4a2 2 0 0 1 2-2h1v9a3 3 0 0 0 3 3h9v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/>
+                              </svg>
+                            </button>
                             <button
                               type="button"
                               className="btn-info"
@@ -720,71 +886,73 @@ export default function TaxonomyBrowserPage() {
                 </>
             )
             )}
-            
-          {/* Edit Modal */}
-          {editOpen && (
-            <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+          
+          {/* Clone Modal */}
+          {cloneOpen && (
+            <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cloneTitle">
               <div className="modal">
                 <div className="modal-head">
-                  <h4 id="editTitle">แก้ไขข้อมูลรายการ</h4>
-                  <button className="btn-icon" aria-label="ปิด" onClick={() => setEditOpen(false)}>
+                  <div className="modal-head__left">
+                    <h4 id="cloneTitle">ทำสำเนา / สร้างรายการใหม่</h4>
+                  </div>
+                  <button className="btn-icon" aria-label="ปิด" onClick={() => setCloneOpen(false)}>
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                       <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
                     </svg>
                   </button>
                 </div>
 
-                <form className="modal-body" onSubmit={handleSave}>
+                <form className="modal-body" onSubmit={handleCloneSave}>
                   <div className="form-grid">
                     <label>
                       <span>ชื่อทางการ (ไทย)</span>
-                      <input type="text" value={(editForm.officialNameTh as any) ?? ''} onChange={(e) => setField('officialNameTh', e.target.value)} />
+                      <input type="text" value={(cloneForm.officialNameTh as any) ?? ''} onChange={(e) => setCloneField('officialNameTh', e.target.value)} />
                     </label>
 
                     <label>
                       <span>Title</span>
-                      <input type="text" value={(editForm.title as any) ?? ''} onChange={(e) => setField('title', e.target.value)} />
+                      <input type="text" value={(cloneForm.title as any) ?? ''} onChange={(e) => setCloneField('title', e.target.value)} />
                     </label>
 
                     <label>
                       <span>ชื่อวิทยาศาสตร์</span>
-                      <input type="text" value={(editForm.scientificName as any) ?? ''} onChange={(e) => setField('scientificName', e.target.value)} />
+                      <input type="text" value={(cloneForm.scientificName as any) ?? ''} onChange={(e) => setCloneField('scientificName', e.target.value)} />
                     </label>
 
                     <label>
                       <span>ชื่อสกุล (Genus)</span>
-                      <input type="text" value={(editForm.genus as any) ?? ''} onChange={(e) => setField('genus', e.target.value)} />
+                      <input type="text" value={(cloneForm.genus as any) ?? ''} onChange={(e) => setCloneField('genus', e.target.value)} />
                     </label>
 
                     <label>
                       <span>คำระบุชนิด (Species)</span>
-                      <input type="text" value={(editForm.species as any) ?? ''} onChange={(e) => setField('species', e.target.value)} />
+                      <input type="text" value={(cloneForm.species as any) ?? ''} onChange={(e) => setCloneField('species', e.target.value)} />
                     </label>
 
                     <label>
                       <span>วงศ์ (Family)</span>
-                      <input type="text" value={(editForm.family as any) ?? ''} onChange={(e) => setField('family', e.target.value)} />
+                      <input type="text" value={(cloneForm.family as any) ?? ''} onChange={(e) => setCloneField('family', e.target.value)} />
                     </label>
 
                     <label className="span-2">
                       <span>ชื่อพ้อง (Synonyms)</span>
-                      <textarea value={(editForm.synonyms as any) ?? ''} onChange={(e) => setField('synonyms', e.target.value)} rows={3} />
+                      <textarea value={(cloneForm.synonyms as any) ?? ''} onChange={(e) => setCloneField('synonyms', e.target.value)} rows={3} />
                     </label>
 
                     <label className="span-2">
                       <span>ชื่ออื่น ๆ</span>
-                      <input type="text" value={(editForm.otherNames as any) ?? ''} onChange={(e) => setField('otherNames', e.target.value)} />
+                      <input type="text" value={(cloneForm.otherNames as any) ?? ''} onChange={(e) => setCloneField('otherNames', e.target.value)} />
                     </label>
 
                     <label className="span-2">
                       <span>คำโปรย/คำอธิบายสั้น</span>
                       <div className="tinymce-wrap">
                         <Editor
-                          id="edit-shortdesc"
+                          id="clone-shortdesc"
                           apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
                           tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
-                          value={(editForm.shortDescription as any) ?? ''}
-                          onEditorChange={(v: string) => setField('shortDescription', v)}
+                          value={(cloneForm.shortDescription as any) ?? ''}
+                          onEditorChange={(v: string) => setCloneField('shortDescription', v)}
                           init={{
                             height: 220,
                             menubar: false,
@@ -802,27 +970,207 @@ export default function TaxonomyBrowserPage() {
 
                     <label className="span-2">
                       <span>ผู้เขียนคำอธิบาย</span>
-                      <input type="text" value={(editForm.author as any) ?? ''} onChange={(e) => setField('author', e.target.value)} />
+                      <input type="text" value={(cloneForm.author as any) ?? ''} onChange={(e) => setCloneField('author', e.target.value)} />
                     </label>
 
                     <label className="span-2">
                       <span>ผู้ตั้งพรรณพืช (แสดงผล)</span>
-                      <textarea value={(editForm.authorsDisplay as any) ?? ''} onChange={(e) => setField('authorsDisplay', e.target.value)} rows={2} />
+                      <textarea value={(cloneForm.authorsDisplay as any) ?? ''} onChange={(e) => setCloneField('authorsDisplay', e.target.value)} rows={2} />
                     </label>
 
                     <label className="span-2">
                       <span>ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</span>
-                      <textarea value={(editForm.authorsPeriod as any) ?? ''} onChange={(e) => setField('authorsPeriod', e.target.value)} rows={2} />
+                      <textarea value={(cloneForm.authorsPeriod as any) ?? ''} onChange={(e) => setCloneField('authorsPeriod', e.target.value)} rows={2} />
                     </label>
 
                     <label>
                       <span>Slug</span>
-                      <input type="text" value={(editForm.slug as any) ?? ''} onChange={(e) => setField('slug', e.target.value)} />
+                      <input type="text" value={(cloneForm.slug as any) ?? ''} onChange={(e) => setCloneField('slug', e.target.value)} />
                     </label>
 
                     <label>
                       <span>ลำดับ (orderIndex)</span>
-                      <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} />
+                      <input type="number" value={cloneForm.orderIndex as any ?? ''} onChange={(e) => setCloneField('orderIndex', e.target.value)} />
+                    </label>
+
+                    <label className="span-2">
+                      <span>เนื้อหา (HTML)</span>
+                      <div className="tinymce-wrap">
+                        <Editor
+                          id="clone-contenthtml"
+                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
+                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          value={(cloneForm.contentHtml as any) ?? ''}
+                          onEditorChange={(v: string) => setCloneField('contentHtml', v)}
+                          init={{
+                            height: 520,
+                            menubar: 'file edit view insert format tools table help',
+                            branding: false,
+                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+                            toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat | code preview fullscreen',
+                            toolbar_sticky: true,
+                            toolbar_mode: 'sliding',
+                            content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.8}',
+                            paste_data_images: true,
+                            image_caption: true,
+                            table_default_attributes: { border: '1' },
+                          }}
+                        />
+                      </div>
+                    </label>
+                  </div>
+
+                  {cloneErr && (
+                    <div className="alert alert--danger" role="alert" style={{ marginTop: 8 }}>
+                      <strong>ผิดพลาด:</strong> {cloneErr}
+                    </div>
+                  )}
+
+                  <div className="modal-actions">
+                    <button type="button" className="tbtn" onClick={() => setCloneOpen(false)}>ยกเลิก</button>
+                    <button type="submit" className="tbtn tbtn-number is-active" disabled={cloning}>
+                      {cloning ? 'กำลังสร้าง…' : 'สร้างใหม่'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
+          {/* Edit Modal */}
+          {editOpen && (
+            <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+              <div className="modal">
+                <div className="modal-head">
+                  <div className="modal-head__left">
+                    <h4 id="editTitle">แก้ไขข้อมูลรายการ</h4>
+                    <div className="ver-switch" title="สลับดูเวอร์ชัน">
+                      <label>
+                        <span>เวอร์ชัน:</span>
+                        <select
+                          value={selectedVersionNum ?? ''}
+                          onChange={async (e) => {
+                            const v = e.target.value ? parseInt(e.target.value, 10) : NaN;
+                            if (!selected) return;
+                            if (!Number.isFinite(v)) return;
+                            setSelectedVersionNum(v);
+                            // when switching: if not latest → load snapshot and show read-only
+                            await fetchVersionSnapshot(selected.id, v);
+                          }}
+                          className="ver-select"
+                          disabled={versionsLoading || versions.length <= 1}
+                        >
+                          {(versions && versions.length > 0 ? versions : [{ version: (selected as any)?.version ?? 1 }])
+                            .sort((a,b)=> (b.version||0)-(a.version||0))
+                            .map((row) => (
+                              <option key={row.version} value={row.version}>
+                                {`v${row.version}`}{row.version === ((selected as any)?.version ?? 0) ? ' (ล่าสุด)' : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      {versionsLoading && <span className="ver-hint">กำลังโหลดเวอร์ชัน…</span>}
+                      {versionsErr && <span className="ver-hint ver-hint--err">{versionsErr}</span>}
+                    </div>
+                  </div>
+                  <button className="btn-icon" aria-label="ปิด" onClick={() => setEditOpen(false)}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M6.22 6.22a.75.75 0 0 1 1.06 0L12 10.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L13.06 12l4.72 4.72a.75.75 0 1 1-1.06 1.06L12 13.06l-4.72 4.72a.75.75 0 1 1-1.06-1.06L10.94 12 6.22 7.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+
+                <form className="modal-body" onSubmit={handleSave}>
+                  {(() => { /* banner for readonly when viewing older version */ return null; })()}
+                  <div className="form-grid">
+                    <label>
+                      <span>ชื่อทางการ (ไทย)</span>
+                      <input type="text" value={(editForm.officialNameTh as any) ?? ''} onChange={(e) => setField('officialNameTh', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>Title</span>
+                      <input type="text" value={(editForm.title as any) ?? ''} onChange={(e) => setField('title', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>ชื่อวิทยาศาสตร์</span>
+                      <input type="text" value={(editForm.scientificName as any) ?? ''} onChange={(e) => setField('scientificName', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>ชื่อสกุล (Genus)</span>
+                      <input type="text" value={(editForm.genus as any) ?? ''} onChange={(e) => setField('genus', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>คำระบุชนิด (Species)</span>
+                      <input type="text" value={(editForm.species as any) ?? ''} onChange={(e) => setField('species', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>วงศ์ (Family)</span>
+                      <input type="text" value={(editForm.family as any) ?? ''} onChange={(e) => setField('family', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label className="span-2">
+                      <span>ชื่อพ้อง (Synonyms)</span>
+                      <textarea value={(editForm.synonyms as any) ?? ''} onChange={(e) => setField('synonyms', e.target.value)} rows={3} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label className="span-2">
+                      <span>ชื่ออื่น ๆ</span>
+                      <input type="text" value={(editForm.otherNames as any) ?? ''} onChange={(e) => setField('otherNames', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label className="span-2">
+                      <span>คำโปรย/คำอธิบายสั้น</span>
+                      <div className="tinymce-wrap">
+                        <Editor
+                          id="edit-shortdesc"
+                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
+                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          value={(editForm.shortDescription as any) ?? ''}
+                          onEditorChange={(v: string) => setField('shortDescription', v)}
+                          disabled={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false}
+                          init={{
+                            height: 220,
+                            menubar: false,
+                            branding: false,
+                            toolbar_mode: 'sliding',
+                            plugins: 'lists link table code',
+                            toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link | removeformat | code',
+                            content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.7}',
+                            block_unsupported_drop: false,
+                            statusbar: true,
+                          }}
+                        />
+                      </div>
+                    </label>
+
+                    <label className="span-2">
+                      <span>ผู้เขียนคำอธิบาย</span>
+                      <input type="text" value={(editForm.author as any) ?? ''} onChange={(e) => setField('author', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label className="span-2">
+                      <span>ผู้ตั้งพรรณพืช (แสดงผล)</span>
+                      <textarea value={(editForm.authorsDisplay as any) ?? ''} onChange={(e) => setField('authorsDisplay', e.target.value)} rows={2} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label className="span-2">
+                      <span>ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</span>
+                      <textarea value={(editForm.authorsPeriod as any) ?? ''} onChange={(e) => setField('authorsPeriod', e.target.value)} rows={2} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>Slug</span>
+                      <input type="text" value={(editForm.slug as any) ?? ''} onChange={(e) => setField('slug', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                    </label>
+
+                    <label>
+                      <span>ลำดับ (orderIndex)</span>
+                      <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
                     </label>
 
                     <label className="span-2">
@@ -834,6 +1182,7 @@ export default function TaxonomyBrowserPage() {
                           tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
                           value={(editForm.contentHtml as any) ?? ''}
                           onEditorChange={(v: string) => setField('contentHtml', v)}
+                          disabled={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false}
                           init={{
                             height: 520,
                             menubar: 'file edit view insert format tools table help',
@@ -860,8 +1209,8 @@ export default function TaxonomyBrowserPage() {
 
                   <div className="modal-actions">
                     <button type="button" className="tbtn" onClick={() => setEditOpen(false)}>ยกเลิก</button>
-                    <button type="submit" className="tbtn tbtn-number is-active" disabled={saving}>
-                      {saving ? 'กำลังบันทึก…' : 'บันทึก (เพิ่มเวอร์ชัน +1)'}
+                    <button type="submit" className="tbtn tbtn-number is-active" disabled={saving || (selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false)}>
+                      {saving ? 'กำลังบันทึก…' : (selected && selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null) ? 'ดูย้อนหลัง (แก้ไขไม่ได้)' : 'บันทึก (เพิ่มเวอร์ชัน +1)')}
                     </button>
                   </div>
                 </form>
@@ -999,6 +1348,12 @@ export default function TaxonomyBrowserPage() {
               border-bottom: 1px solid #e5e7eb;
             }
             .modal-head h4{ margin: 0; font-weight: 800; color: #111827; }
+            .modal-head__left{ display:flex; align-items:center; gap:12px; }
+            .ver-switch{ display:flex; align-items:center; gap:6px; }
+            .ver-switch label{ display:flex; align-items:center; gap:6px; font-size:.9rem; color:#374151; }
+            .ver-select{ border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; background:#fff; }
+            .ver-hint{ font-size:.8rem; color:#6b7280; margin-left:6px; }
+            .ver-hint--err{ color:#b91c1c; }
             .modal-body{ padding: 14px; }
             .form-grid{
               display: grid;
@@ -1035,3 +1390,4 @@ export default function TaxonomyBrowserPage() {
   );
 }
             
+          

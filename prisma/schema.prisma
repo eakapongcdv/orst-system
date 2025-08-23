@@ -36,6 +36,7 @@ model User {
   folders                     Folder[] // Folders owned by the user
   sharedDocuments             DocumentShare[]               @relation("SharedDocuments") // Documents shared with this user
   TransliterationEntryVersion TransliterationEntryVersion[]
+  TaxonEntryVersion           TaxonEntryVersion[]
 
   @@index([resetToken], map: "idx_user_reset_token")
 }
@@ -538,13 +539,13 @@ model TaxonSynonym {
 }
 
 model TaxonEntry {
-  id               Int      @id @default(autoincrement())
+  id               Int                 @id @default(autoincrement())
   taxonId          Int
   title            String
   slug             String?
-  contentHtml      String?  @db.Text
-  contentText      String?  @db.Text
-  shortDescription String?  @db.Text // HTML ของย่อหน้าแรก (&lt;p&gt;...&lt;/p&gt;) ที่ตัดออกจากเนื้อหา
+  contentHtml      String?             @db.Text
+  contentText      String?             @db.Text
+  shortDescription String?             @db.Text // HTML ของย่อหน้าแรก (&lt;p&gt;...&lt;/p&gt;) ที่ตัดออกจากเนื้อหา
   // --- Extracted meta fields (optional) ---
   officialNameTh   String? // ชื่อหลักหรือชื่อทางการ (ไทย)
   official         String? // ชื่อหลัก (ไทย) — ฟิลด์ alias สำหรับ meta key "official"
@@ -559,8 +560,13 @@ model TaxonEntry {
   family           String? // วงศ์ (เช่น "Marantaceae")
   meta             Json? // ที่เก็บข้อมูลเพิ่มเติมในอนาคต (เช่น โครงสร้าง JSON เต็ม)
   orderIndex       Int?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isPublished      Boolean             @default(false) // ใช้ควบคุมการ preview/export เฉพาะรายการที่เผยแพร่แล้ว
+  // --- Versioning ---
+  version          Int                 @default(1) // เริ่มต้นที่เวอร์ชัน 1
+  versions         TaxonEntryVersion[] // บันทึกประวัติการแก้ไขเพื่อ rollback
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   taxon Taxon @relation(fields: [taxonId], references: [id], onDelete: Cascade)
 
@@ -572,4 +578,43 @@ model TaxonEntry {
   @@index([genus])
   @@index([species])
   @@index([family])
+  @@index([id, version], name: "idx_taxon_entry_id_version")
+  @@index([isPublished])
+}
+
+model TaxonEntryVersion {
+  id           Int @id @default(autoincrement())
+  taxonEntryId Int
+  version      Int // เวอร์ชันที่บันทึกสแน็ปช็อตนี้
+
+  // --- Snapshot fields (คัดลอกค่าจาก TaxonEntry ตอนสร้าง log) ---
+  taxonId          Int
+  title            String
+  slug             String?
+  contentHtml      String? @db.Text
+  contentText      String? @db.Text
+  shortDescription String? @db.Text
+  officialNameTh   String?
+  official         String?
+  scientificName   String?
+  genus            String?
+  species          String?
+  authorsDisplay   String?
+  authorsPeriod    String?
+  otherNames       String?
+  author           String?
+  synonyms         String?
+  family           String?
+  orderIndex       Int?
+  isPublished      Boolean?
+
+  changed_at         DateTime @default(now())
+  changed_by_user_id Int?
+  changed_by         User?    @relation(fields: [changed_by_user_id], references: [id], onDelete: SetNull)
+
+  TaxonEntry TaxonEntry @relation(fields: [taxonEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([taxonEntryId, version], name: "uniq_taxon_entry_version")
+  @@index([taxonEntryId])
+  @@index([changed_at])
 }
