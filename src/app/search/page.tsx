@@ -23,13 +23,14 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [taxonHits, setTaxonHits] = useState<UniversalHit[]>([]);
-  const [dictHits, setDictHits] = useState<UniversalHit[]>([]);
+  const [dictGeneralHits, setDictGeneralHits] = useState<UniversalHit[]>([]);
+  const [dictSpecialHits, setDictSpecialHits] = useState<UniversalHit[]>([]);
   const [translitHits, setTranslitHits] = useState<UniversalHit[]>([]);
 
   // Popular searches
   const [popular, setPopular] = useState<PopularItem[]>([]);
 
-  const anyResults = taxonHits.length + dictHits.length + translitHits.length > 0;
+  const anyResults = taxonHits.length + dictGeneralHits.length + dictSpecialHits.length + translitHits.length > 0;
 
   // --- Utils ---
   const stripTags = (html: string) => html.replace(/<[^>]+>/g, ' ');
@@ -41,6 +42,7 @@ export default function SearchPage() {
   }
 
   function loadPopularFromLocal(): PopularItem[] {
+    //localStorage.removeItem('popular:universal');
     if (typeof window === 'undefined') return [];
     try{
       const raw = localStorage.getItem('popular:universal');
@@ -100,33 +102,27 @@ export default function SearchPage() {
 
   async function runSearch(query: string){
     const finalQ = query.trim();
-    if (!finalQ){ setTaxonHits([]); setDictHits([]); setTranslitHits([]); return; }
+    if (!finalQ){ setTaxonHits([]); setDictGeneralHits([]); setDictSpecialHits([]); setTranslitHits([]); return; }
     setLoading(true);
     setError(null);
     setTaxonHits([]);
-    setDictHits([]);
+    setDictGeneralHits([]);
+    setDictSpecialHits([]);
     setTranslitHits([]);
 
     try {
       // 1) TaxonEntry — try global taxonomy search (no taxonomyId)
       const taxonUrl = `/api/taxonomy/search?q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`;
-      // 2) DictionaryEntry — try a few likely endpoints, pick the first that returns data
-      const dictCandidates = [
-        `/api/search-dictionary?dictionaryId=3&q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`,
-        `/api/search-dictionary?dictionaryId=0&q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`,
-      ];
+      // 2) DictionaryEntry — แยกเป็น 2 แหล่ง
+      const dictGeneralUrl = `/api/search-dictionary?dictionaryId=0&q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`;
+      const dictSpecialUrl = `/api/search-dictionary?dictionaryId=3&q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`;
       // 3) TransliterationEntry
       const translitUrl = `/api/admin/transliteration?q=${encodeURIComponent(finalQ)}&take=20`;
 
-      const [taxonData, dictData, translitData] = await Promise.all([
+      const [taxonData, dictGeneralData, dictSpecialData, translitData] = await Promise.all([
         fetchJson(taxonUrl),
-        (async () => {
-          for (const u of dictCandidates) {
-            const j = await fetchJson(u);
-            if (j) return j;
-          }
-          return null;
-        })(),
+        fetchJson(dictGeneralUrl),
+        fetchJson(dictSpecialUrl),
         fetchJson(translitUrl),
       ]);
 
@@ -152,29 +148,58 @@ export default function SearchPage() {
         setTaxonHits(hits);
       }
 
-      // --- Build DictionaryEntry hits ---
-      if (dictData) {
-        const arr: any[] = Array.isArray(dictData?.items)
-          ? dictData.items
-          : Array.isArray(dictData?.results)
-          ? dictData.results
-          : Array.isArray(dictData)
-          ? dictData
+      // --- Build DictionaryEntry hits: พจนานุกรม (dictionaryId=0) ---
+      if (dictGeneralData) {
+        const arr0: any[] = Array.isArray(dictGeneralData?.items)
+          ? dictGeneralData.items
+          : Array.isArray(dictGeneralData?.results)
+          ? dictGeneralData.results
+          : Array.isArray(dictGeneralData)
+          ? dictGeneralData
           : [];
 
-        const hits: UniversalHit[] = arr.slice(0, 5).map((it: any) => {
+        const hits0: UniversalHit[] = arr0.slice(0, 5).map((it: any) => {
           const termTH = it.term_th || '';
           const termEN = it.term_en || '';
-          const titleHtml = (termTH || termEN) ? `${termTH}${termTH && termEN ? ' / ' : ''}${termEN}` : `คำศัพท์ #${it.id}`;
+          const titleHtml = (termTH || termEN)
+            ? `${termTH}${termTH && termEN ? ' / ' : ''}${termEN}`
+            : `คำศัพท์ #${it.id}`;
           const defHtml = typeof it.definition_html === 'string' && it.definition_html
             ? it.definition_html
             : (it.definition || '');
           const snippetHtml = truncate(stripTags(defHtml || ''), 320);
-          const url = `/dictionaries/${it.specializedDictionaryId}?q=${encodeURIComponent(titleHtml)}`;
-          const meta = it.specializedDictionaryTitle || (it.SpecializedDictionary?.title) || `พจนานุกรมเฉพาะสาขา #${it.specializedDictionaryId ?? ''}`;
+          const url = `/dictionaries/${it.specializedDictionaryId ?? 0}?q=${encodeURIComponent(titleHtml)}`;
+          const meta = 'พจนานุกรม';
           return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
         });
-        setDictHits(hits);
+        setDictGeneralHits(hits0);
+      }
+
+      // --- Build DictionaryEntry hits: พจนานุกรมเฉพาะสาขาวิชา (dictionaryId=3) ---
+      if (dictSpecialData) {
+        const arr3: any[] = Array.isArray(dictSpecialData?.items)
+          ? dictSpecialData.items
+          : Array.isArray(dictSpecialData?.results)
+          ? dictSpecialData.results
+          : Array.isArray(dictSpecialData)
+          ? dictSpecialData
+          : [];
+
+        const hits3: UniversalHit[] = arr3.slice(0, 5).map((it: any) => {
+          const termTH = it.term_th || '';
+          const termEN = it.term_en || '';
+          const titleHtml = (termTH || termEN)
+            ? `${termTH}${termTH && termEN ? ' / ' : ''}${termEN}`
+            : `คำศัพท์ #${it.id}`;
+          const defHtml = typeof it.definition_html === 'string' && it.definition_html
+            ? it.definition_html
+            : (it.definition || '');
+          const snippetHtml = truncate(stripTags(defHtml || ''), 320);
+          const url = `/dictionaries/${it.specializedDictionaryId ?? 3}?q=${encodeURIComponent(titleHtml)}`;
+          const meta = it.specializedDictionaryTitle || (it.SpecializedDictionary?.title) || 'พจนานุกรมเฉพาะสาขาวิชา';
+          return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
+        });
+        setDictSpecialHits(hits3);
       }
 
       // --- Build TransliterationEntry hits ---
@@ -199,7 +224,7 @@ export default function SearchPage() {
         setTranslitHits(hits);
       }
 
-      if (!taxonData && !dictData && !translitData) {
+      if (!taxonData && !dictGeneralData && !dictSpecialData && !translitData) {
         setError('ไม่สามารถติดต่อแหล่งข้อมูลได้');
       }
 
@@ -332,9 +357,11 @@ export default function SearchPage() {
           <div className="grid grid-cols-1 gap-5">
             {[
               { key: 'taxon', title: 'อนุกรมวิธาน', badge: 'อนุกรมวิธาน', hits: taxonHits },
-              { key: 'dict', title: 'พจนานุกรม/พจนานุกรมเฉพาะสาขาวิชา', badge: 'พจนานุกรม', hits: dictHits },
+              { key: 'dict-general', title: 'พจนานุกรม', badge: 'พจนานุกรม', hits: dictGeneralHits },
+              { key: 'dict-special', title: 'พจนานุกรมเฉพาะสาขาวิชา', badge: 'พจนานุกรมเฉพาะสาขา', hits: dictSpecialHits },
               { key: 'translit', title: 'คำทับศัพท์', badge: 'คำทับศัพท์', hits: translitHits },
             ]
+              .filter(sec => sec.hits && sec.hits.length > 0)
               .sort((a,b) => b.hits.length - a.hits.length)
               .map(sec => (
                 <Section key={sec.key} title={sec.title} badge={sec.badge} hits={sec.hits} />

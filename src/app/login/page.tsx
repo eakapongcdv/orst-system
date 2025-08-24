@@ -85,8 +85,8 @@ export default function LoginPage() {
       localStorage.removeItem("user");
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // สำเร็จ → /dictionaries
-      router.push("/dictionaries");
+      // สำเร็จ → /dashboard
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "เข้าสู่ระบบล้มเหลว");

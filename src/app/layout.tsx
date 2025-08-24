@@ -43,9 +43,10 @@ export default async function RootLayout({
   const isAuthenticated = !!payload;
 
   const navItems = [
-    { name: "จัดการพจนานุกรม", href: "/admin/dictionary" },
-    { name: "จัดการอนุกรมวิธาน", href: "/admin/taxonomy" },
-    { name: "จัดการคำทับศัพท์", href: "/admin/transliteration" },
+    { name: "ค้นหา", href: "/search" },
+    { name: "พจนานุกรม", href: "/admin/dictionary" },
+    { name: "อนุกรมวิธาน", href: "/admin/taxonomy" },
+    { name: "คำทับศัพท์", href: "/admin/transliteration" },
     //{ name: "พจนานุกรม", href: "/dictionaries/0" },
     //{ name: "อนุกรมวิธาน", href: "/taxonomy/9" },
     //{ name: "คำทับศัพท์", href: "/search-transliteration" },
@@ -53,7 +54,7 @@ export default async function RootLayout({
     //{ name: "นำเข้าคำศัพท์", href: "/file-manager/upload-dictionary" },
     { name: "นำเข้าคำศัพท์", href: "/file-manager/upload-transliteration" },
     { name: "Open API", href: "/open-api/dashboard" },
-    { name: "จัดการผู้ใช้", href: "/users" },
+    { name: "ผู้ใช้", href: "/users" },
   ];
 
   return (
