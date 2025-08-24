@@ -124,7 +124,7 @@ export default function UpdateDictionaryUploadPage() {
     () => [
       { name: "นำเข้าพจนานุกรม", href: "/file-manager/upload-dictionary" },
       { name: "นำเข้าคำทับศัพท์", href: "/file-manager/upload-transliteration" },
-      { name: "นำเข้าอนุกรมวิธาน", href: "/file-manager/upload-taxonomy" },
+      { name: "นำเข้าอนุกรมวิธาน", href: "/file-manager/upload-taxonomy/docx" },
     ],
     []
   );
@@ -200,7 +200,7 @@ export default function UpdateDictionaryUploadPage() {
       await new Promise<UploadResult>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         // Build API URL with commit flag and optional metadata
-        const apiUrl = new URL("/api/file-manager/upload-taxonomy", window.location.origin);
+        const apiUrl = new URL("/api/file-manager/upload-taxonomy/docx", window.location.origin);
         apiUrl.searchParams.set("commit", "1");
         // Pass title/domain/kingdom based on selected taxonomy (if any)
         const sel = specOptions.find(o => String(o.id) === specializedDictionaryId);

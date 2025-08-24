@@ -234,7 +234,7 @@ export default function TransliterationUploadPage() {
               นำเข้าคำทับศัพท์
             </Link>
             <Link
-              href="/file-manager/upload-taxonomy"
+              href="/file-manager/upload-taxonomy/docx"
               className={`${pathname?.startsWith('/file-manager/upload-taxonomy') ? 'btn-primary' : 'btn-secondary'} btn--sm`}
             >
               <BeakerIcon className="h-5 w-5" aria-hidden="true" />

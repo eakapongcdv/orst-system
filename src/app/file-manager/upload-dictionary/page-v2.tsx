@@ -57,7 +57,7 @@ export default function UpdateDictionaryUploadPage() {
       { name: "นำเข้า พจนานุกรม", href: "/file-manager/upload-dictionary" },
       { name: "อัปเดตพจนานุกรม (HTML)", href: "/file-manager/update-dictionary" }, // current page
       { name: "นำเข้าคำทับศัพท์", href: "/file-manager/upload-transliteration" },
-      { name: "นำเข้า อนุกรมวิธาน", href: "/file-manager/upload-taxonomy" },
+      { name: "นำเข้า อนุกรมวิธาน", href: "/file-manager/upload-taxonomy/docx" },
     ]),
     []
   );
