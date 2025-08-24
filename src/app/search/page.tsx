@@ -35,6 +35,10 @@ export default function SearchPage() {
   // --- Utils ---
   const stripTags = (html: string) => html.replace(/<[^>]+>/g, ' ');
   const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+  // Remove only <mark> tags (keep the text), then strip any leftover HTML and compress spaces
+  const stripMarks = (s: string) => (typeof s === 'string' ? s.replace(/<\/?mark[^>]*>/gi, '') : '');
+  const compactSpaces = (s: string) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim() : '');
+  const toQueryParam = (s: string) => encodeURIComponent(compactSpaces(stripTags(stripMarks(s || ''))));
 
   // --- Popular search helpers ---
   function normQuery(s: string){
@@ -141,7 +145,8 @@ export default function SearchPage() {
           else if (it.contentHtmlMarked) snippetHtml = it.contentHtmlMarked;
           else if (typeof it.contentText === 'string') snippetHtml = truncate(stripTags(it.contentText), 320);
 
-          const url = `/taxonomy/${encodeURIComponent(it.taxonomyId || 9 )}?q=${encodeURIComponent(it.officialNameTh)}`;
+          const qText = it.officialNameThMarked || it.officialNameTh || it.titleMarked || it.title || '';
+          const url = `/taxonomy/${encodeURIComponent(it.taxonomyId || 9)}?q=${toQueryParam(qText)}`;
           const meta: string = it.scientificName || it?.taxon?.scientificName || '';
           return { kind: 'taxon', id: it.id, titleHtml, snippetHtml, url, meta };
         });
@@ -168,7 +173,8 @@ export default function SearchPage() {
             ? it.definition_html
             : (it.definition || '');
           const snippetHtml = truncate(stripTags(defHtml || ''), 320);
-          const url = `/dictionaries/${it.specializedDictionaryId ?? 0}?q=${encodeURIComponent(titleHtml)}`;
+          const qText0 = termTH || termEN || titleHtml || '';
+          const url = `/dictionaries/${it.specializedDictionaryId ?? 0}?q=${toQueryParam(termTH)}`;
           const meta = 'พจนานุกรม';
           return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
         });
@@ -195,7 +201,7 @@ export default function SearchPage() {
             ? it.definition_html
             : (it.definition || '');
           const snippetHtml = truncate(stripTags(defHtml || ''), 320);
-          const url = `/dictionaries/${it.specializedDictionaryId ?? 3}?q=${encodeURIComponent(titleHtml)}`;
+          const url = `/dictionaries/${it.specializedDictionaryId ?? 3}?q=${toQueryParam(termTH)}`;
           const meta = it.specializedDictionaryTitle || (it.SpecializedDictionary?.title) || 'พจนานุกรมเฉพาะสาขาวิชา';
           return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
         });
@@ -217,7 +223,7 @@ export default function SearchPage() {
             .join(' • ');
           const raw = it.meaning || it.notes || '';
           const snippetHtml = truncate(stripTags(String(raw)), 320);
-          const url = `/search-transliteration?q=${encodeURIComponent(it.transliteration1)}`;
+          const url = `/search-transliteration?q=${toQueryParam(it.transliteration1 || it.romanization || '')}`;
           const meta = it.category || it.wordType || '';
           return { kind: 'translit', id: it.id, titleHtml, snippetHtml, url, meta };
         });
@@ -296,8 +302,8 @@ export default function SearchPage() {
               className="h-16 w-auto"
             />
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">ค้นหาข้อมูลแบบรวมทุกคลัง</h1>
-          <p className="text-gray-600">ค้นหา TaxonEntry, DictionaryEntry, TransliterationEntry พร้อมตัวอย่างเนื้อหา</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา</h1>
+          <p className="text-gray-600">สืบค้นข้อมูลแบบข้อความภาษาไทยและภาษาอังกฤษ (full text search)</p>
         </div>
 
         {/* Search Bar */}
@@ -358,7 +364,7 @@ export default function SearchPage() {
             {[
               { key: 'taxon', title: 'อนุกรมวิธาน', badge: 'อนุกรมวิธาน', hits: taxonHits },
               { key: 'dict-general', title: 'พจนานุกรม', badge: 'พจนานุกรม', hits: dictGeneralHits },
-              { key: 'dict-special', title: 'พจนานุกรมเฉพาะสาขาวิชา', badge: 'พจนานุกรมเฉพาะสาขา', hits: dictSpecialHits },
+              { key: 'dict-special', title: 'พจนานุกรมเฉพาะสาขา', badge: 'พจนานุกรมเฉพาะสาขา', hits: dictSpecialHits },
               { key: 'translit', title: 'คำทับศัพท์', badge: 'คำทับศัพท์', hits: translitHits },
             ]
               .filter(sec => sec.hits && sec.hits.length > 0)
