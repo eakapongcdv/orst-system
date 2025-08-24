@@ -23,6 +23,7 @@ const ALLOWED_FIELDS = new Set([
   'otherNames',
   'synonyms',
   'author',
+  'isPublished',
 ]);
 
 function pickAllowed(body: Record<string, any>) {
@@ -197,7 +198,7 @@ export async function POST(req: Request, ctx: { params: any }) {
         synonyms: (overrides.synonyms ?? src.synonyms) ?? null,
         family: (overrides.family ?? src.family) ?? null,
         orderIndex: (overrides.orderIndex ?? src.orderIndex) ?? null,
-        isPublished: false, // clone มาให้ยังไม่เผยแพร่ (สามารถแก้ไขทีหลังได้)
+        isPublished: (overrides.isPublished ?? false),
         version: 1,
       },
     });
@@ -227,6 +228,7 @@ export async function POST(req: Request, ctx: { params: any }) {
           family: created.family ?? null,
           orderIndex: created.orderIndex ?? null,
           isPublished: (created as any).isPublished ?? null,
+          
         },
       });
     } catch {}
@@ -300,7 +302,7 @@ export async function PUT(req: Request, ctx: { params: any }) {
           synonyms: updated.synonyms ?? null,
           family: updated.family ?? null,
           orderIndex: updated.orderIndex ?? null,
-          // Optionally set changed_by_user_id here if you have auth context
+          isPublished: (updated as any).isPublished ?? null,
         },
       });
 

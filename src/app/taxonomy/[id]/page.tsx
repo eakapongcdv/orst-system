@@ -44,6 +44,7 @@ type TaxonEntry = {
   updatedAt?: string;
   taxon?: { id: number; scientificName: string | null };
   version?: number;
+  isPublished?: boolean;
 };
 
 type Pagination = {
@@ -153,8 +154,46 @@ export default function TaxonomyBrowserPage() {
     await fetchData(1);
   };
 
-  const openEdit = () => {
+  const openEdit = async () => {
     if (!selected) return;
+
+    setSaveErr(null);
+    setEditOpen(true);
+
+    const currVer = (selected as any).version ?? null;
+    setSelectedVersionNum(currVer);
+
+    if (selected?.id) void fetchVersionsList(selected.id);
+
+    try {
+      const res = await fetch(`/api/taxonomy/entry/${selected.id}`);
+      if (res.ok) {
+        const full = await res.json();
+        setEditForm({
+          id: full.id,
+          taxonId: full.taxonId,
+          title: full.title ?? '',
+          officialNameTh: full.officialNameTh ?? '',
+          scientificName: full.scientificName ?? '',
+          genus: full.genus ?? '',
+          species: full.species ?? '',
+          family: full.family ?? '',
+          authorsDisplay: full.authorsDisplay ?? '',
+          authorsPeriod: full.authorsPeriod ?? '',
+          otherNames: full.otherNames ?? '',
+          synonyms: full.synonyms ?? '',
+          author: full.author ?? '',
+          shortDescription: full.shortDescription ?? '',
+          contentHtml: full.contentHtml ?? '',
+          slug: full.slug ?? '',
+          orderIndex: full.orderIndex ?? null,
+          version: (full as any).version ?? currVer ?? 0,
+          isPublished: !!(full as any).isPublished,
+        });
+        return;
+      }
+    } catch {}
+
     setEditForm({
       id: selected.id,
       taxonId: selected.taxonId,
@@ -174,40 +213,41 @@ export default function TaxonomyBrowserPage() {
       slug: selected.slug ?? '',
       orderIndex: selected.orderIndex ?? null,
       version: (selected as any).version ?? 0,
+      isPublished: (selected as any).isPublished ?? false,
     });
-    // set current version as selected in dropdown
-    const currVer = (selected as any).version ?? null;
-    setSelectedVersionNum(currVer);
-    setSaveErr(null);
-    setEditOpen(true);
-    // load versions list (best-effort)
-    if (selected?.id) {
-      void fetchVersionsList(selected.id);
-    }
   };
 
-  const openClone = () => {
+  const openClone = async () => {
     if (!selected) return;
-    const baseTitle = selected.title || selected.officialNameTh || 'รายการใหม่';
+
+    let src: any = selected;
+    try {
+      const res = await fetch(`/api/taxonomy/entry/${selected.id}`);
+      if (res.ok) src = await res.json();
+    } catch {}
+
+    const baseTitle = src.title || src.officialNameTh || 'รายการใหม่';
     const suggestedTitle = `${baseTitle} (สำเนา)`;
-    const suggestedSlug = selected.slug ? `${selected.slug}-copy` : '';
+    const suggestedSlug = src.slug ? `${src.slug}-copy` : '';
+
     setCloneForm({
-      taxonId: selected.taxonId,
+      taxonId: src.taxonId,
       title: suggestedTitle,
-      officialNameTh: selected.officialNameTh ?? '',
-      scientificName: selected.scientificName ?? '',
-      genus: selected.genus ?? '',
-      species: selected.species ?? '',
-      family: selected.family ?? '',
-      authorsDisplay: selected.authorsDisplay ?? '',
-      authorsPeriod: selected.authorsPeriod ?? '',
-      otherNames: selected.otherNames ?? '',
-      synonyms: selected.synonyms ?? '',
-      author: selected.author ?? '',
-      shortDescription: selected.shortDescription ?? '',
-      contentHtml: selected.contentHtml ?? '',
+      officialNameTh: src.officialNameTh ?? '',
+      scientificName: src.scientificName ?? '',
+      genus: src.genus ?? '',
+      species: src.species ?? '',
+      family: src.family ?? '',
+      authorsDisplay: src.authorsDisplay ?? '',
+      authorsPeriod: src.authorsPeriod ?? '',
+      otherNames: src.otherNames ?? '',
+      synonyms: src.synonyms ?? '',
+      author: src.author ?? '',
+      shortDescription: src.shortDescription ?? '',
+      contentHtml: src.contentHtml ?? '',
       slug: suggestedSlug,
-      orderIndex: selected.orderIndex ?? null,
+      orderIndex: src.orderIndex ?? null,
+      isPublished: !!src.isPublished,
     });
     setCloneErr(null);
     setCloneOpen(true);
@@ -326,42 +366,69 @@ export default function TaxonomyBrowserPage() {
 
   // Fetch snapshot of a specific version and load into form (read-only view)
   const fetchVersionSnapshot = async (entryId: number, version: number) => {
-  try {
-    // try RESTful nested route first
-    let res = await fetch(`/api/taxonomy/entry/${entryId}/versions/${version}`).catch(() => null as any);
-    if (!res || !res.ok) {
-      // fallback to query param variant
-      res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
+    try {
+      if (version === latestVersionFromVersions) {
+        const live = await fetch(`/api/taxonomy/entry/${entryId}`).catch(() => null as any);
+        if (live && live.ok) {
+          const full = await live.json();
+          setEditForm((f) => ({
+            ...f,
+            id: full.id,
+            taxonId: full.taxonId,
+            title: full.title ?? '',
+            officialNameTh: full.officialNameTh ?? '',
+            scientificName: full.scientificName ?? '',
+            genus: full.genus ?? '',
+            species: full.species ?? '',
+            family: full.family ?? '',
+            authorsDisplay: full.authorsDisplay ?? '',
+            authorsPeriod: full.authorsPeriod ?? '',
+            otherNames: full.otherNames ?? '',
+            synonyms: full.synonyms ?? '',
+            author: full.author ?? '',
+            shortDescription: full.shortDescription ?? '',
+            contentHtml: full.contentHtml ?? '',
+            slug: full.slug ?? '',
+            orderIndex: full.orderIndex ?? null,
+            isPublished: !!(full as any).isPublished,
+          }));
+          return;
+        }
+      }
+
+      let res = await fetch(`/api/taxonomy/entry/${entryId}/versions/${version}`).catch(() => null as any);
+      if (!res || !res.ok) {
+        res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const snap = await res.json();
+      const payload = snap?.entry || snap?.snapshot || snap;
+      if (payload && typeof payload === 'object') {
+        setEditForm((f) => ({
+          ...f,
+          id: (payload.taxonEntryId ?? payload.id ?? entryId) as any,
+          taxonId: (payload.taxonId ?? (f as any).taxonId ?? null) as any,
+          title: payload.title ?? '',
+          officialNameTh: payload.officialNameTh ?? '',
+          scientificName: payload.scientificName ?? '',
+          genus: payload.genus ?? '',
+          species: payload.species ?? '',
+          family: payload.family ?? '',
+          authorsDisplay: payload.authorsDisplay ?? '',
+          authorsPeriod: payload.authorsPeriod ?? '',
+          otherNames: payload.otherNames ?? '',
+          synonyms: payload.synonyms ?? '',
+          author: payload.author ?? '',
+          shortDescription: payload.shortDescription ?? '',
+          contentHtml: payload.contentHtml ?? '',
+          slug: payload.slug ?? '',
+          orderIndex: payload.orderIndex ?? null,
+          isPublished: (payload.isPublished ?? (f as any).isPublished ?? false) as any,
+        }));
+      }
+    } catch (e: any) {
+      setSaveErr(e?.message || 'ไม่สามารถโหลดข้อมูลเวอร์ชัน');
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const snap = await res.json();
-    // If the response wraps snapshot
-    const payload = snap?.entry || snap?.snapshot || snap;
-    if (payload && typeof payload === 'object') {
-      setEditForm((f) => ({
-        ...f,
-        id: (payload.taxonEntryId ?? payload.id ?? entryId) as any,
-        taxonId: (payload.taxonId ?? (f as any).taxonId ?? null) as any,
-        title: payload.title ?? '',
-        officialNameTh: payload.officialNameTh ?? '',
-        scientificName: payload.scientificName ?? '',
-        genus: payload.genus ?? '',
-        species: payload.species ?? '',
-        family: payload.family ?? '',
-        authorsDisplay: payload.authorsDisplay ?? '',
-        authorsPeriod: payload.authorsPeriod ?? '',
-        otherNames: payload.otherNames ?? '',
-        synonyms: payload.synonyms ?? '',
-        author: payload.author ?? '',
-        shortDescription: payload.shortDescription ?? '',
-        contentHtml: payload.contentHtml ?? '',
-        slug: payload.slug ?? '',
-        orderIndex: payload.orderIndex ?? null,
-      }));
-    }
-  } catch (e: any) {
-    setSaveErr(e?.message || 'ไม่สามารถโหลดข้อมูลเวอร์ชัน');
-  }
   };
 
   const pageNumbers = useMemo(() => {
@@ -1016,6 +1083,16 @@ export default function TaxonomyBrowserPage() {
                       <input type="number" value={cloneForm.orderIndex as any ?? ''} onChange={(e) => setCloneField('orderIndex', e.target.value)} />
                     </label>
 
+                    <label>
+                      <span>เผยแพร่ (isPublished)</span>
+                      <input
+                        type="checkbox"
+                        checked={!!cloneForm.isPublished}
+                        onChange={(e) => setCloneField('isPublished', e.target.checked)}
+                        style={{ width: 'auto' }}
+                      />
+                    </label>
+
                     <label className="span-2">
                       <span>เนื้อหา (HTML)</span>
                       <div className="tinymce-wrap">
@@ -1223,6 +1300,17 @@ export default function TaxonomyBrowserPage() {
                       <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
+                    <label>
+                      <span>เผยแพร่ (isPublished)</span>
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.isPublished}
+                        onChange={(e) => setField('isPublished', e.target.checked)}
+                        disabled={isViewingOldVersion}
+                        style={{ width: 'auto' }}
+                      />
+                    </label>
+                    
                     <label className="span-2">
                       <span>เนื้อหา (HTML)</span>
                       <div className="tinymce-wrap">

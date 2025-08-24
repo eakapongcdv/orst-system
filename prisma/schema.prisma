@@ -560,7 +560,7 @@ model TaxonEntry {
   family           String? // วงศ์ (เช่น "Marantaceae")
   meta             Json? // ที่เก็บข้อมูลเพิ่มเติมในอนาคต (เช่น โครงสร้าง JSON เต็ม)
   orderIndex       Int?
-  isPublished      Boolean             @default(false) // ใช้ควบคุมการ preview/export เฉพาะรายการที่เผยแพร่แล้ว
+  isPublished      Boolean             @default(true) // ใช้ควบคุมการ preview/export เฉพาะรายการที่เผยแพร่แล้ว
   // --- Versioning ---
   version          Int                 @default(1) // เริ่มต้นที่เวอร์ชัน 1
   versions         TaxonEntryVersion[] // บันทึกประวัติการแก้ไขเพื่อ rollback
