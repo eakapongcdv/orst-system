@@ -1,10 +1,12 @@
 // app/search-transliteration/page.tsx
+//search-transliteration?q=geisha
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import * as FlagIcons from 'country-flag-icons/react/3x2';
 import type { ComponentType, SVGProps, ChangeEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 // === Types ===
 interface TransliterationSearchResult {
@@ -242,6 +244,7 @@ export default function SearchTransliterationPage() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
 
   // ==== Modal & versioning states ====
   const [editOpen, setEditOpen] = useState(false);
@@ -300,6 +303,7 @@ export default function SearchTransliterationPage() {
 
   // --- Popular search helpers (API with localStorage fallback) ---
   const POP_KEY = 'tl_popular_terms';
+  //localStorage.removeItem(POP_KEY);
   const readLocalPopular = (): Record<string, number> => {
     try { return JSON.parse(localStorage.getItem(POP_KEY) || '{}'); } catch { return {}; }
   };
@@ -342,16 +346,26 @@ export default function SearchTransliterationPage() {
   };
 
   useEffect(() => {
-    loadResults();
+    const qp = (searchParams?.get('q') || '').trim();
+    if (qp) {
+      setQuery(qp);
+      // run search immediately with the URL's q without waiting for state to settle
+      fetchResults(1, pageSize, qp);
+      trackSearch(qp);
+    } else {
+      loadResults();
+    }
     try { loadPopular(); } catch {}
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, pageSize]);
 
-  const fetchResults = async (page = 1, size: number = pageSize) => {
+  const fetchResults = async (page = 1, size: number = pageSize, qOverride?: string) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (query.trim()) params.append('q', query.trim());
+      const qParam = (qOverride !== undefined ? qOverride : query).trim();
+      if (qParam) params.append('q', qParam);
       if (languageFilter !== 'all') params.append('language', languageFilter);
       params.append('page', page.toString());
       params.append('pageSize', String(size));
@@ -593,7 +607,7 @@ export default function SearchTransliterationPage() {
                     key={p.term}
                     type="button"
                     className="popular-chip"
-                    onClick={() => { setQuery(p.term); loadResults(1); }}
+                    onClick={() => { setQuery(p.term); fetchResults(1, pageSize, p.term); }}
                     title={`${p.term} (${p.count})`}
                   >
                     {p.term}

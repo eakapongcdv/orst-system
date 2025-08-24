@@ -294,7 +294,7 @@ export default function AdminTransliterationPage() {
                     <td className="row-actions">
                       {/* ปุ่มไปหน้า public/preview ถ้ามี */}
                       <Link
-                        href={`/search-transliteration?query=${encodeURIComponent(it.romanization)}`}
+                        href={`/search-transliteration?q=${encodeURIComponent(it.romanization)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-ghost"
