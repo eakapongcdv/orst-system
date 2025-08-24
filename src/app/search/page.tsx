@@ -146,7 +146,7 @@ export default function SearchPage() {
           else if (it.contentHtmlMarked) snippetHtml = it.contentHtmlMarked;
           else if (typeof it.contentText === 'string') snippetHtml = truncate(stripTags(it.contentText), 320);
 
-          const url = `/taxonomy/${encodeURIComponent(it.taxonId)}?entry=${encodeURIComponent(it.id)}`;
+          const url = `/taxonomy/${encodeURIComponent(it.taxonomyId || 9 )}?q=${encodeURIComponent(it.officialNameTh)}`;
           const meta: string = it.scientificName || it?.taxon?.scientificName || '';
           return { kind: 'taxon', id: it.id, titleHtml, snippetHtml, url, meta };
         });
