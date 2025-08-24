@@ -107,7 +107,8 @@ const isEditorPage = (
                     </form>
                   </div>
                 ) : (
-                  <div className="flex space-x-4">
+                  <>
+                  {/*<div className="flex space-x-4">
                     <Link
                       href="/login"
                       className="btn-primary btn--sm"
@@ -123,6 +124,7 @@ const isEditorPage = (
                       ลงทะเบียน
                     </Link>
                   </div>
+                  */}</>
                 )}
               </div>
             </div>
