@@ -39,6 +39,41 @@ function pickAllowed(body: Record<string, any>) {
   return out;
 }
 
+// Helper: Ensure unique title for given taxonId (for cloning)
+async function ensureUniqueTitle(taxonId: number, desired: string): Promise<string> {
+  let title = (desired || '').trim() || 'รายการใหม่';
+  let guard = 0;
+  while (true) {
+    const exists = await prisma.taxonEntry.findFirst({
+      where: { taxonId, title },
+      select: { id: true },
+    });
+    if (!exists) return title;
+
+    // ถ้าชน ให้เติม/เพิ่ม (สำเนา [N]) ต่อท้าย
+    const m = title.match(/^(.*?)(?:\s*\(สำเนา(?:\s+(\d+))?\))$/);
+    if (m) {
+      const base = m[1].trim();
+      const num = m[2] ? parseInt(m[2], 10) + 1 : 2;
+      title = `${base} (สำเนา ${num})`;
+    } else {
+      title = `${title} (สำเนา)`;
+    }
+
+    guard++;
+    if (guard > 200) {
+      // กันลูปยาว/ชนซ้ำรัว ๆ
+      title = `${(desired || 'รายการใหม่').trim()} (สำเนา ${Date.now().toString().slice(-4)})`;
+      const exists2 = await prisma.taxonEntry.findFirst({
+        where: { taxonId, title },
+        select: { id: true },
+      });
+      if (!exists2) return title;
+      return `${title}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+  }
+}
+
 // อ่าน 1 รายการ (with ?versions=1 or ?version=N support)
 export async function GET(req: Request, ctx: { params: any }) {
   const params = await (ctx as any).params; // works whether Promise or plain object
@@ -151,24 +186,14 @@ export async function POST(req: Request, ctx: { params: any }) {
     const src = await prisma.taxonEntry.findUnique({ where: { id } });
     if (!src) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // เลี่ยง unique([taxonId, title]) ด้วยชื่อ (สำเนา) และเลขกำกับถ้าซ้ำ
-    const baseTitle = (overrides.title ?? src.title) || 'รายการใหม่';
-    let newTitle = String(baseTitle);
-    // ถ้า client ไม่ได้ส่ง title มา ให้ต่อท้าย "(สำเนา)" อัตโนมัติ และตรวจความซ้ำ
-    if (!overrides.title) {
-      newTitle = `${baseTitle} (สำเนา)`;
-      let suffix = 2;
-      while (true) {
-        const exists = await prisma.taxonEntry.findFirst({
-          where: { taxonId: relTaxonId ?? src.taxonId, title: newTitle },
-          select: { id: true },
-        });
-        if (!exists) break;
-        newTitle = `${baseTitle} (สำเนา ${suffix})`;
-        suffix++;
-        if (suffix > 50) break; // กัน loop ยาว
-      }
-    }
+    // Always ensure unique([taxonId, title]) even if overrides.title is provided
+    const taxonTargetId = relTaxonId ?? src.taxonId;
+    // ตั้งชื่อที่ต้องการเริ่มต้น: ถ้า client ไม่ได้ส่ง title มา → เติม "(สำเนา)" ให้ก่อน
+    const desiredTitle = String(
+      overrides.title ?? ((src.title || 'รายการใหม่') + ' (สำเนา)')
+    ).trim();
+    // ทำให้ title ไม่ชนกันภายใต้ taxon เดียวกัน
+    const newTitle = await ensureUniqueTitle(taxonTargetId, desiredTitle);
 
     // slug อนุญาตให้ override มาได้ ถ้าไม่ส่งมา จะพยายามแนบท้าย -copy-xxxx
     const baseSlug = overrides.slug ?? src.slug ?? null;
@@ -178,30 +203,65 @@ export async function POST(req: Request, ctx: { params: any }) {
     }
 
     // สร้าง record ใหม่ โดยใช้ override ถ้ามี ไม่งั้นดึงจาก src
-    const created = await prisma.taxonEntry.create({
-      data: {
-        taxonId: relTaxonId ?? src.taxonId,
-        title: newTitle,
-        slug: newSlug,
-        contentHtml: (overrides.contentHtml ?? src.contentHtml) ?? null,
-        contentText: (overrides.contentText ?? src.contentText) ?? null,
-        shortDescription: (overrides.shortDescription ?? src.shortDescription) ?? null,
-        officialNameTh: (overrides.officialNameTh ?? src.officialNameTh) ?? null,
-        official: (overrides.official ?? src.official) ?? null,
-        scientificName: (overrides.scientificName ?? src.scientificName) ?? null,
-        genus: (overrides.genus ?? src.genus) ?? null,
-        species: (overrides.species ?? src.species) ?? null,
-        authorsDisplay: (overrides.authorsDisplay ?? src.authorsDisplay) ?? null,
-        authorsPeriod: (overrides.authorsPeriod ?? src.authorsPeriod) ?? null,
-        otherNames: (overrides.otherNames ?? src.otherNames) ?? null,
-        author: (overrides.author ?? src.author) ?? null,
-        synonyms: (overrides.synonyms ?? src.synonyms) ?? null,
-        family: (overrides.family ?? src.family) ?? null,
-        orderIndex: (overrides.orderIndex ?? src.orderIndex) ?? null,
-        isPublished: (overrides.isPublished ?? false),
-        version: 1,
-      },
-    });
+    let created;
+    try {
+      created = await prisma.taxonEntry.create({
+        data: {
+          taxonId: taxonTargetId,
+          title: newTitle,
+          slug: newSlug,
+          contentHtml: (overrides.contentHtml ?? src.contentHtml) ?? null,
+          contentText: (overrides.contentText ?? src.contentText) ?? null,
+          shortDescription: (overrides.shortDescription ?? src.shortDescription) ?? null,
+          officialNameTh: (overrides.officialNameTh ?? src.officialNameTh) ?? null,
+          official: (overrides.official ?? src.official) ?? null,
+          scientificName: (overrides.scientificName ?? src.scientificName) ?? null,
+          genus: (overrides.genus ?? src.genus) ?? null,
+          species: (overrides.species ?? src.species) ?? null,
+          authorsDisplay: (overrides.authorsDisplay ?? src.authorsDisplay) ?? null,
+          authorsPeriod: (overrides.authorsPeriod ?? src.authorsPeriod) ?? null,
+          otherNames: (overrides.otherNames ?? src.otherNames) ?? null,
+          author: (overrides.author ?? src.author) ?? null,
+          synonyms: (overrides.synonyms ?? src.synonyms) ?? null,
+          family: (overrides.family ?? src.family) ?? null,
+          orderIndex: (overrides.orderIndex ?? src.orderIndex) ?? null,
+          isPublished: (overrides.isPublished ?? false),
+          version: 1,
+        },
+      });
+    } catch (e: any) {
+      const em = String(e?.message || '');
+      if (e?.code === 'P2002' || /Unique constraint.*taxonId.*title/i.test(em)) {
+        // ถ้ายังชน ให้ generate ชื่อใหม่แล้วลองอีกครั้ง
+        const retryTitle = await ensureUniqueTitle(taxonTargetId, desiredTitle + ' (สำเนา)');
+        created = await prisma.taxonEntry.create({
+          data: {
+            taxonId: taxonTargetId,
+            title: retryTitle,
+            slug: newSlug,
+            contentHtml: (overrides.contentHtml ?? src.contentHtml) ?? null,
+            contentText: (overrides.contentText ?? src.contentText) ?? null,
+            shortDescription: (overrides.shortDescription ?? src.shortDescription) ?? null,
+            officialNameTh: (overrides.officialNameTh ?? src.officialNameTh) ?? null,
+            official: (overrides.official ?? src.official) ?? null,
+            scientificName: (overrides.scientificName ?? src.scientificName) ?? null,
+            genus: (overrides.genus ?? src.genus) ?? null,
+            species: (overrides.species ?? src.species) ?? null,
+            authorsDisplay: (overrides.authorsDisplay ?? src.authorsDisplay) ?? null,
+            authorsPeriod: (overrides.authorsPeriod ?? src.authorsPeriod) ?? null,
+            otherNames: (overrides.otherNames ?? src.otherNames) ?? null,
+            author: (overrides.author ?? src.author) ?? null,
+            synonyms: (overrides.synonyms ?? src.synonyms) ?? null,
+            family: (overrides.family ?? src.family) ?? null,
+            orderIndex: (overrides.orderIndex ?? src.orderIndex) ?? null,
+            isPublished: (overrides.isPublished ?? false),
+            version: 1,
+          },
+        });
+      } else {
+        throw e;
+      }
+    }
 
     // seed log เวอร์ชันแรก (optional)
     try {
