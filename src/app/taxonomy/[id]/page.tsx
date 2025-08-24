@@ -260,7 +260,7 @@ export default function TaxonomyBrowserPage() {
     e.preventDefault();
     if (!selected) return;
     // Prevent saving when viewing non-latest version
-    const latestVersion = (selected as any).version ?? null;
+    const latestVersion = latestVersionFromVersions;
     if (selectedVersionNum !== null && latestVersion !== null && selectedVersionNum !== latestVersion) {
       setSaveErr('ขณะนี้กำลังดูเวอร์ชันเก่า โปรดสลับเป็นเวอร์ชันล่าสุดก่อนบันทึก');
       setSaving(false);
@@ -389,9 +389,31 @@ export default function TaxonomyBrowserPage() {
   const rangeEnd = pagination ? Math.min(total, pagination.currentPage * pageSizeEff) : 0;
 
   const selected = useMemo(() => {
-    if (!results.length) return null;
-    return results.find((r) => r.id === selectedId) || results[0] || null;
-  }, [results, selectedId]);
+      if (!results.length) return null;
+      return results.find((r) => r.id === selectedId) || results[0] || null;
+    }, [results, selectedId]);
+
+    // Determine latest version from versions list (fallback to selected.version)
+    const latestVersionFromVersions = useMemo(() => {
+      if (versions && versions.length) {
+        return Math.max(...versions.map(v => v.version || 0));
+      }
+      return (selected as any)?.version ?? null;
+    }, [versions, selected]);
+
+    // Are we currently viewing an older (non-latest) version?
+    const isViewingOldVersion = useMemo(() => {
+      if (selectedVersionNum == null || latestVersionFromVersions == null) return false;
+      return selectedVersionNum !== latestVersionFromVersions;
+    }, [selectedVersionNum, latestVersionFromVersions]);
+
+    // Default to the latest version when editor opens and versions are available
+    useEffect(() => {
+      if (!editOpen) return;
+      if (selectedVersionNum == null && latestVersionFromVersions != null) {
+        setSelectedVersionNum(latestVersionFromVersions);
+      }
+    }, [editOpen, latestVersionFromVersions]);
 
   // summary: schema-first, only schema fields (no HTML extraction fallbacks)
   const summary = useMemo(() => {
@@ -1066,7 +1088,7 @@ export default function TaxonomyBrowserPage() {
                             .map((row) => {
                               const d = (row as any).updatedAt || (row as any).changed_at;
                               const when = d ? new Date(d as any).toLocaleString('th-TH') : '';
-                              const isLatest = row.version === ((selected as any)?.version ?? 0);
+                              const isLatest = latestVersionFromVersions != null && row.version === latestVersionFromVersions;
                               return (
                                 <option key={row.version} value={row.version}>
                                   {`v${row.version}${when ? ` – ${when}` : ''}`}{isLatest ? ' (ล่าสุด)' : ''}
@@ -1075,15 +1097,16 @@ export default function TaxonomyBrowserPage() {
                             })}
                         </select>
                       </label>
-                      {selected && selectedVersionNum !== ((selected as any)?.version ?? null) && (
+                      {isViewingOldVersion && (
                         <button
                           type="button"
                           className="tbtn"
                           onClick={async () => {
-                            const v = ((selected as any)?.version ?? null);
-                            if (selected && v) {
-                              setSelectedVersionNum(v);
-                              await fetchVersionSnapshot(selected.id, v);
+                            if (!selected) return;
+                            const latest = latestVersionFromVersions;
+                            if (latest != null) {
+                              setSelectedVersionNum(latest);
+                              await fetchVersionSnapshot(selected.id, latest);
                             }
                           }}
                           title="กลับไปยังเวอร์ชันล่าสุด"
@@ -1104,7 +1127,7 @@ export default function TaxonomyBrowserPage() {
                 </div>
 
                 <form className="modal-body" onSubmit={handleSave}>
-                  {selected && (selectedVersionNum !== null) && (selectedVersionNum !== ((selected as any).version ?? null)) && (
+                  {isViewingOldVersion && (
                     <div className="alert alert--warning" role="status" style={{ marginBottom: 12 }}>
                       ขณะนี้กำลังดู <strong>เวอร์ชัน v{selectedVersionNum}</strong> (ไม่ใช่เวอร์ชันล่าสุด) — ฟิลด์ถูกล็อกเพื่อการดูย้อนหลังเท่านั้น
                     </div>
@@ -1112,42 +1135,42 @@ export default function TaxonomyBrowserPage() {
                   <div className="form-grid">
                     <label>
                       <span>ชื่อทางการ (ไทย)</span>
-                      <input type="text" value={(editForm.officialNameTh as any) ?? ''} onChange={(e) => setField('officialNameTh', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.officialNameTh as any) ?? ''} onChange={(e) => setField('officialNameTh', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>Title</span>
-                      <input type="text" value={(editForm.title as any) ?? ''} onChange={(e) => setField('title', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.title as any) ?? ''} onChange={(e) => setField('title', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>ชื่อวิทยาศาสตร์</span>
-                      <input type="text" value={(editForm.scientificName as any) ?? ''} onChange={(e) => setField('scientificName', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.scientificName as any) ?? ''} onChange={(e) => setField('scientificName', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>ชื่อสกุล (Genus)</span>
-                      <input type="text" value={(editForm.genus as any) ?? ''} onChange={(e) => setField('genus', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.genus as any) ?? ''} onChange={(e) => setField('genus', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>คำระบุชนิด (Species)</span>
-                      <input type="text" value={(editForm.species as any) ?? ''} onChange={(e) => setField('species', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.species as any) ?? ''} onChange={(e) => setField('species', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>วงศ์ (Family)</span>
-                      <input type="text" value={(editForm.family as any) ?? ''} onChange={(e) => setField('family', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.family as any) ?? ''} onChange={(e) => setField('family', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label className="span-2">
                       <span>ชื่อพ้อง (Synonyms)</span>
-                      <textarea value={(editForm.synonyms as any) ?? ''} onChange={(e) => setField('synonyms', e.target.value)} rows={3} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <textarea value={(editForm.synonyms as any) ?? ''} onChange={(e) => setField('synonyms', e.target.value)} rows={3} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label className="span-2">
                       <span>ชื่ออื่น ๆ</span>
-                      <input type="text" value={(editForm.otherNames as any) ?? ''} onChange={(e) => setField('otherNames', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.otherNames as any) ?? ''} onChange={(e) => setField('otherNames', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label className="span-2">
@@ -1159,7 +1182,7 @@ export default function TaxonomyBrowserPage() {
                           tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
                           value={(editForm.shortDescription as any) ?? ''}
                           onEditorChange={(v: string) => setField('shortDescription', v)}
-                          disabled={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false}
+                          disabled={isViewingOldVersion}
                           init={{
                             height: 220,
                             menubar: false,
@@ -1177,27 +1200,27 @@ export default function TaxonomyBrowserPage() {
 
                     <label className="span-2">
                       <span>ผู้เขียนคำอธิบาย</span>
-                      <input type="text" value={(editForm.author as any) ?? ''} onChange={(e) => setField('author', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.author as any) ?? ''} onChange={(e) => setField('author', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label className="span-2">
                       <span>ผู้ตั้งพรรณพืช (แสดงผล)</span>
-                      <textarea value={(editForm.authorsDisplay as any) ?? ''} onChange={(e) => setField('authorsDisplay', e.target.value)} rows={2} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <textarea value={(editForm.authorsDisplay as any) ?? ''} onChange={(e) => setField('authorsDisplay', e.target.value)} rows={2} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label className="span-2">
                       <span>ช่วงเวลาเกี่ยวกับผู้ตั้งพรรณพืช</span>
-                      <textarea value={(editForm.authorsPeriod as any) ?? ''} onChange={(e) => setField('authorsPeriod', e.target.value)} rows={2} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <textarea value={(editForm.authorsPeriod as any) ?? ''} onChange={(e) => setField('authorsPeriod', e.target.value)} rows={2} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>Slug</span>
-                      <input type="text" value={(editForm.slug as any) ?? ''} onChange={(e) => setField('slug', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="text" value={(editForm.slug as any) ?? ''} onChange={(e) => setField('slug', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label>
                       <span>ลำดับ (orderIndex)</span>
-                      <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} readOnly={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false} />
+                      <input type="number" value={editForm.orderIndex as any ?? ''} onChange={(e) => setField('orderIndex', e.target.value)} readOnly={isViewingOldVersion} />
                     </label>
 
                     <label className="span-2">
@@ -1209,7 +1232,7 @@ export default function TaxonomyBrowserPage() {
                           tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
                           value={(editForm.contentHtml as any) ?? ''}
                           onEditorChange={(v: string) => setField('contentHtml', v)}
-                          disabled={selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false}
+                          disabled={isViewingOldVersion}
                           init={{
                             height: 520,
                             menubar: 'file edit view insert format tools table help',
@@ -1236,8 +1259,8 @@ export default function TaxonomyBrowserPage() {
 
                   <div className="modal-actions">
                     <button type="button" className="tbtn" onClick={() => setEditOpen(false)}>ยกเลิก</button>
-                    <button type="submit" className="tbtn tbtn-number is-active" disabled={saving || (selected ? (selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null)) : false)}>
-                      {saving ? 'กำลังบันทึก…' : (selected && selectedVersionNum !== null && selectedVersionNum !== ((selected as any).version ?? null) ? 'ดูย้อนหลัง (แก้ไขไม่ได้)' : 'บันทึก (เพิ่มเวอร์ชัน +1)')}
+                    <button type="submit" className="tbtn tbtn-number is-active" disabled={saving || isViewingOldVersion}>
+                      {saving ? 'กำลังบันทึก…' : (isViewingOldVersion ? 'ดูย้อนหลัง' : 'บันทึก')}
                     </button>
                   </div>
                 </form>
