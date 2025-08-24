@@ -1,3 +1,9 @@
+// Helper to coerce truthy strings
+function isTruthyString(val: string | null | undefined): boolean {
+  if (!val) return false;
+  const s = val.trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(s);
+}
 // src/app/api/admin/transliteration/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -102,5 +108,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, item: created });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'สร้างไม่สำเร็จ' }, { status: 500 });
+  }
+}
+// DELETE /api/admin/transliteration
+export async function DELETE(req: NextRequest) {
+  try {
+    // 1. Try query string (?all=1, ?all=true, etc)
+    const { searchParams } = new URL(req.url);
+    let all = false;
+    const qAll = searchParams.get('all');
+    if (isTruthyString(qAll)) {
+      all = true;
+    }
+    // 2. If not in query, check JSON body
+    if (!all) {
+      try {
+        const body = await req.json();
+        if (typeof body?.all === 'boolean') {
+          all = body.all;
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+    // 3. If neither, return 400
+    if (!all) {
+      return NextResponse.json(
+        {
+          error:
+            "To delete all TransliterationEntry rows, pass ?all=1 in the query string or JSON body { all: true }.",
+        },
+        { status: 400 }
+      );
+    }
+    // 4. Do the deletion
+    const result = await prisma.transliterationEntry.deleteMany({});
+    return NextResponse.json({ ok: true, deleted: result.count });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message || "Delete failed" },
+      { status: 500 }
+    );
   }
 }

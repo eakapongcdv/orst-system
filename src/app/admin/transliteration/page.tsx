@@ -392,7 +392,7 @@ export default function AdminTransliterationPage() {
             </div>
             <div className="modal-body">
               <p style={{marginTop: 0}}>
-                การลบนี้จะลบ <strong>TransliterationEntry</strong> ทั้งหมดออกจากระบบ ไม่สามารถกู้คืนได้ คุณแน่ใจหรือไม่?
+                การลบนี้จะลบ <strong>คำทับศัพท์</strong> ทั้งหมดออกจากระบบ ไม่สามารถกู้คืนได้ คุณแน่ใจหรือไม่?
               </p>
               {deleteErr && <div className="alert error">ผิดพลาด: {deleteErr}</div>}
               {deleteInfo && <div className="alert" style={{background:'#ecfeff', border:'1px solid #a5f3fc', color:'#0e7490'}}> {deleteInfo} </div>}
