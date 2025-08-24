@@ -306,7 +306,10 @@ export default function TaxonomyBrowserPage() {
     setVersionsErr(null);
     try {
       // primary endpoint (recommended)
-      let res = await fetch(`/api/taxonomy/entry/${entryId}?versions=1`);
+      let res = await fetch(`/api/taxonomy/entry/${entryId}/versions`).catch(() => null as any);
+      if (!res || !res.ok) {
+        res = await fetch(`/api/taxonomy/entry/${entryId}?versions=1`);
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const rows: EntryVersionRow[] = Array.isArray(data?.versions) ? data.versions : Array.isArray(data) ? data : [];
@@ -323,35 +326,42 @@ export default function TaxonomyBrowserPage() {
 
   // Fetch snapshot of a specific version and load into form (read-only view)
   const fetchVersionSnapshot = async (entryId: number, version: number) => {
-    try {
-      let res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const snap = await res.json();
-      // If the response wraps snapshot
-      const payload = snap?.entry || snap?.snapshot || snap;
-      if (payload && typeof payload === 'object') {
-        setEditForm((f) => ({
-          ...f,
-          title: payload.title ?? '',
-          officialNameTh: payload.officialNameTh ?? '',
-          scientificName: payload.scientificName ?? '',
-          genus: payload.genus ?? '',
-          species: payload.species ?? '',
-          family: payload.family ?? '',
-          authorsDisplay: payload.authorsDisplay ?? '',
-          authorsPeriod: payload.authorsPeriod ?? '',
-          otherNames: payload.otherNames ?? '',
-          synonyms: payload.synonyms ?? '',
-          author: payload.author ?? '',
-          shortDescription: payload.shortDescription ?? '',
-          contentHtml: payload.contentHtml ?? '',
-          slug: payload.slug ?? '',
-          orderIndex: payload.orderIndex ?? null,
-        }));
-      }
-    } catch (e: any) {
-      setSaveErr(e?.message || 'ไม่สามารถโหลดข้อมูลเวอร์ชัน');
+  try {
+    // try RESTful nested route first
+    let res = await fetch(`/api/taxonomy/entry/${entryId}/versions/${version}`).catch(() => null as any);
+    if (!res || !res.ok) {
+      // fallback to query param variant
+      res = await fetch(`/api/taxonomy/entry/${entryId}?version=${version}`);
     }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const snap = await res.json();
+    // If the response wraps snapshot
+    const payload = snap?.entry || snap?.snapshot || snap;
+    if (payload && typeof payload === 'object') {
+      setEditForm((f) => ({
+        ...f,
+        id: (payload.taxonEntryId ?? payload.id ?? entryId) as any,
+        taxonId: (payload.taxonId ?? (f as any).taxonId ?? null) as any,
+        title: payload.title ?? '',
+        officialNameTh: payload.officialNameTh ?? '',
+        scientificName: payload.scientificName ?? '',
+        genus: payload.genus ?? '',
+        species: payload.species ?? '',
+        family: payload.family ?? '',
+        authorsDisplay: payload.authorsDisplay ?? '',
+        authorsPeriod: payload.authorsPeriod ?? '',
+        otherNames: payload.otherNames ?? '',
+        synonyms: payload.synonyms ?? '',
+        author: payload.author ?? '',
+        shortDescription: payload.shortDescription ?? '',
+        contentHtml: payload.contentHtml ?? '',
+        slug: payload.slug ?? '',
+        orderIndex: payload.orderIndex ?? null,
+      }));
+    }
+  } catch (e: any) {
+    setSaveErr(e?.message || 'ไม่สามารถโหลดข้อมูลเวอร์ชัน');
+  }
   };
 
   const pageNumbers = useMemo(() => {
@@ -1053,13 +1063,35 @@ export default function TaxonomyBrowserPage() {
                         >
                           {(versions && versions.length > 0 ? versions : [{ version: (selected as any)?.version ?? 1 }])
                             .sort((a,b)=> (b.version||0)-(a.version||0))
-                            .map((row) => (
-                              <option key={row.version} value={row.version}>
-                                {`v${row.version}`}{row.version === ((selected as any)?.version ?? 0) ? ' (ล่าสุด)' : ''}
-                              </option>
-                            ))}
+                            .map((row) => {
+                              const d = (row as any).updatedAt || (row as any).changed_at;
+                              const when = d ? new Date(d as any).toLocaleString('th-TH') : '';
+                              const isLatest = row.version === ((selected as any)?.version ?? 0);
+                              return (
+                                <option key={row.version} value={row.version}>
+                                  {`v${row.version}${when ? ` – ${when}` : ''}`}{isLatest ? ' (ล่าสุด)' : ''}
+                                </option>
+                              );
+                            })}
                         </select>
                       </label>
+                      {selected && selectedVersionNum !== ((selected as any)?.version ?? null) && (
+                        <button
+                          type="button"
+                          className="tbtn"
+                          onClick={async () => {
+                            const v = ((selected as any)?.version ?? null);
+                            if (selected && v) {
+                              setSelectedVersionNum(v);
+                              await fetchVersionSnapshot(selected.id, v);
+                            }
+                          }}
+                          title="กลับไปยังเวอร์ชันล่าสุด"
+                          style={{ marginLeft: 6 }}
+                        >
+                          กลับเวอร์ชันล่าสุด
+                        </button>
+                      )}
                       {versionsLoading && <span className="ver-hint">กำลังโหลดเวอร์ชัน…</span>}
                       {versionsErr && <span className="ver-hint ver-hint--err">{versionsErr}</span>}
                     </div>
@@ -1072,7 +1104,11 @@ export default function TaxonomyBrowserPage() {
                 </div>
 
                 <form className="modal-body" onSubmit={handleSave}>
-                  {(() => { /* banner for readonly when viewing older version */ return null; })()}
+                  {selected && (selectedVersionNum !== null) && (selectedVersionNum !== ((selected as any).version ?? null)) && (
+                    <div className="alert alert--warning" role="status" style={{ marginBottom: 12 }}>
+                      ขณะนี้กำลังดู <strong>เวอร์ชัน v{selectedVersionNum}</strong> (ไม่ใช่เวอร์ชันล่าสุด) — ฟิลด์ถูกล็อกเพื่อการดูย้อนหลังเท่านั้น
+                    </div>
+                  )}
                   <div className="form-grid">
                     <label>
                       <span>ชื่อทางการ (ไทย)</span>

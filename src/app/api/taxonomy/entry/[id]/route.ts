@@ -53,22 +53,41 @@ export async function GET(req: Request, ctx: { params: any }) {
     // 1) List versions: /api/taxonomy/entry/:id?versions=1
     if (wantVersions) {
       try {
+        // Try selecting with timestamps if the columns exist
         const list = await prisma.taxonEntryVersion.findMany({
           where: { taxonEntryId: id },
           select: {
             version: true,
-            updatedAt: true,
-            // keep optional fields if model has them
+            // These may or may not exist depending on your schema; if they don't,
+            // Prisma will throw and we will retry below with a minimal select.
+            updatedAt: true as any,
             changed_at: true as any,
             changed_by_user_id: true as any,
           },
           orderBy: { version: 'desc' },
         });
-        return NextResponse.json({ versions: list });
+
+        // Normalize timestamp field name to `updatedAt` for the client
+        const normalized = (list as any[]).map((row) => ({
+          version: row.version,
+          updatedAt: row.updatedAt ?? row.changed_at ?? null,
+          changed_by_user_id: 'changed_by_user_id' in row ? row.changed_by_user_id : null,
+        }));
+        return NextResponse.json({ versions: normalized });
       } catch (e) {
-        // Fallback if version table not ready: return current version only
-        const curr = await prisma.taxonEntry.findUnique({ where: { id }, select: { version: true } });
-        return NextResponse.json({ versions: curr?.version ? [{ version: curr.version }] : [] });
+        try {
+          // Table likely exists but columns differ; fetch only version numbers
+          const list = await prisma.taxonEntryVersion.findMany({
+            where: { taxonEntryId: id },
+            select: { version: true },
+            orderBy: { version: 'desc' },
+          });
+          return NextResponse.json({ versions: list });
+        } catch {
+          // Fallback if version table not ready at all: return current live version only
+          const curr = await prisma.taxonEntry.findUnique({ where: { id }, select: { version: true } });
+          return NextResponse.json({ versions: curr?.version ? [{ version: curr.version }] : [] });
+        }
       }
     }
 
