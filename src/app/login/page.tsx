@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bookOpened, setBookOpened] = useState(false);
   const router = useRouter();
 
   // Ensure login screen fills the remaining viewport after header/footer dynamically
@@ -95,176 +96,447 @@ export default function LoginPage() {
     }
   };
 
+  const handleBookClick = () => {
+    setBookOpened(true);
+  };
+
   return (
-    <main className="login-layout app-viewport theme-royal">
-      {/* LEFT: Full-screen Royal background (image + gradient + thai pattern) */}
-      <section className="login-pane--left center-both">
-        <div className="login-brand text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="brand-seal">
+    <main className="login-layout app-viewport theme-royal book-login">
+      <style jsx global>{`
+        /* Hide header and footer */
+        header.brand-header, footer.brand-footer {
+          display: none !important;
+        }
+
+        .book-login {
+          position: relative;
+          height: 100vh;
+          overflow: hidden;
+          background: #002317;
+          font-family: 'Sarabun', sans-serif;
+        }
+
+        .book-cover {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 600px;
+          height: 800px;
+          perspective: 2000px;
+          cursor: pointer;
+          z-index: 10;
+          transition: transform 0.5s ease;
+        }
+
+        .book-cover:hover {
+          transform: translate(-50%, -50%) scale(1.02);
+        }
+
+        .book-front {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          backface-visibility: hidden;
+          border-radius: 8px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          padding: 20px;
+          box-sizing: border-box;
+          transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+          background: linear-gradient(135deg, #002317 0%, #001f12 100%);
+          color: #D4AF37;
+          border: 3px solid #D4AF37;
+          transform-origin: left center;
+          z-index: 2;
+          background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23002317"/><path d="M10 10 L90 10 L90 90 L10 90 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/><path d="M20 20 L80 20 L80 80 L20 80 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/><path d="M30 30 L70 30 L70 70 L30 70 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/><path d="M40 40 L60 40 L60 60 L40 60 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/></svg>');
+          background-size: 100% 100%;
+          background-repeat: repeat;
+        }
+
+        .book-cover.opened .book-front {
+          transform: rotateY(-160deg);
+        }
+
+        .book-cover-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          width: 100%;
+        }
+
+        .book-title {
+          margin-bottom: 30px;
+          text-align: center;
+        }
+
+        .book-title h1 {
+          font-size: 2.2rem;
+          margin-bottom: 10px;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+          font-weight: 700;
+          color: #D4AF37;
+        }
+
+        .book-title h2 {
+          font-size: 1.4rem;
+          margin-bottom: 20px;
+          font-weight: 500;
+          color: #D4AF37;
+        }
+
+        .book-seal {
+          margin: 20px 0;
+          filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+        }
+
+        .book-instructions {
+          position: absolute;
+          bottom: 20px;
+          width: 100%;
+          text-align: center;
+          font-size: 0.9rem;
+          opacity: 0.8;
+          color: #D4AF37;
+        }
+
+        .book-pages {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          transform: translateX(100%);
+          transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+          z-index: 5;
+        }
+
+        .book-pages.opened {
+          transform: translateX(0);
+        }
+
+        .login-pane--left {
+          width: 50%;
+          background: linear-gradient(135deg, #002317 0%, #001f12 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          box-sizing: border-box;
+          background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23002317"/><path d="M10 10 L90 10 L90 90 L10 90 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/><path d="M20 20 L80 20 L80 80 L20 80 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/><path d="M30 30 L70 30 L70 70 L30 70 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/><path d="M40 40 L60 40 L60 60 L40 60 Z" fill="none" stroke="%23D4AF37" stroke-width="1" opacity="0.1"/></svg>');
+          background-size: 100% 100%;
+          background-repeat: repeat;
+        }
+
+        .login-pane--right {
+          width: 50%;
+          background: #f8f9fa;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          box-sizing: border-box;
+        }
+
+        .login-brand {
+          max-width: 400px;
+          padding: 30px;
+          text-align: center;
+        }
+
+        .title {
+          font-size: 1.8rem;
+          font-weight: 700;
+          margin-bottom: 10px;
+        }
+
+        .emboss-gold {
+          color: #D4AF37;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .brand-seal {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 20px;
+        }
+
+        .brand-seal__img {
+          border: 3px solid #D4AF37;
+          border-radius: 50%;
+          padding: 10px;
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .login-card {
+          background: white;
+          border-radius: 12px;
+          padding: 30px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          width: 100%;
+          max-width: 400px;
+        }
+
+        .form-label {
+          font-weight: 600;
+          color: #333;
+        }
+
+        .input-affix {
+          position: relative;
+        }
+
+        .affix-left {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #666;
+        }
+
+        .input-affix input {
+          padding-left: 40px;
+        }
+
+        @media (max-width: 768px) {
+          .book-cover {
+            width: 400px;
+            height: 550px;
+          }
+          
+          .book-title h1 {
+            font-size: 1.8rem;
+          }
+          
+          .book-title h2 {
+            font-size: 1.2rem;
+          }
+          
+          .book-pages {
+            flex-direction: column;
+          }
+          
+          .login-pane--left, .login-pane--right {
+            width: 100%;
+            height: 50%;
+          }
+          
+          .login-pane--left {
+            padding: 15px;
+          }
+          
+          .login-pane--right {
+            padding: 15px;
+          }
+          
+          .login-card {
+            padding: 20px;
+          }
+        }
+      `}</style>
+
+      {/* Book Cover - Click to open */}
+      <div 
+        className={`book-cover ${bookOpened ? 'opened' : ''}`}
+        onClick={!bookOpened ? handleBookClick : undefined}
+      >
+        <div className="book-front">
+          <div className="book-cover-content">
+            <div className="book-title">
+              <h1>ระบบฐานข้อมูล</h1>
+              <h2>สำนักงานราชบัณฑิตยสภา</h2>
+            </div>
+            <div className="book-seal">
               <Image
                 src="/logo.png"
                 alt="ราชบัณฑิตยสภา"
-                width={84}
-                height={84}
+                width={120}
+                height={120}
                 priority
-                className="brand-seal__img"
               />
             </div>
+            <div className="book-instructions">
+              <p>คลิกที่ปกหนังสือเพื่อเปิด</p>
+            </div>
           </div>
-          <p className="title tracking-wide emboss-gold">
-            ระบบฐานข้อมูล
-          </p>
-          <span className="title flex items-center gap-2 emboss-gold">
-              <ShieldCheckIcon className="h-7 w-7 text-[var(--brand-gold)]" />
-                 สำนักงานราชบัณฑิตยสภา
-            </span>
-          
         </div>
-      </section>
+      </div>
 
-      {/* RIGHT: Login Form */}
-      <section className="login-pane--right center-both bg-login-right">
-        <div className="w-full max-w-md login-card">
-          {/* หัวข้อย่อสำหรับจอเล็ก */}
-          <div className="mb-4 text-center lg:hidden">
-            <h2 className="mt-1 h2 font-extrabold text-[var(--brand-ink)] flex items-center justify-center gap-2">
-              <ArrowRightEndOnRectangleIcon className="h-6 w-6" />
-              เข้าสู่ระบบ
-            </h2>
-            <p className="mt-1 text-lead">ป้อนข้อมูลของคุณเพื่อเข้าสู่ระบบ</p>
+      {/* Book Pages - Login Form */}
+      <div className={`book-pages ${bookOpened ? 'opened' : ''}`}>
+        {/* LEFT: Full-screen Royal background (image + gradient + thai pattern) */}
+        <section className="login-pane--left center-both">
+          <div className="login-brand text-center">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="brand-seal">
+                <Image
+                  src="/logo.png"
+                  alt="ราชบัณฑิตยสภา"
+                  width={84}
+                  height={84}
+                  priority
+                  className="brand-seal__img"
+                />
+              </div>
+            </div>
+            <p className="title tracking-wide emboss-gold">
+              ระบบฐานข้อมูล
+            </p>
+            <span className="title flex items-center gap-2 emboss-gold">
+              <ShieldCheckIcon className="h-7 w-7 text-[var(--brand-gold)]" />
+              สำนักงานราชบัณฑิตยสภา
+            </span>
           </div>
+        </section>
 
-          {/* Error */}
-          {error && (
-            <div className="rounded-lg bg-red-50 p-3 border border-red-100 mb-4">
-              <div className="flex">
-                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mt-[1px]" />
-                <p className="ml-2  font-medium text-red-800">
-                  {error}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="form-label block mb-1.5">
-                ที่อยู่อีเมล
-              </label>
-              <div className="input-affix rounded-xl">
-                <span className="affix-left">
-                  <EnvelopeIcon className="h-5 w-5" />
-                </span>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 rounded-xl border border-gray-300 placeholder-gray-400 focus:border-[var(--brand-gold)] focus:ring-[var(--brand-gold)]"
-                  placeholder="admin@orst.go.th"
-                />
-              </div>
+        {/* RIGHT: Login Form */}
+        <section className="login-pane--right center-both bg-login-right">
+          <div className="w-full max-w-md login-card">
+            {/* หัวข้อย่อสำหรับจอเล็ก */}
+            <div className="mb-4 text-center lg:hidden">
+              <h2 className="mt-1 h2 font-extrabold text-[var(--brand-ink)] flex items-center justify-center gap-2">
+                <ArrowRightEndOnRectangleIcon className="h-6 w-6" />
+                เข้าสู่ระบบ
+              </h2>
+              <p className="mt-1 text-lead">ป้อนข้อมูลของคุณเพื่อเข้าสู่ระบบ</p>
             </div>
 
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="form-label block mb-1.5">
-                รหัสผ่าน
-              </label>
-              <div className="input-affix rounded-xl">
-                <span className="affix-left">
-                  <KeyIcon className="h-5 w-5" />
-                </span>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-3 rounded-xl border border-gray-300 placeholder-gray-400 focus:border-[var(--brand-gold)] focus:ring-[var(--brand-gold)]"
-                  placeholder="••••••••"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-[var(--muted-ink)] hover:text-[var(--brand-ink)] focus:outline-none"
-                    aria-label="toggle password"
-                  >
-                    {showPassword ? (
-                      <EyeSlashIcon className="h-5 w-5" />
-                    ) : (
-                      <EyeIcon className="h-5 w-5" />
-                    )}
-                  </button>
+            {/* Error */}
+            {error && (
+              <div className="rounded-lg bg-red-50 p-3 border border-red-100 mb-4">
+                <div className="flex">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mt-[1px]" />
+                  <p className="ml-2 font-medium text-red-800">
+                    {error}
+                  </p>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-[var(--brand-green)] focus:ring-[var(--brand-gold)] border-gray-300 rounded"
-                />
-                <span className=" text-[var(--brand-ink)]">จำฉันไว้</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className=" font-medium text-[var(--brand-gold)] hover:text-[var(--brand-green)]"
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              {/* Email */}
+              <div>
+                <label htmlFor="email" className="form-label block mb-1.5">
+                  อีเมล
+                </label>
+                <div className="input-affix rounded-xl">
+                  <span className="affix-left">
+                    <EnvelopeIcon className="h-5 w-5" />
+                  </span>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-3 rounded-xl border border-gray-300 placeholder-gray-400 focus:border-[var(--brand-gold)] focus:ring-[var(--brand-gold)]"
+                    placeholder="admin@orst.go.th"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label htmlFor="password" className="form-label block mb-1.5">
+                  รหัสผ่าน
+                </label>
+                <div className="input-affix rounded-xl">
+                  <span className="affix-left">
+                    <KeyIcon className="h-5 w-5" />
+                  </span>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full pl-10 pr-10 py-3 rounded-xl border border-gray-300 placeholder-gray-400 focus:border-[var(--brand-gold)] focus:ring-[var(--brand-gold)]"
+                    placeholder="••••••••"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-[var(--muted-ink)] hover:text-[var(--brand-ink)] focus:outline-none"
+                      aria-label="toggle password"
+                    >
+                      {showPassword ? (
+                        <EyeSlashIcon className="h-5 w-5" />
+                      ) : (
+                        <EyeIcon className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Remember & Forgot */}
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 text-[var(--brand-green)] focus:ring-[var(--brand-gold)] border-gray-300 rounded"
+                  />
+                  <span className="text-[var(--brand-ink)]">จำฉันไว้</span>
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="font-medium text-[var(--brand-gold)] hover:text-[var(--brand-green)]"
+                >
+                  ลืมรหัสผ่าน?
+                </Link>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-white bg-[var(--brand-green)] hover:brightness-[1.06] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--brand-gold)] disabled:opacity-60 transition"
               >
-                ลืมรหัสผ่าน?
+                {loading ? (
+                  <>
+                    {/* spinner */}
+                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                    </svg>
+                    กำลังเข้าสู่ระบบ...
+                  </>
+                ) : (
+                  <>
+                    เข้าสู่ระบบ
+                    <ArrowRightIcon className="h-5 w-5" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Register */}
+            <p className="mt-6 text-center text-[var(--muted-ink)]">
+              ยังไม่มีบัญชี?{" "}
+              <Link
+                href="/register"
+                className="font-semibold text-[var(--brand-gold)] hover:text-[var(--brand-green)]"
+              >
+                ลงทะเบียนที่นี่
               </Link>
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl  font-bold text-white bg-[var(--brand-green)] hover:brightness-[1.06] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--brand-gold)] disabled:opacity-60 transition"
-            >
-              {loading ? (
-                <>
-                  {/* spinner */}
-                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                  </svg>
-                  กำลังเข้าสู่ระบบ...
-                </>
-              ) : (
-                <>
-                  เข้าสู่ระบบ
-                  <ArrowRightIcon className="h-5 w-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Register */}
-          <p className="mt-6 text-center  text-[var(--muted-ink)]">
-            ยังไม่มีบัญชี?{" "}
-            <Link
-              href="/register"
-              className="font-semibold text-[var(--brand-gold)] hover:text-[var(--brand-green)]"
-            >
-              ลงทะเบียนที่นี่
-            </Link>
-          </p>
-        </div>
-      </section>
+            </p>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

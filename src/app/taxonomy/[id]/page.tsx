@@ -6,7 +6,39 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { taxonomyStyles } from './taxonomyStyles';
-import dynamic from 'next/dynamic';
+import { Editor } from '@tinymce/tinymce-react';
+
+const TINYMCE_KEY = process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key';
+const TINYMCE_SRC = `https://cdn.tiny.cloud/1/${TINYMCE_KEY}/tinymce/6/tinymce.min.js`;
+
+// TinyMCE image helpers (base64 inline upload)
+const tinymceBase64ImageUploadHandler = (blobInfo: any) => {
+  return new Promise<string>((resolve, reject) => {
+    try {
+      const mime = blobInfo.blob()?.type || 'image/png';
+      const base64 = blobInfo.base64();
+      resolve(`data:${mime};base64,${base64}`);
+    } catch (err: any) {
+      reject(err?.message || 'Failed to read image');
+    }
+  });
+};
+
+const tinymceImagePicker = (cb: (url: string, meta?: Record<string, any>) => void) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = () => {
+    const file = (input.files && input.files[0]) || null;
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      cb(reader.result as string, { title: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+};
 
 // === Types ===
 type TaxonEntry = {
@@ -71,11 +103,6 @@ function htmlToText(html: string): string {
 
 // --- Summary extraction helpers ---
 
-// TinyMCE Editor (dynamically loaded, client-side only)
-const Editor = dynamic(
-  () => import('@tinymce/tinymce-react').then(m => m.Editor as any),
-  { ssr: false }
-) as any;
 export default function TaxonomyBrowserPage() {
   const params = useParams<{ id: string }>();
   const taxonomyId = Number(params?.id || 0);
@@ -1038,9 +1065,10 @@ export default function TaxonomyBrowserPage() {
                       <span>คำโปรย/คำอธิบายสั้น</span>
                       <div className="tinymce-wrap">
                         <Editor
+                          key={`clone-shortdesc-${cloneOpen ? 'open' : 'closed'}`}
                           id="clone-shortdesc"
-                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
-                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          apiKey={TINYMCE_KEY}
+                          tinymceScriptSrc={TINYMCE_SRC}
                           value={(cloneForm.shortDescription as any) ?? ''}
                           onEditorChange={(v: string) => setCloneField('shortDescription', v)}
                           init={{
@@ -1048,11 +1076,17 @@ export default function TaxonomyBrowserPage() {
                             menubar: false,
                             branding: false,
                             toolbar_mode: 'sliding',
-                            plugins: 'lists link table code',
-                            toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link | removeformat | code',
+                            plugins: 'lists link table code image paste',
+                            toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link image | removeformat | code',
                             content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.7}',
-                            block_unsupported_drop: false,
                             statusbar: true,
+                            // image upload (base64)
+                            automatic_uploads: true,
+                            paste_data_images: true,
+                            file_picker_types: 'image',
+                            file_picker_callback: (cb) => tinymceImagePicker(cb),
+                            images_upload_handler: tinymceBase64ImageUploadHandler,
+                            convert_urls: false,
                           }}
                         />
                       </div>
@@ -1095,25 +1129,34 @@ export default function TaxonomyBrowserPage() {
 
                     <label className="span-2">
                       <span>เนื้อหา (HTML)</span>
+                      <div id="clone-content-toolbar" className="tinymce-toolbar-host" />
                       <div className="tinymce-wrap">
                         <Editor
+                          key={`clone-content-${cloneOpen ? 'open' : 'closed'}`}
                           id="clone-contenthtml"
-                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
-                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          apiKey={TINYMCE_KEY}
+                          tinymceScriptSrc={TINYMCE_SRC}
                           value={(cloneForm.contentHtml as any) ?? ''}
                           onEditorChange={(v: string) => setCloneField('contentHtml', v)}
                           init={{
                             height: 520,
                             menubar: 'file edit view insert format tools table help',
                             branding: false,
-                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount paste',
                             toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat | code preview fullscreen',
-                            toolbar_sticky: true,
+                            toolbar_sticky: false,
                             toolbar_mode: 'sliding',
+                            fixed_toolbar_container: '#clone-content-toolbar',
                             content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.8}',
                             paste_data_images: true,
                             image_caption: true,
                             table_default_attributes: { border: '1' },
+                            // image upload (base64)
+                            automatic_uploads: true,
+                            file_picker_types: 'image',
+                            file_picker_callback: (cb) => tinymceImagePicker(cb),
+                            images_upload_handler: tinymceBase64ImageUploadHandler,
+                            convert_urls: false,
                           }}
                         />
                       </div>
@@ -1254,9 +1297,10 @@ export default function TaxonomyBrowserPage() {
                       <span>คำโปรย/คำอธิบายสั้น</span>
                       <div className="tinymce-wrap">
                         <Editor
+                          key={`edit-shortdesc-${editOpen ? 'open' : 'closed'}-v${selectedVersionNum ?? 'live'}`}
                           id="edit-shortdesc"
-                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
-                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          apiKey={TINYMCE_KEY}
+                          tinymceScriptSrc={TINYMCE_SRC}
                           value={(editForm.shortDescription as any) ?? ''}
                           onEditorChange={(v: string) => setField('shortDescription', v)}
                           disabled={isViewingOldVersion}
@@ -1265,11 +1309,17 @@ export default function TaxonomyBrowserPage() {
                             menubar: false,
                             branding: false,
                             toolbar_mode: 'sliding',
-                            plugins: 'lists link table code',
-                            toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link | removeformat | code',
+                            plugins: 'lists link table code image paste',
+                            toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link image | removeformat | code',
                             content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.7}',
-                            block_unsupported_drop: false,
                             statusbar: true,
+                            // image upload (base64)
+                            automatic_uploads: true,
+                            paste_data_images: true,
+                            file_picker_types: 'image',
+                            file_picker_callback: (cb) => tinymceImagePicker(cb),
+                            images_upload_handler: tinymceBase64ImageUploadHandler,
+                            convert_urls: false,
                           }}
                         />
                       </div>
@@ -1313,11 +1363,13 @@ export default function TaxonomyBrowserPage() {
                     
                     <label className="span-2">
                       <span>เนื้อหา (HTML)</span>
+                      <div id="edit-content-toolbar" className="tinymce-toolbar-host" />
                       <div className="tinymce-wrap">
                         <Editor
+                          key={`edit-content-${editOpen ? 'open' : 'closed'}-v${selectedVersionNum ?? 'live'}`}
                           id="edit-contenthtml"
-                          apiKey={(process.env.NEXT_PUBLIC_TINYMCE_KEY as any) || 'no-api-key'}
-                          tinymceScriptSrc={`https://cdn.tiny.cloud/1/${process.env.NEXT_PUBLIC_TINYMCE_KEY || 'no-api-key'}/tinymce/6/tinymce.min.js`}
+                          apiKey={TINYMCE_KEY}
+                          tinymceScriptSrc={TINYMCE_SRC}
                           value={(editForm.contentHtml as any) ?? ''}
                           onEditorChange={(v: string) => setField('contentHtml', v)}
                           disabled={isViewingOldVersion}
@@ -1325,14 +1377,21 @@ export default function TaxonomyBrowserPage() {
                             height: 520,
                             menubar: 'file edit view insert format tools table help',
                             branding: false,
-                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount paste',
                             toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat | code preview fullscreen',
-                            toolbar_sticky: true,
+                            toolbar_sticky: false,
                             toolbar_mode: 'sliding',
+                            fixed_toolbar_container: '#edit-content-toolbar',
                             content_style: 'body{font-family:"TH Sarabun PSK","TH Sarabun New",Tahoma,Arial,sans-serif;font-size:16px;line-height:1.8}',
                             paste_data_images: true,
                             image_caption: true,
                             table_default_attributes: { border: '1' },
+                            // image upload (base64)
+                            automatic_uploads: true,
+                            file_picker_types: 'image',
+                            file_picker_callback: (cb) => tinymceImagePicker(cb),
+                            images_upload_handler: tinymceBase64ImageUploadHandler,
+                            convert_urls: false,
                           }}
                         />
                       </div>
@@ -1521,6 +1580,20 @@ export default function TaxonomyBrowserPage() {
             }
             .tinymce-wrap :global(.tox-tinymce){ width: 100%; border-radius: 8px; }
             .tinymce-wrap :global(.tox .tox-statusbar){ border-radius: 0 0 8px 8px; }
+            .tinymce-toolbar-host{
+              position: sticky;
+              top: 0;
+              z-index: 80; /* above editor content but below modal header */
+              background: #fff;
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+              padding: 4px 6px;
+              margin-bottom: 6px;
+            }
+            /* Ensure TinyMCE dropdown panels appear above image/content inside modal */
+            :global(.tox-tinymce-aux){
+              z-index: 100000 !important;
+            }
           `}</style>
         </section>
       </main>

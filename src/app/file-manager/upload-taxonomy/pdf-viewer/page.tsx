@@ -328,45 +328,172 @@ export default function UpdateDictionaryUploadPdfPage() {
   };
 
   // --- NEW: Function to extract text and HTML from the entire PDF ---
-  const extractPdfTextAndHtml = async (pdfInstanceToUse?: any) => {
-    const pdfToUse = pdfInstanceToUse || pdfInstance;
-    if (!pdfToUse) {
-      setExtractionError("PDF ไม่ได้ถูกโหลด");
-      return;
-    }
+  // --- NEW: Function to extract text and HTML from the entire PDF ---
+const extractPdfTextAndHtml = async (pdfInstanceToUse?: any) => {
+  const pdfToUse = pdfInstanceToUse || pdfInstance;
+  if (!pdfToUse) {
+    setExtractionError("PDF ไม่ได้ถูกโหลด");
+    return;
+  }
 
-    setIsExtracting(true);
-    setExtractionError(null);
-    setExtractedText('');
-    setExtractedHtml(''); // Reset previous HTML
+  setIsExtracting(true);
+  setExtractionError(null);
+  setExtractedText('');
+  setExtractedHtml('');
 
-    try {
-      let fullText = '';
-      let fullHtml = '';
-      const numPgs = pdfToUse.numPages;
-      for (let i = 1; i <= numPgs; i++) {
-        const page = await pdfToUse.getPage(i);
-        const content = await page.getTextContent();
-        const pageText = content.items
-          .filter((item: any) => item && typeof item.str === 'string')
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + '\n\n';
+  // ฟังก์ชันทำความสะอาดข้อความ
+  const cleanTextContent = (text: string): string => {
+    // ลบสระหรือวรรณยุกต์ที่พิมพ์ซ้ำ
+    let cleaned = text
+      .replace(/([่-๋])\1+/g, '$1')  // วรรณยุกต์ซ้ำ
+      .replace(/([ั-ู])\1+/g, '$1')  // สระซ้ำ
+      .replace(/([็์])\1+/g, '$1')   // ไม้ไต่คู้/ไม้หันอากาศซ้ำ
 
-        // Simple HTML generation for preview (you can enhance this logic)
-        const pageHtml = `<div class="pdf-page"><h3>Page ${i}</h3><p>${pageText.replace(/\n/g, '<br>')}</p></div>`;
-        fullHtml += pageHtml;
-      }
-      setExtractedText(fullText);
-      setExtractedHtml(fullHtml); // Store the generated HTML
-      console.log("[PDF Viewer] Finished extracting text and HTML.");
-    } catch (err) {
-      console.error("[PDF Viewer] Error extracting text/HTML:", err);
-      setExtractionError(`เกิดข้อผิดพลาดขณะดึงข้อความ/HTML: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsExtracting(false);
-    }
+    // ลบข้อความที่ไม่เกี่ยวข้อง
+    cleaned = cleaned.replace(/_.*?indd.*?\d+\/\d+\/\d+.*?BE.*?\d+:\d+.*/g, '');
+
+    // ลบอักขระแปลกและยุบช่องว่าง
+    cleaned = cleaned
+      .replace(/[^\x20-\x7E\u0E00-\u0E7F\n\r\t]/g, '') // ลบอักขระแปลก
+      .replace(/\s+/g, ' ') // ยุบช่องว่าง
+      .trim();
+
+    return cleaned;
   };
+
+  try {
+    let fullText = '';
+    let fullHtml = '';
+    const numPgs = pdfToUse.numPages;
+
+    // รวบรวมข้อความทั้งหมดจากทุกหน้า และทำความสะอาดทันที
+    let allCleanedItems: any[] = [];
+    for (let i = 1; i <= numPgs; i++) {
+      const page = await pdfToUse.getPage(i);
+      const content = await page.getTextContent();
+
+      for (const item of content.items) {
+        if (item && typeof item.str === 'string') {
+          const cleanedText = cleanTextContent(item.str);
+          // เก็บเฉพาะข้อความที่มีเนื้อหาหลังทำความสะอาด
+          if (cleanedText.trim()) {
+            allCleanedItems.push({
+              ...item,
+              originalText: item.str,
+              cleanedText: cleanedText,
+              pageNumber: i
+            });
+          }
+        }
+      }
+    }
+
+    // แบ่งรายการ (entries) ตามคำว่า "ผู้เขียน" ในข้อความที่ทำความสะอาดแล้ว
+    const entries: any[][] = [[]]; // เริ่มต้นด้วยรายการว่าง
+    let currentEntryIndex = 0;
+
+    for (const item of allCleanedItems) {
+      if (item.cleanedText.includes('ผู้เขียน')) {
+        // ถ้าเจอคำว่า "ผู้เขียน" ให้เริ่มรายการใหม่
+        // แต่ต้องแน่ใจว่ารายการปัจจุบันไม่ว่าง และรายการใหม่ยังไม่ถูกสร้าง
+        if (entries[currentEntryIndex].length > 0) {
+          entries.push([]); // สร้างรายการใหม่
+          currentEntryIndex++;
+        }
+        entries[currentEntryIndex].push(item);
+      } else {
+        // เพิ่มรายการลงในรายการปัจจุบัน
+        entries[currentEntryIndex].push(item);
+      }
+    }
+
+    // ลบรายการว่างแรกหากมันยังว่างอยู่ (กรณีรายการแรกเริ่มด้วย "ผู้เขียน")
+    // หรือหากไม่มีรายการอื่น
+    if (entries.length > 0 && entries[0].length === 0 && entries.length > 1) {
+        entries.shift();
+    }
+
+    // สร้าง HTML และ Text สำหรับแต่ละรายการ
+    let entryHtml = '';
+    let entryText = '';
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.length === 0) continue; // ข้ามรายการว่าง
+
+      entryHtml += `<div class="pdf-entry"><h3>Entry ${i + 1}</h3>\n`;
+      entryText += `Entry ${i + 1}\n`;
+
+      // จัดกลุ่มข้อความตามบรรทัดภายในแต่ละรายการ
+      const lines: any[] = [];
+      let currentLine: any[] = [];
+      let lastY = null;
+      const Y_TOLERANCE = 5;
+
+      for (const item of entry) {
+        const y = item.transform ? item.transform[5] : 0;
+
+        if (lastY === null || Math.abs(lastY - y) > Y_TOLERANCE) {
+          if (currentLine.length > 0) {
+            lines.push(currentLine);
+          }
+          currentLine = [item];
+          lastY = y;
+        } else {
+          currentLine.push(item);
+        }
+      }
+
+      if (currentLine.length > 0) {
+        lines.push(currentLine);
+      }
+
+      // ประมวลผลแต่ละบรรทัด
+      for (const line of lines) {
+        let lineHtml = '<div class="pdf-line">';
+        let lineText = '';
+
+        for (const item of line) {
+          const text = item.cleanedText || '';
+          lineText += text;
+
+          // ตรวจสอบฟอนต์สำหรับการจัดรูปแบบ
+          let tag = 'span';
+          const fontName = item.fontName || '';
+
+          if (/bold|black/i.test(fontName)) {
+            tag = 'strong';
+          } else if (/italic|oblique/i.test(fontName)) {
+            tag = 'em';
+          }
+
+          if (text.trim()) {
+            lineHtml += `<${tag}>${text}</${tag}>`;
+          }
+        }
+
+        lineHtml += '</div>';
+        entryHtml += lineHtml + '\n';
+        entryText += lineText + '\n';
+      }
+
+      entryHtml += '</div>\n\n';
+      entryText += '\n\n';
+    }
+
+    fullText = entryText;
+    fullHtml = entryHtml;
+
+    setExtractedText(fullText);
+    setExtractedHtml(fullHtml);
+    console.log("[PDF Viewer] Finished extracting text and styled HTML by entries.");
+  } catch (err) {
+    console.error("[PDF Viewer] Error extracting text/HTML:", err);
+    setExtractionError(`เกิดข้อผิดพลาดขณะดึงข้อความ/HTML: ${err instanceof Error ? err.message : 'Unknown error'}`);
+  } finally {
+    setIsExtracting(false);
+  }
+};
 
   // --- Effect to render PDF page when currentPage or pdfInstance changes ---
   useEffect(() => {

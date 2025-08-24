@@ -67,6 +67,9 @@ export default function UploadTaxonomyPdfPreviewPage() {
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.2);
 
+  // Store page snapshots (PNG data URLs) keyed by page number
+  const [pageSnapshots, setPageSnapshots] = useState<Record<number, string>>({});
+
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
@@ -141,6 +144,24 @@ export default function UploadTaxonomyPdfPreviewPage() {
     }
   }, []);
 
+  // Capture the current page canvas into a PNG data URL after render
+  const onPageRender = useCallback(() => {
+    try {
+      // Scope search to the viewer to avoid grabbing unrelated canvases
+      const wrap = document.querySelector('.viewer-wrap') || document.body;
+      const canvases = wrap.querySelectorAll('canvas.react-pdf__Page__canvas');
+      const canvas = canvases[canvases.length - 1] as HTMLCanvasElement | null;
+      if (!canvas) return;
+      const png = canvas.toDataURL('image/png');
+      setPageSnapshots(prev => ({ ...prev, [pageNumber]: png }));
+      // eslint-disable-next-line no-console
+      console.log('[PDF] Snapshot stored for page', pageNumber, png.slice(0, 64) + '...');
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[PDF] Snapshot failed:', e);
+    }
+  }, [pageNumber]);
+
   const zoomIn = () => setScale((s) => Math.min(3, +((s + 0.2).toFixed(2))));
   const zoomOut = () => setScale((s) => Math.max(0.5, +((s - 0.2).toFixed(2))));
   const goPrev = () => setPageNumber((p) => Math.max(1, p - 1));
@@ -192,9 +213,31 @@ export default function UploadTaxonomyPdfPreviewPage() {
 
               <div className="viewer-wrap">
                 <Document file={fileUrl} onLoadSuccess={onLoadSuccess} loading={<div className="loading">กำลังโหลด PDF…</div>}>
-                  <Page pageNumber={pageNumber} scale={scale} renderTextLayer renderAnnotationLayer />
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    renderTextLayer
+                    renderAnnotationLayer
+                    onRenderSuccess={onPageRender}
+                  />
                 </Document>
               </div>
+              {pageSnapshots[pageNumber] && (
+                <div className="snap-panel">
+                  <div className="snap-thumb">
+                    <img src={pageSnapshots[pageNumber]} alt={`หน้า ${pageNumber}`} />
+                  </div>
+                  <div className="snap-actions">
+                    <a
+                      className="btn"
+                      href={pageSnapshots[pageNumber]}
+                      download={`pdf-page-${pageNumber}.png`}
+                    >
+                      ดาวน์โหลดภาพหน้านี้ (PNG)
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="panel">
@@ -258,7 +301,47 @@ export default function UploadTaxonomyPdfPreviewPage() {
         .text-dump { margin: 8px 12px 12px; border-top: 1px dashed #e5e7eb; padding-top: 8px; }
         .text-dump summary { cursor: pointer; color: #374151; font-weight: 600; margin-bottom: 6px; }
         .text-dump textarea { width: 100%; min-height: 140px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; color: #111827; background: #fff; }
+        .snap-panel { padding: 10px 12px; border-top: 1px solid #f1f5f9; background: #fff; }
+        .snap-thumb { display: grid; place-items: center; background: #f8fafc; border: 1px dashed #e5e7eb; border-radius: 10px; padding: 8px; }
+        .snap-thumb img { max-width: 100%; height: auto; display: block; border-radius: 6px; }
+        .snap-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
         @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } .viewer-wrap { height: 70vh; } }
+      
+        /* ===== react-pdf: TextLayer ===== */
+        .react-pdf__Page__textContent {
+          user-select: text;
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+        }
+        .react-pdf__Page__textContent span {
+          position: absolute;
+          white-space: pre;
+          transform-origin: left top;
+          color: transparent;
+          cursor: text;
+          pointer-events: all;
+          -webkit-user-select: text;
+          user-select: text;
+        }
+        .react-pdf__Page__textContent span::selection {
+          background: rgba(0, 0, 255, 0.3);
+        }
+
+        /* ===== react-pdf: AnnotationLayer ===== */
+        .react-pdf__Page__annotations {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+        .react-pdf__annotationLayer .linkAnnotation > a,
+        .react-pdf__annotationLayer .buttonWidgetAnnotation.pushButton > a {
+          position: absolute;
+          font-size: 1em;
+          text-decoration: none;
+          background: transparent;
+          pointer-events: all;
+        }
       `}</style>
     </div>
   );
