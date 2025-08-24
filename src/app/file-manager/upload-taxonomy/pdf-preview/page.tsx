@@ -7,12 +7,12 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 const Document = dynamic(() => import('react-pdf').then(mod => mod.Document), { ssr: false });
 const Page = dynamic(() => import('react-pdf').then(mod => mod.Page), { ssr: false });
 
-// --- Pin pdf.js version on CDN to avoid runtime mismatches ---
-const PDF_JS_VERSION = '5.4.54'; // 使用固定版本以保证一致性
-const PDF_JS_CDN = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDF_JS_VERSION}/pdf.min.mjs`;
-const WORKER_CDN = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDF_JS_VERSION}/pdf.worker.min.mjs`;
-// If your environment needs classic workers instead of module workers, you may switch to:
-// const WORKER_CDN = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDF_JS_VERSION}/pdf.worker.min.js`;
+// --- Pin/compute pdf.js version on CDN to avoid runtime mismatches ---
+// Fallback version; will be overridden by the actual `pdfjs.version` from react-pdf at runtime.
+const PDF_JS_VERSION = '5.4.54';
+const PDF_JS_CDN = (ver: string) => `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${ver}/pdf.min.mjs`;
+const WORKER_CDN_MJS = (ver: string) => `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${ver}/pdf.worker.min.mjs`;
+const WORKER_CDN_JS  = (ver: string) => `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${ver}/pdf.worker.min.js`;
 
 // ---------------- Thai-friendly helpers ----------------
 const collapseDuplicateThaiVowels = (s: string): string =>
@@ -51,7 +51,11 @@ export default function UploadTaxonomyPdfPreviewPage() {
       try {
         const { pdfjs } = await import('react-pdf');
         if (!mounted) return;
-        pdfjs.GlobalWorkerOptions.workerSrc = WORKER_CDN; // use pinned CDN worker
+        // Match worker version to the runtime pdfjs to prevent "API version ... does not match Worker version ..."
+        const ver: string = (pdfjs as any)?.version || PDF_JS_VERSION;
+        // Prefer module worker; if your environment requires classic workers, switch to WORKER_CDN_JS(ver).
+        pdfjs.GlobalWorkerOptions.workerSrc = WORKER_CDN_MJS(ver);
+        console.log('[react-pdf] Using pdfjs version:', ver, 'worker:', pdfjs.GlobalWorkerOptions.workerSrc);
       } catch (e) {
         console.error('[react-pdf] worker init failed:', e);
       }
