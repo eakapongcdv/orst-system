@@ -1,20 +1,18 @@
-//src/app/admin/taxonomy/page.tsx
+//src/admin/dictionary/page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import Link from 'next/link';
 
-const DOMAIN_OPTIONS = ['Bacteria', 'Archaea', 'Eukarya'];
-const KINGDOM_OPTIONS = ['Animalia', 'Plantae', 'Fungi', 'Protista', 'Monera'];
-
-type Taxonomy = {
+// === Types ===
+export type SpecializedDictionaryRow = {
   id: number;
   title: string;
-  domain: string;
-  kingdom: string;
+  category?: string;
+  subcategory?: string | null;
   createdAt?: string;
   updatedAt?: string;
-  _entryCount?: number; // NEW: count of TaxonEntry
+  _entryCount?: number; // count of DictionaryEntry grouped by specializedDictionaryId
 };
 
 type Pagination = {
@@ -24,27 +22,34 @@ type Pagination = {
   totalPages: number;
 };
 
-type SortBy = 'id' | 'title' | 'domain' | 'kingdom' | 'updatedAt' | 'entryCount';
+type SortBy = 'id' | 'title' | 'updatedAt' | 'entryCount';
 type SortDir = 'asc' | 'desc';
 
-export default function AdminTaxonomyPage() {
+export default function AdminSpecializedDictionaryPage() {
   const [q, setQ] = useState('');
-  const [list, setList] = useState<Taxonomy[]>([]);
+  const [list, setList] = useState<SpecializedDictionaryRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [exportingId, setExportingId] = useState<number | null>(null);
 
   const [sortBy, setSortBy] = useState<SortBy>('id');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortDir, setSortDir] = useState<SortDir>('asc'); // order by specializedDictionaryId (= id)
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Taxonomy | null>(null);
-  const [form, setForm] = useState<{ title: string; domain: string; kingdom: string }>({ title: '', domain: '', kingdom: '' });
+  const [editing, setEditing] = useState<SpecializedDictionaryRow | null>(null);
+  const [form, setForm] = useState<{ title: string; category: string; subcategory?: string }>({ title: '', category: 'ทั่วไป', subcategory: '' });
   const submitBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const fetchData = async (_page = page, _pageSize = pageSize, _q = q, _sortBy = sortBy, _sortDir = sortDir) => {
+  const fetchData = async (
+    _page = page,
+    _pageSize = pageSize,
+    _q = q,
+    _sortBy = sortBy,
+    _sortDir = sortDir
+  ) => {
     setLoading(true);
     setErr(null);
     try {
@@ -54,10 +59,11 @@ export default function AdminTaxonomyPage() {
       params.set('sortBy', String(_sortBy));
       params.set('sortDir', String(_sortDir));
       if (_q.trim()) params.set('q', _q.trim());
-      const r = await fetch(`/api/admin/taxonomy?${params.toString()}`, { cache: 'no-store' });
+      // API: returns SpecializedDictionary with counts of DictionaryEntry grouped by specializedDictionaryId
+      const r = await fetch(`/api/admin/specialized-dictionary?${params.toString()}`, { cache: 'no-store' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
-      const items: Taxonomy[] = j.items || [];
+      const items: SpecializedDictionaryRow[] = j.items || [];
       setList(items);
       setPagination(j.pagination || null);
     } catch (e: any) {
@@ -78,33 +84,36 @@ export default function AdminTaxonomyPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ title: '', domain: DOMAIN_OPTIONS[2], kingdom: KINGDOM_OPTIONS[1] });
+    setForm({ title: '', category: 'ทั่วไป', subcategory: '' });
     setModalOpen(true);
   };
 
-  const openEdit = (row: Taxonomy) => {
+  const openEdit = (row: SpecializedDictionaryRow) => {
     setEditing(row);
-    setForm({ title: row.title, domain: row.domain, kingdom: (row as any).kingdom || '' });
+    setForm({ title: row.title, category: row.category || 'ทั่วไป', subcategory: row.subcategory || '' });
     setModalOpen(true);
   };
 
   const onSave = async () => {
     try {
       submitBtnRef.current?.setAttribute('disabled', 'true');
-      const payload = { title: form.title?.trim(), domain: form.domain?.trim(), kingdom: form.kingdom?.trim() };
-      if (!payload.title) throw new Error('กรุณาระบุชื่อชุดอนุกรมวิธาน');
-      if (!payload.domain) throw new Error('กรุณาเลือกโดเมน');
-      if (!payload.kingdom) throw new Error('กรุณาเลือกอาณาจักร');
+      const payload = {
+        title: (form.title || '').trim(),
+        category: (form.category || 'ทั่วไป').trim(),
+        subcategory: (form.subcategory || '').trim() || undefined,
+      } as { title: string; category: string; subcategory?: string };
+      if (!payload.title) throw new Error('กรุณาระบุชื่อพจนานุกรมเฉพาะทาง');
+      if (!payload.category) throw new Error('กรุณาระบุสาขาวิชา (category)');
 
       let r: Response;
       if (editing) {
-        r = await fetch(`/api/admin/taxonomy/${editing.id}`, {
+        r = await fetch(`/api/admin/specialized-dictionary/${editing.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
-        r = await fetch('/api/admin/taxonomy', {
+        r = await fetch('/api/admin/specialized-dictionary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -121,10 +130,10 @@ export default function AdminTaxonomyPage() {
     }
   };
 
-  const onDelete = async (row: Taxonomy) => {
-    if (!confirm(`ลบรายการ TaxonEntry ทั้งหมดที่อยู่ใน "${row.title}" ? (Taxonomy จะไม่ถูกลบ)`)) return;
+  const onDelete = async (row: SpecializedDictionaryRow) => {
+    if (!confirm(`ลบ DictionaryEntry ทั้งหมดใน "${row.title}" ? (SpecializedDictionary จะไม่ถูกลบ)`)) return;
     try {
-      const r = await fetch(`/api/admin/taxonomy/${row.id}?mode=entries`, { method: 'DELETE' });
+      const r = await fetch(`/api/admin/specialized-dictionary/${row.id}?mode=entries`, { method: 'DELETE' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       await fetchData(page, pageSize, q, sortBy, sortDir);
@@ -153,25 +162,6 @@ export default function AdminTaxonomyPage() {
     return out;
   }, [pagination]);
 
-  // Group: level 1 by domain, level 2 by kingdom (preserve order within inners)
-  type DomainGroup = { domain: string; groups: Array<{ kingdom: string; items: Taxonomy[] }> };
-  const grouped = useMemo<DomainGroup[]>(() => {
-    const out: Record<string, Record<string, Taxonomy[]>> = {};
-    for (const it of list) {
-      const d = it.domain || 'ไม่ระบุโดเมน';
-      const k = it.kingdom || 'ไม่ระบุ Kingdom';
-      if (!out[d]) out[d] = {};
-      if (!out[d][k]) out[d][k] = [];
-      out[d][k].push(it);
-    }
-    const domains = Object.keys(out).sort((a, b) => a.localeCompare(b, 'th'));
-    return domains.map((domain) => {
-      const kingdoms = Object.keys(out[domain]).sort((a, b) => a.localeCompare(b, 'th'));
-      return { domain, groups: kingdoms.map((kingdom) => ({ kingdom, items: out[domain][kingdom] })) };
-    });
-  }, [list]);
-
-  // Sorting handler
   const applySort = (col: SortBy) => {
     let dir: SortDir = 'asc';
     if (sortBy === col) {
@@ -189,10 +179,49 @@ export default function AdminTaxonomyPage() {
     return <span className="sort-caret active">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
+  // Generate a safe filename from title
+  const slugForFile = (s: string) =>
+    (s || 'export')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'export';
+
+  // Export all DictionaryEntry rows for the selected SpecializedDictionary as XLSX
+  const handleExportXlsx = async (row: SpecializedDictionaryRow) => {
+    try {
+      setExportingId(row.id);
+      const url = `/api/admin/specialized-dictionary/${row.id}/export.xlsx`;
+      const r = await fetch(url, { method: 'GET' });
+      let blob: Blob;
+      if (!r.ok) {
+        // try to read error message
+        const j = await r.json().catch(() => ({} as any));
+        throw new Error(j?.error || `HTTP ${r.status}`);
+      } else {
+        blob = await r.blob();
+      }
+      const fname = `${slugForFile(row.title || 'dictionary')}-${row.id}.xlsx`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 0);
+    } catch (e: any) {
+      alert(e?.message || 'ส่งออกไม่สำเร็จ');
+    } finally {
+      setExportingId(null);
+    }
+  };
+
   return (
     <div className="adm-wrap">
       <header className="adm-head">
-        <h1>จัดการอนุกรมวิธาน (Taxonomy) | นำเข้าข้อมูล - ส่งออกข้อมูล</h1>
+        <h1>จัดการพจนานุกรมและพจนานุกรมเฉพาะทาง | นำเข้าข้อมูล - ส่งออกข้อมูล</h1>
         <div className="head-actions">
           <button className="btn btn-primary" onClick={openCreate} title="เพิ่ม">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
@@ -208,7 +237,7 @@ export default function AdminTaxonomyPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหาชื่อ / โดเมน / อาณาจักร"
+              placeholder="ค้นหาชื่อพจนานุกรม"
             />
           </div>
           <div className="toolbar-right">
@@ -231,13 +260,10 @@ export default function AdminTaxonomyPage() {
                     <button type="button" className="th-sort" onClick={() => applySort('id')}>ID {sortIcon('id')}</button>
                   </th>
                   <th>
-                    <button type="button" className="th-sort" onClick={() => applySort('title')}>ชื่ออนุกรมวิธาน {sortIcon('title')}</button>
+                    <button type="button" className="th-sort" onClick={() => applySort('title')}>ชื่อพจนานุกรม {sortIcon('title')}</button>
                   </th>
-                  <th style={{width: 200}}>
-                    <button type="button" className="th-sort" onClick={() => applySort('kingdom')}>อาณาจักร {sortIcon('kingdom')}</button>
-                  </th>
-                  <th style={{width: 120}}>
-                    <button type="button" className="th-sort" onClick={() => applySort('entryCount')}>จำนวนข้อมูล {sortIcon('entryCount')}</button>
+                  <th style={{width: 140}}>
+                    <button type="button" className="th-sort" onClick={() => applySort('entryCount')}>จำนวนคำศัพท์ {sortIcon('entryCount')}</button>
                   </th>
                   <th style={{width: 200}}>
                     <button type="button" className="th-sort" onClick={() => applySort('updatedAt')}>อัปเดตล่าสุด {sortIcon('updatedAt')}</button>
@@ -246,104 +272,87 @@ export default function AdminTaxonomyPage() {
                 </tr>
               </thead>
               <tbody>
-                {grouped.length === 0 && (
-                  <tr><td colSpan={7} style={{textAlign:'center', color:'#777'}}>ไม่พบข้อมูล</td></tr>
+                {list.length === 0 && (
+                  <tr><td colSpan={5} style={{textAlign:'center', color:'#777'}}>ไม่พบข้อมูล</td></tr>
                 )}
-                {grouped.map((dg) => (
-                  <Fragment key={`domain-${dg.domain}`}>
-                    <tr className="domain-row">
-                      <td colSpan={7}>
-                        <div className="group-tab group-tab--domain">
-                          <span className="group-tab__label">โดเมน</span>
-                          <span className="group-tab__text">{dg.domain}</span>
-                        </div>
-                      </td>
-                    </tr>
-                    {dg.groups.map((kg) => (
-                      <Fragment key={`kg-${dg.domain}::${kg.kingdom}`}>
-                        <tr className="kingdom-row">
-                          <td colSpan={7}>
-                            <div className="group-tab group-tab--kingdom">
-                              <span className="group-tab__label">อาณาจักร</span>
-                              <span className="group-tab__text">{kg.kingdom}</span>
-                            </div>
-                          </td>
-                        </tr>
-                        {kg.items.map((it) => (
-                          <tr key={it.id}>
-                            <td>#{it.id}</td>
-                            <td>{it.title}</td>
-                            <td>{it.kingdom}</td>
-                            <td>{it._entryCount ?? 0}</td>
-                            <td>{new Date(it.updatedAt ?? it.createdAt ?? Date.now()).toLocaleString('th-TH')}</td>
-                            <td className="row-actions">
-                              {(it._entryCount ?? 0) > 0 && (
-                                <>
-                                  <Link
-                                    href={`/taxonomy/${it.id}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="btn btn-ghost"
-                                    title="ค้นหา"
-                                  >
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                      <path d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z"/>
-                                    </svg>
-                                  </Link>
-                                  
-                                  <Link
-                                    href={`/admin/taxonomy/${it.id}/preview`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="btn btn-ghost"
-                                    title="พรีวิว"
-                                  >
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                      <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 9Z"/>
-                                    </svg>
-                                  </Link>
-
-                                  
-                                </>
-                              )}
-                              <Link
-                                  href={`/file-manager/upload-taxonomy/docx`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="btn btn-ghost"
-                                  title="นำเข้าข้อมูล"
-                                >
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                  <path d="M12 3a1 1 0 0 1 .7.29l4 4a1 1 0 1 1-1.4 1.42L13 6.41V14a1 1 0 1 1-2 0V6.41L8.7 8.71A1 1 0 1 1 7.3 7.29l4-4A1 1 0 0 1 12 3Z"/>
-                                  <path d="M4 13a1 1 0 0 1 1 1v5h14v-5a1 1 0 1 1 2 0v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a1 1 0 0 1 1-1Z"/>
-                                </svg>
-                              </Link>
-                              <a
-                                href={`/api/admin/taxonomy/${it.id}/export.xlsx`}
-                                className="btn btn-ghost"
-                                title="ส่งออกเป็น Excel (.xlsx)"
-                              >
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                  <path d="M12 3a1 1 0 0 1 1 1v8l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L11 12V4a1 1 0 0 1 1-1Z"/>
-                                  <path d="M4 14a1 1 0 0 1 1 1v4h14v-4a1 1 0 1 1 2 0v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a1 1 0 0 1 1-1Z"/>
-                                </svg>
-                              </a>
-                              <button className="btn btn-ghost" title="แก้ไข" onClick={() => openEdit(it)}>
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                                  <path d="M5 18.25V21h2.75l8.1-8.1-2.75-2.75L5 18.25Zm13.71-10.21a1.003 1.003 0 0 0 0-1.42l-1.33-1.33a1.003 1.003 0 0 0-1.42 0l-1.12 1.12 2.75 2.75 1.12-1.12Z"/>
-                                </svg>
-                              </button>
-                              <button className="btn btn-ghost danger" title="ลบ" onClick={() => onDelete(it)}>
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                                  <path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.8l.86 12.09A2 2 0 0 0 7.65 21h8.7a2 2 0 0 0 1.99-1.91L19.2 7H20a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9Zm2 3h2v-.5h-2V6Z"/>
-                                </svg>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </Fragment>
-                    ))}
-                  </Fragment>
+                {list.map((it) => (
+                  <tr key={it.id}>
+                    <td>#{it.id}</td>
+                    <td>{it.title}</td>
+                    <td>{it._entryCount ?? 0}</td>
+                    <td>{new Date(it.updatedAt ?? it.createdAt ?? Date.now()).toLocaleString('th-TH')}</td>
+                    <td className="row-actions">
+                      {(it._entryCount ?? 0) > 0 && (
+                        <>
+                         <Link
+                          href={`/dictionaries/${it.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-ghost"
+                          title="ค้นหา"
+                        >
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                            <path d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z"/>
+                          </svg>
+                        </Link>
+                        <Link
+                          href={`/dictionaries/${it.id}/preview`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-ghost"
+                          title="พรีวิว"
+                        >
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                            <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 9Z"/>
+                          </svg>
+                        </Link>
+                        </>
+                      )}
+                      <Link
+                        href={`/file-manager/upload-dictionary`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-ghost"
+                        title="นำเข้าข้อมูล"
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                          <path d="M12 3a1 1 0 0 1 .7.29l4 4a1 1 0 1 1-1.4 1.42L13 6.41V14a1 1 0 1 1-2 0V6.41L8.7 8.71A1 1 0 1 1 7.3 7.29l4-4A1 1 0 0 1 12 3Z"/>
+                          <path d="M4 13a1 1 0 0 1 1 1v5h14v-5a1 1 0 1 1 2 0v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a1 1 0 0 1 1-1Z"/>
+                        </svg>
+                      </Link>
+                      <button
+                        className="btn btn-ghost"
+                        title="ส่งออก XLSX"
+                        onClick={() => handleExportXlsx(it)}
+                        disabled={(it._entryCount ?? 0) === 0 || exportingId === it.id}
+                      >
+                        {exportingId === it.id ? (
+                          // simple inline spinner
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                            <path d="M12 2a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1Zm6.364 3.636a1 1 0 0 1 0 1.415l-1.06 1.06a1 1 0 1 1-1.415-1.414l1.06-1.06a1 1 0 0 1 1.415 0ZM21 13a1 1 0 1 1 0-2h-1.5a1 1 0 1 1 0 2H21ZM6.106 6.11A1 1 0 1 1 7.52 7.523l-1.06 1.06A1 1 0 0 1 5.045 7.17l1.06-1.06ZM12 18.5a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm7.364-3.636a1 1 0 0 1-1.414 1.415l-1.06-1.06a1 1 0 0 1 1.414-1.415l1.06 1.06ZM4.5 13a1 1 0 0 1 0-2H3a1 1 0 1 1 0 2h1.5Zm2.02 4.95a1 1 0 0 1-1.415 0l-1.06-1.06a1 1 0 1 1 1.415-1.415l1.06 1.06a1 1 0 0 1 0 1.415Z"/>
+                          </svg>
+                        ) : (
+                          // download-to-tray icon
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                            <path d="M12 3a1 1 0 0 1 1 1v8l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L11 12V4a1 1 0 0 1 1-1Z"/>
+                            <path d="M4 14a1 1 0 0 1 1 1v4h14v-4a1 1 0 1 1 2 0v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a1 1 0 0 1 1-1Z"/>
+                          </svg>
+                        )}
+                      </button>
+                      <button className="btn btn-ghost" title="แก้ไข" onClick={() => openEdit(it)}>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <path d="M5 18.25V21h2.75l8.1-8.1-2.75-2.75L5 18.25Zm13.71-10.21a1.003 1.003 0 0 0 0-1.42l-1.33-1.33a1.003 1.003 0 0 0-1.42 0l-1.12 1.12 2.75 2.75 1.12-1.12Z"/>
+                        </svg>
+                      </button>
+                      {/*
+                      <button className="btn btn-ghost danger" title="ลบคำศัพท์ทั้งหมด" onClick={() => onDelete(it)}>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <path d="M9 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.8l.86 12.09A2 2 0 0 0 7.65 21h8.7a2 2 0 0 0 1.99-1.91L19.2 7H20a1 1 0 1 0 0-2h-4V4a1 1 0 0 0-1-1H9Zm2 3h2v-.5h-2V6Z"/>
+                        </svg>
+                      </button>
+                      */}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -429,41 +438,33 @@ export default function AdminTaxonomyPage() {
           <div className="overlay" onClick={() => setModalOpen(false)} />
           <div className="modal">
             <div className="modal-head">
-              <h3>{editing ? 'แก้ไขอนุกรมวิธาน' : 'เพิ่มอนุกรมวิธาน'}</h3>
+              <h3>{editing ? 'แก้ไขพจนานุกรมเฉพาะทาง' : 'เพิ่มพจนานุกรมเฉพาะทาง'}</h3>
               <button className="icon-btn" onClick={() => setModalOpen(false)} title="ปิด">✕</button>
             </div>
             <div className="modal-body">
               <label className="fld">
-                <span>ชื่ออนุกรมวิธาน</span>
+                <span>ชื่อพจนานุกรมเฉพาะทาง</span>
                 <input
                   value={form.title}
                   onChange={(e) => setForm(v => ({ ...v, title: e.target.value }))}
-                  placeholder="เช่น อนุกรมวิธานพืช"
+                  placeholder="เช่น พจนานุกรมศัพท์พฤกษศาสตร์"
                 />
               </label>
               <label className="fld">
-                <span>โดเมน (Domain)</span>
-                <select
-                  value={form.domain}
-                  onChange={(e) => setForm(v => ({ ...v, domain: e.target.value }))}
-                  aria-label="เลือกโดเมน"
-                >
-                  {DOMAIN_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
+                <span>สาขาวิชา (category) <small style={{color:'#b91c1c'}}>*จำเป็น</small></span>
+                <input
+                  value={form.category}
+                  onChange={(e) => setForm(v => ({ ...v, category: e.target.value }))}
+                  placeholder="เช่น วิทยาศาสตร์ / ภาษาไทย / กฎหมาย"
+                />
               </label>
               <label className="fld">
-                <span>อาณาจักร (Kingdom)</span>
-                <select
-                  value={form.kingdom}
-                  onChange={(e) => setForm(v => ({ ...v, kingdom: e.target.value }))}
-                  aria-label="เลือก Kingdom"
-                >
-                  {KINGDOM_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
+                <span>กลุ่มย่อย (subcategory)</span>
+                <input
+                  value={form.subcategory || ''}
+                  onChange={(e) => setForm(v => ({ ...v, subcategory: e.target.value }))}
+                  placeholder="เช่น พฤกษศาสตร์ / ภาษาศาสตร์ / นิติศาสตร์แพ่ง"
+                />
               </label>
             </div>
             <div className="modal-foot">
@@ -485,7 +486,7 @@ export default function AdminTaxonomyPage() {
 
         .adm-card{background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px;}
         .toolbar{display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px;}
-        .search{display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e5e7eb; border-radius:999px; padding:6px 10px; width:min(520px, 100%);}
+        .search{display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e5e7eb; border-radius:999px; padding:6px 10px; width:min(520px, 100%);}        
         .search input{border:none; outline:none; width:100%;}
         .toolbar-right{display:flex; gap:8px;}
 
@@ -498,13 +499,6 @@ export default function AdminTaxonomyPage() {
         .th-sort{display:inline-flex; align-items:center; gap:6px; background:transparent; border:0; font-weight:700; cursor:pointer; color:#111827;}
         .sort-caret{opacity:.4;}
         .sort-caret.active{opacity:1;}
-
-        .domain-row td,
-        .kingdom-row td{
-          background:transparent;
-          border-bottom:none;
-          padding:8px 10px;
-        }
 
         .btn{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; cursor:pointer;}
         .btn:hover{background:#f8fafc;}
@@ -529,69 +523,13 @@ export default function AdminTaxonomyPage() {
         .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
 
         .overlay{position:fixed; inset:0; background:rgba(15,23,42,.35); backdrop-filter: blur(2px); z-index:30;}
-        .modal{
-          position:fixed;
-          top:50%;
-          left:50%;
-          transform:translate(-50%, -50%);
-          width:min(560px, 92vw);
-          max-height:85vh;
-          background:#fff;
-          border:1px solid #e5e7eb;
-          border-radius:14px;
-          padding:0;
-          z-index:40;
-          box-shadow:0 12px 40px rgba(15,23,42,.15);
-          display:flex;
-          flex-direction:column;
-        }
-        .modal-head{
-          display:flex; align-items:center; justify-content:space-between;
-          padding:12px 16px; border-bottom:1px solid #e5e7eb;
-        }
+        .modal{ position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(560px, 92vw); max-height:85vh; background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:0; z-index:40; box-shadow:0 12px 40px rgba(15,23,42,.15); display:flex; flex-direction:column; }
+        .modal-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e5e7eb; }
         .modal-head h3{margin:0; font-weight:800;}
-        .modal-body{
-          padding:16px; display:grid; gap:12px;
-          overflow:auto; flex:1;
-        }
+        .modal-body{ padding:16px; display:grid; gap:12px; overflow:auto; flex:1; }
         .fld{display:grid; gap:6px;}
         .fld input{border:1px solid #e5e7eb; border-radius:10px; padding:10px;}
-        .fld select{border:1px solid #e5e7eb; border-radius:10px; padding:10px; background:#fff;}
-        .modal-foot{
-          display:flex; justify-content:flex-end; gap:8px;
-          padding:12px 16px; border-top:1px solid #e5e7eb;
-        }
-
-        .group-tab{
-          display:flex; align-items:center; gap:10px;
-          padding:10px 12px;
-          border-radius:12px;
-          border:1px solid #e5e7eb;
-        }
-        .group-tab__label{
-          font-weight:800;
-          border-radius:999px;
-          padding:6px 10px;
-          line-height:1;
-          color:#fff;
-        }
-        .group-tab__text{
-          font-weight:700; color:#111827;
-        }
-        .group-tab--domain{
-          background:#F4F7FF;
-          border-left:4px solid #0c57d2;
-        }
-        .group-tab--domain .group-tab__label{
-          background:#0c57d2;
-        }
-        .group-tab--kingdom{
-          background:#F2FEF6;
-          border-left:4px solid #16a34a;
-        }
-        .group-tab--kingdom .group-tab__label{
-          background:#16a34a;
-        }
+        .modal-foot{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e5e7eb; }
       `}</style>
     </div>
   );

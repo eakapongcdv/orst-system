@@ -395,7 +395,7 @@ export default function UpdateDictionaryUploadPage() {
                   <p className="text-base font-medium text-gray-800 mb-1">
                     {isDragOver ? "ปล่อยไฟล์ที่นี่" : "ลากวางไฟล์ที่นี่ หรือคลิกเพื่อเลือก"}
                   </p>
-                  <p className="text-gray-500 text-sm">รองรับ .html / .htm / .docx / .doc (สูงสุด 200MB)</p>
+                  <p className="text-gray-500 text-sm">รองรับ .docx / .doc (สูงสุด 200MB)</p>
                   <p className="text-gray-400 text-sm mt-2">
                     {selectedFile ? `เลือกแล้ว: ${selectedFile.name}` : "ยังไม่ได้เลือกไฟล์"}
                   </p>
@@ -546,7 +546,7 @@ export default function UpdateDictionaryUploadPage() {
             {/* Tips / Help */}
             <div className="card-body text-sm text-gray-600">
               <ul className="list-disc pl-5 space-y-1">
-                <li>รองรับไฟล์ .html / .htm / .docx / .doc เท่านั้น</li>
+                <li>รองรับไฟล์ .docx / .doc เท่านั้น</li>
                 <li>ขนาดไฟล์สูงสุด 200MB</li>
                 <li>ตรวจสอบโครงสร้างแท็ก <code>&lt;article class='entry'&gt;</code> ให้ถูกต้องก่อนอัปโหลด</li>
               </ul>

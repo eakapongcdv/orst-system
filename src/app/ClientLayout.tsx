@@ -13,7 +13,7 @@ import {
   UserGroupIcon,
   ArrowRightOnRectangleIcon,
   ArrowLeftOnRectangleIcon,
-  UserPlusIcon
+  UserPlusIcon,MagnifyingGlassIcon
 } from '@heroicons/react/24/solid';
 
 export default function ClientLayout({ 
@@ -90,6 +90,12 @@ const isEditorPage = (
               </div>
               
               <div className="flex items-center">
+                <Link
+                      href="/search"
+                      className="btn-secondary btn--sm"
+                    >
+                  <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
+                </Link>
                 {isAuthenticated ? (
                   <div className="flex items-center space-x-4">
                     <span className="text-md text-white/90 hidden md:inline">
@@ -102,7 +108,7 @@ const isEditorPage = (
                         className="btn-primary btn--sm"
                       >
                         <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
-                        ออกจากระบบ
+                        ออก
                       </button>
                     </form>
                   </div>

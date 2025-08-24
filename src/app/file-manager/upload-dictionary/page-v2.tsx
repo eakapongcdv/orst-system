@@ -259,7 +259,7 @@ export default function UpdateDictionaryUploadPage() {
               <div>
                 <h1 className="text-lg font-bold text-gray-900">อัปเดตพจนานุกรม (HTML)</h1>
                 <p className="text-sm text-gray-500 mt-1">
-                  เลือกไฟล์ .html / .htm เพื่ออัปเดตข้อมูลสำหรับพจนานุกรม (ID: {specializedDictionaryId})
+                  เลือกไฟล์เพื่ออัปเดตข้อมูลสำหรับพจนานุกรม (ID: {specializedDictionaryId})
                 </p>
               </div>
               <button
@@ -302,7 +302,7 @@ export default function UpdateDictionaryUploadPage() {
                 <p className="text-base font-medium text-gray-700 mb-1">
                   {isDragOver ? "ปล่อยไฟล์ที่นี่" : "ลาก &amp; วางไฟล์ที่นี่ หรือคลิกเพื่อเลือก"}
                 </p>
-                <p className="text-gray-500 text-sm">รองรับ .html / .htm (สูงสุด 20MB)</p>
+                <p className="text-gray-500 text-sm">รองรับ (สูงสุด 20MB)</p>
                 <p className="text-gray-400 text-sm mt-2">
                   {selectedFile ? `เลือกแล้ว: ${selectedFile.name}` : "ยังไม่ได้เลือกไฟล์"}
                 </p>

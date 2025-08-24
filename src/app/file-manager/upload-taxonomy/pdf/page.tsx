@@ -410,7 +410,7 @@ const allowedExt = [".html", ".htm", ".docx", ".doc", ".pdf"];
                   <p className="text-base font-medium text-gray-800 mb-1">
                     {isDragOver ? "ปล่อยไฟล์ที่นี่" : "ลากวางไฟล์ที่นี่ หรือคลิกเพื่อเลือก"}
                   </p>
-                  <p className="text-gray-500 text-sm">รองรับ .html / .htm / .docx / .doc / .pdf (สูงสุด 200MB) — สำหรับ PDF จำเป็นต้องติดตั้งแพ็กเกจ <code>pdf-parse</code></p>
+                  <p className="text-gray-500 text-sm">รองรับ .docx / .doc / .pdf (สูงสุด 200MB) — สำหรับ PDF จำเป็นต้องติดตั้งแพ็กเกจ <code>pdf-parse</code></p>
                   <p className="text-gray-400 text-sm mt-2">
                     {selectedFile ? `เลือกแล้ว: ${selectedFile.name}` : "ยังไม่ได้เลือกไฟล์"}
                   </p>
@@ -587,7 +587,7 @@ const allowedExt = [".html", ".htm", ".docx", ".doc", ".pdf"];
             {/* Tips / Help */}
             <div className="card-body text-sm text-gray-600">
               <ul className="list-disc pl-5 space-y-1">
-                <li>รองรับไฟล์ .html / .htm / .docx / .doc / .pdf เท่านั้น</li>
+                <li>รองรับไฟล์ .docx / .doc / .pdf เท่านั้น</li>
                 <li>ขนาดไฟล์สูงสุด 200MB</li>
                 <li>ไฟล์ PDF ต้องติดตั้งแพ็กเกจ <code>pdf-parse</code> บนเซิร์ฟเวอร์ก่อนใช้งาน</li>
                 <li>ตรวจสอบโครงสร้างแท็ก <code>&lt;article class='entry'&gt;</code> ให้ถูกต้องก่อนอัปโหลด</li>
