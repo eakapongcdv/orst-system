@@ -109,15 +109,14 @@ export default function SearchPage() {
 
     try {
       // 1) TaxonEntry — try global taxonomy search (no taxonomyId)
-      const taxonUrl = `/api/taxonomy/search?q=${encodeURIComponent(finalQ)}&page=1&pageSize=5`;
+      const taxonUrl = `/api/taxonomy/search?q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`;
       // 2) DictionaryEntry — try a few likely endpoints, pick the first that returns data
       const dictCandidates = [
-        `/api/admin/dictionary/entries/search?q=${encodeURIComponent(finalQ)}&take=5`,
-        `/api/admin/dictionary/entries?q=${encodeURIComponent(finalQ)}&take=5`,
-        `/api/admin/dictionary?q=${encodeURIComponent(finalQ)}&mode=entries&take=5`,
+        `/api/search-dictionary?dictionaryId=3&q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`,
+        `/api/search-dictionary?dictionaryId=0&q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`,
       ];
       // 3) TransliterationEntry
-      const translitUrl = `/api/admin/transliteration?q=${encodeURIComponent(finalQ)}&take=5`;
+      const translitUrl = `/api/admin/transliteration?q=${encodeURIComponent(finalQ)}&take=20`;
 
       const [taxonData, dictData, translitData] = await Promise.all([
         fetchJson(taxonUrl),
@@ -171,7 +170,7 @@ export default function SearchPage() {
             ? it.definition_html
             : (it.definition || '');
           const snippetHtml = truncate(stripTags(defHtml || ''), 320);
-          const url = `/admin/dictionary?entryId=${encodeURIComponent(it.id)}`;
+          const url = `/dictionaries/${it.specializedDictionaryId}?q=${encodeURIComponent(titleHtml)}`;
           const meta = it.specializedDictionaryTitle || (it.SpecializedDictionary?.title) || `พจนานุกรมเฉพาะสาขา #${it.specializedDictionaryId ?? ''}`;
           return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
         });
