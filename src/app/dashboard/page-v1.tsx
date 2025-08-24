@@ -18,11 +18,7 @@ interface DocumentStats {
   totalSize: number; // in bytes
   recentActivityCount: number;
   sharedDocuments: number;
-  totalVocabularyEntries: number;
-  totalDictEntries: number;
-  totalTransliterationEntries: number;
-  totalTaxonEntries: number;
-  publicApiCount: number;
+  totalVocabularyEntries: number; // Added this field
   // --- Added new stats based on schema ---
   totalDictionaries: number;
   totalEncyclopedias: number;
@@ -105,6 +101,27 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    // Load counts for each vocabulary type
+    const loadEntryCounts = async (dictCountFromStats: number) => {
+      try {
+        // 1) Dictionary entries count: from stats provided
+        let dictCount = dictCountFromStats || 0;
+
+        // 2) TransliterationEntry count
+        let translitCount = 0;
+        const tl = await fetchJson('/api/admin/transliteration?take=1');
+        translitCount = tl?.total ?? tl?.pagination?.total ?? tl?.count ?? 0;
+
+        // 3) TaxonEntry count (global search with pageSize=1 to get pagination meta)
+        let taxonCount = 0;
+        const tx = await fetchJson('/api/taxonomy/search?page=1&pageSize=1');
+        taxonCount = tx?.pagination?.total ?? tx?.total ?? 0;
+
+        setEntryCounts({ dict: Number(dictCount) || 0, translit: Number(translitCount) || 0, taxon: Number(taxonCount) || 0 });
+      } catch {
+        // best-effort
+      }
+    };
 
     // Load popular searches per dictionary group (0: general, 3: specialized)
     const loadPopularByGroup = async () => {
@@ -160,11 +177,8 @@ export default function DashboardPage() {
         setStats(data.stats);
         setRecentDocuments(data.recentDocuments);
         setError(null);
-        setEntryCounts({
-          dict: Number(data?.stats?.totalDictEntries || 0),
-          translit: Number(data?.stats?.totalTransliterationEntries || 0),
-          taxon: Number(data?.stats?.totalTaxonEntries || 0),
-        });
+        // Kick off dependent loads (best-effort)
+        void loadEntryCounts(data?.stats?.totalVocabularyEntries || 0);
         void loadPopularByGroup();
       } catch (err) {
         console.error("Error fetching dashboard ", err);
@@ -357,7 +371,7 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
-                  <Link href="/admin/encyclopedia">
+                  <Link href="/admin/taxonomy">
                     <dl>
                       <dt className="text-md font-bold text-gray-600 truncate">สารานุกรม</dt>
                       <dd className="flex items-baseline">
@@ -393,7 +407,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Transliteration Entries Card - New Card Added */}
+               {/* Taxonomies Card - New Card Added */}
           <div className="card overflow-hidden">
             <div className="card-body">
               <div className="flex items-center">
@@ -403,11 +417,11 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
-                  <Link href="/admin/transliteration">
+                  <Link href="/admin/taxonomy">
                     <dl>
                       <dt className="text-md font-bold text-gray-600 truncate">คำทับศัพท์</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{stats.totalTransliterationEntries}</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats.totalTaxonomies}</div>
                       </dd>
                     </dl>
                   </Link>
@@ -441,7 +455,7 @@ export default function DashboardPage() {
 
          
 
-          {/* Open APIs Card */}
+          {/* Shared Documents Card */}
           <div className="card overflow-hidden">
             <div className="card-body">
               <div className="flex items-center">
@@ -455,7 +469,7 @@ export default function DashboardPage() {
                     <dl>
                       <dt className="text-md font-bold text-gray-600 truncate">Open APIs</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">3</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats.sharedDocuments}</div>
                       </dd>
                     </dl>
                   </Link>
@@ -675,7 +689,7 @@ export default function DashboardPage() {
               </div>
               <div className="card-body">
                 <div className="space-y-4">
-                  <Link href="/file-manager/upload-transliteration" className="block">
+                  <Link href="/file-manager" className="block">
                     <div className="list-tile">
                       <div className="flex-shrink-0 h-10 w-10 rounded-md bg-blue-100 flex items-center justify-center">
                         <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -683,8 +697,8 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div className="ml-4">
-                        <h4 className="text-md font-bold text-gray-900">นำเข้าคำศัพท์</h4>
-                        <p className="text-md text-black-500">เพิ่มคำศัพท์ใหม่</p>
+                        <h4 className="text-md font-bold text-gray-900">นำเข้าเอกสาร</h4>
+                        <p className="text-md text-black-500">เพิ่มเอกสารใหม่</p>
                       </div>
                     </div>
                   </Link>
@@ -696,8 +710,8 @@ export default function DashboardPage() {
                         </svg>
                       </div>
                       <div className="ml-4">
-                        <h4 className="text-md font-bold text-gray-900">ค้นหาคำศัพท์</h4>
-                        <p className="text-md text-black-500">ค้นหาในคลังคำศัพท์</p>
+                        <h4 className="text-md font-bold text-gray-900">ค้นหาเอกสาร</h4>
+                        <p className="text-md text-black-500">ค้นหาในคลังเอกสาร</p>
                       </div>
                     </div>
                   </Link>
@@ -777,10 +791,6 @@ export default function DashboardPage() {
                   <div className="flex justify-between">
                     <span className="text-md text-black-500">จำนวนรายการภูมิศาสตร์</span>
                     <span className="text-md font-bold text-gray-900">{stats.totalGazetteerEntries}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-md text-black-500">จำนวน API</span>
-                    <span className="text-md font-bold text-gray-900">3</span>
                   </div>
                 </div>
               </div>

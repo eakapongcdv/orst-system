@@ -76,10 +76,22 @@ export async function GET(request: NextRequest) {
     // 4. Calculate total size
     let totalSize = documentStats._sum.size || 0;
 
-    // 5. Fetch vocabulary statistics (DictionaryEntry count)
-    const vocabularyStats = await prisma.dictionaryEntry.aggregate({
-      _count: true,
+    // 5. Vocabulary entry counts (per type)
+    const dictEntriesCount = await prisma.dictionaryEntry.count();
+    const translitEntriesCount = await prisma.transliterationEntry.count();
+    const taxonEntriesCount = await prisma.taxonEntry.count();
+    const totalVocabularyEntries = dictEntriesCount + translitEntriesCount + taxonEntriesCount;
+
+    // Count of distinct public API endpoints (paths that start with /api/ but not /api/admin)
+    const publicApiDistinct = await prisma.apiAccessLog.findMany({
+      where: {
+        path: { startsWith: '/api/' },
+        NOT: { path: { startsWith: '/api/admin' } },
+      },
+      distinct: ['path'],
+      select: { path: true },
     });
+    const publicApiCount = publicApiDistinct.length;
 
     // 6. Fetch shared documents count
     const sharedDocumentsCount = await prisma.documentShare.count({
@@ -112,13 +124,16 @@ export async function GET(request: NextRequest) {
     return Response.json({
       stats: {
         totalDocuments: documentStats._count || 0,
-        totalSize: totalSize, // Size in bytes
-        totalVocabularyEntries: vocabularyStats._count || 0,
+        totalSize: totalSize,
+        totalVocabularyEntries: totalVocabularyEntries,
+        totalDictEntries: dictEntriesCount,
+        totalTransliterationEntries: translitEntriesCount,
+        totalTaxonEntries: taxonEntriesCount,
         recentActivityCount: recentDocuments.length,
         sharedDocuments: sharedDocumentsCount,
+        publicApiCount: publicApiCount,
         totalFolders: foldersCount,
         totalComments: commentsCount,
-        // --- Added new counts for specialized content ---
         totalDictionaries: dictionariesCount,
         totalEncyclopedias: encyclopediasCount,
         totalTaxonomies: taxonomyCount,

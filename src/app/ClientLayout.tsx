@@ -148,7 +148,7 @@ const isEditorPage = (
         <footer className="brand-footer">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-2 lg:px-8">
             <p className="text-center text-md">
-              © {new Date().getFullYear() + 543} A ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
+              © {new Date().getFullYear() + 543} ระบบฐานข้อมูลของสำนักงานราชบัณฑิตยสภา. สงวนลิขสิทธิ์
             </p>
           </div>
         </footer>
