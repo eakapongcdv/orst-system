@@ -604,7 +604,7 @@ export default function DashboardPage() {
                   // --- All Dictionaries Panel ---
                   <>
                     <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">พจนานุกรมเฉพาะสาขาวิชาทั้งหมด</h3>
-                    {groupedDictionaries.length === 0 ? (
+                    {dictionaries.length === 0 ? (
                       <div className="text-center py-8">
                         <svg className="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -623,41 +623,48 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     ) : (
-                      // --- Render grouped dictionaries as a directory structure ---
-                      <div className="space-y-6">
-                         {groupedDictionaries.map((category) => (
-                          <div key={category.name} className="border border-gray-200 rounded-md">
-                            <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                              <h4 className="text-md font-bold text-gray-800">{category.name}</h4>
-                            </div>
-                            <div className="p-4 space-y-4">
-                              {category.subcategories.map((subcat) => (
-                                 <div key={subcat.name || 'no-subcategory'}>
-                                    {subcat.name && ( // Only show subcategory header if it exists
-                                       <h5 className="text-md font-semibold text-gray-700 mb-2">{subcat.name}</h5>
-                                    )}
-                                    <ul className="space-y-2 ml-4"> {/* Indent list items */}
-                                      {subcat.dictionaries.map((dict) => (
-                                        <li key={dict.id} className="flex items-start">
-                                          <svg className="h-5 w-5 text-purple-500 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                          </svg>
-                                          <span className="text-md">
-                                            <Link href={`/dictionaries/${dict.id}`} className="text-blue-600 hover:underline">
-                                              {dict.title}
-                                            </Link>
-                                            {dict.year_published && (
-                                              <span className="text-gray-500"> ({dict.year_published})</span>
-                                            )}
-                                          </span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                               ))}
-                            </div>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto border border-gray-200 rounded-md">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">#</th>
+                              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">ชื่อพจนานุกรม</th>
+                              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">หมวด</th>
+                              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">กลุ่มย่อย</th>
+                              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">ปีพิมพ์</th>
+                              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">อัปเดตล่าสุด</th>
+                              <th className="px-3 py-2 text-right text-sm font-semibold text-gray-700">เปิดดู</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-100">
+                            {dictionaries
+                              .slice()
+                              .sort((a, b) =>
+                                (a.category || '').localeCompare(b.category || '') ||
+                                (a.subcategory || '').localeCompare(b.subcategory || '') ||
+                                (a.title || '').localeCompare(b.title || '')
+                              )
+                              .map((dict, idx) => (
+                                <tr key={dict.id} className="hover:bg-gray-50">
+                                  <td className="px-3 py-2 text-sm text-gray-600">{idx + 1}</td>
+                                  <td className="px-3 py-2 text-sm">
+                                    <Link href={`/dictionaries/${dict.id}`} className="text-blue-600 hover:underline font-medium">
+                                      {dict.title}
+                                    </Link>
+                                  </td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{dict.category}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{dict.subcategory || '-'}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{dict.year_published ?? '-'}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{dict.updated_at ? new Date(dict.updated_at).toLocaleDateString('th-TH') : '-'}</td>
+                                  <td className="px-3 py-2 text-sm text-right">
+                                    <Link href={`/dictionaries/${dict.id}`} className="inline-flex items-center px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
+                                      เปิด
+                                    </Link>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </>
