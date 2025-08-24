@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         ? null
         : Number.parseInt(String(yearInput), 10);
 
-    if (!title) return NextResponse.json({ error: 'กรุณาระบุชื่อพจนานุกรมเฉพาะทาง' }, { status: 400 });
+    if (!title) return NextResponse.json({ error: 'กรุณาระบุชื่อพจนานุกรมเฉพาะสาขา' }, { status: 400 });
     if (!category) return NextResponse.json({ error: 'กรุณาระบุสาขาวิชา (category)' }, { status: 400 });
 
     const created = await prisma.specializedDictionary.create({

@@ -102,7 +102,7 @@ export default function AdminSpecializedDictionaryPage() {
         category: (form.category || 'ทั่วไป').trim(),
         subcategory: (form.subcategory || '').trim() || undefined,
       } as { title: string; category: string; subcategory?: string };
-      if (!payload.title) throw new Error('กรุณาระบุชื่อพจนานุกรมเฉพาะทาง');
+      if (!payload.title) throw new Error('กรุณาระบุชื่อพจนานุกรมเฉพาะสาขา');
       if (!payload.category) throw new Error('กรุณาระบุสาขาวิชา (category)');
 
       let r: Response;
@@ -221,7 +221,7 @@ export default function AdminSpecializedDictionaryPage() {
   return (
     <div className="adm-wrap">
       <header className="adm-head">
-        <h1>จัดการพจนานุกรมและพจนานุกรมเฉพาะทาง | นำเข้าข้อมูล - ส่งออกข้อมูล</h1>
+        <h1>จัดการพจนานุกรมและพจนานุกรมเฉพาะสาขา | นำเข้าข้อมูล - ส่งออกข้อมูล</h1>
         <div className="head-actions">
           <button className="btn btn-primary" onClick={openCreate} title="เพิ่ม">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
@@ -438,12 +438,12 @@ export default function AdminSpecializedDictionaryPage() {
           <div className="overlay" onClick={() => setModalOpen(false)} />
           <div className="modal">
             <div className="modal-head">
-              <h3>{editing ? 'แก้ไขพจนานุกรมเฉพาะทาง' : 'เพิ่มพจนานุกรมเฉพาะทาง'}</h3>
+              <h3>{editing ? 'แก้ไขพจนานุกรมเฉพาะสาขา' : 'เพิ่มพจนานุกรมเฉพาะสาขา'}</h3>
               <button className="icon-btn" onClick={() => setModalOpen(false)} title="ปิด">✕</button>
             </div>
             <div className="modal-body">
               <label className="fld">
-                <span>ชื่อพจนานุกรมเฉพาะทาง</span>
+                <span>ชื่อพจนานุกรมเฉพาะสาขา</span>
                 <input
                   value={form.title}
                   onChange={(e) => setForm(v => ({ ...v, title: e.target.value }))}
