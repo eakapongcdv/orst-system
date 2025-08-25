@@ -1,7 +1,7 @@
 // app/search/page.tsx — Universal Full Text Search (TaxonEntry, DictionaryEntry, TransliterationEntry)
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 
 // --- Types ---
@@ -29,6 +29,17 @@ export default function SearchPage() {
 
   // Popular searches
   const [popular, setPopular] = useState<PopularItem[]>([]);
+
+  // Track whether user has executed a search (to differentiate "no results" vs initial state)
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Voice Search & TTS supports
+  const [recSupported, setRecSupported] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recRef = useRef<any>(null);
+
+  const [ttsSupported, setTtsSupported] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null); // `${kind}-${id}`
 
   const anyResults = taxonHits.length + dictGeneralHits.length + dictSpecialHits.length + translitHits.length > 0;
 
@@ -72,14 +83,29 @@ export default function SearchPage() {
     savePopularToLocal(map);
   }
 
+  function dedupePopular(items: PopularItem[]): PopularItem[] {
+    const map = new Map<string, PopularItem>();
+    for (const it of items || []) {
+      const key = (it.query || '').trim().toLowerCase();
+      if (!key) continue;
+      const prev = map.get(key);
+      if (!prev || (it.count || 0) > (prev.count || 0)) {
+        map.set(key, { query: it.query, count: it.count });
+      }
+    }
+    return Array.from(map.values())
+      .sort((a, b) => (b.count || 0) - (a.count || 0))
+      .slice(0, 12);
+  }
+
   async function loadPopular(){
     // Try API first
     const data = await fetchJson('/api/search/popular?limit=12');
     if (data && Array.isArray(data.items)){
-      setPopular(data.items as PopularItem[]);
+      setPopular(dedupePopular(data.items as PopularItem[]));
     } else {
       // Fallback to localStorage if API is not available
-      setPopular(loadPopularFromLocal());
+      setPopular(dedupePopular(loadPopularFromLocal()));
     }
   }
 
@@ -104,17 +130,121 @@ export default function SearchPage() {
   // On mount, load popular
   useEffect(()=>{ void loadPopular(); },[]);
 
+  // Detect browser support for SpeechRecognition and SpeechSynthesis
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const w: any = window as any;
+    const SR = w.webkitSpeechRecognition || w.SpeechRecognition;
+    setRecSupported(!!SR);
+    setTtsSupported(!!w.speechSynthesis && !!w.SpeechSynthesisUtterance);
+  }, []);
+
+  // Start/stop voice search (SpeechRecognition)
+  function startVoiceSearch() {
+    if (typeof window === 'undefined') return;
+    const w: any = window as any;
+    const SR = w.webkitSpeechRecognition || w.SpeechRecognition;
+    if (!SR) return;
+    try {
+      const rec = new SR();
+      rec.lang = 'th-TH'; // Thai by default
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onstart = () => setIsListening(true);
+      rec.onerror = () => setIsListening(false);
+      rec.onend = () => setIsListening(false);
+      rec.onresult = (ev: any) => {
+        const transcript =
+          (ev.results && ev.results[0] && ev.results[0][0] && ev.results[0][0].transcript) || '';
+        if (transcript) {
+          setQ(transcript);
+          void runSearch(transcript);
+        }
+      };
+      recRef.current = rec;
+      rec.start();
+    } catch {
+      setIsListening(false);
+    }
+  }
+  function stopVoiceSearch() {
+    try { recRef.current?.stop?.(); } catch {}
+    setIsListening(false);
+  }
+
+  // Close listening modal on Escape
+  useEffect(() => {
+    if (!isListening) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        try { recRef.current?.stop?.(); } catch {}
+        stopVoiceSearch();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isListening]);
+
+  // Build plain text for TTS from a hit
+  const toSpeechText = (hit: UniversalHit) => {
+    const title = compactSpaces(stripTags(stripMarks(hit.titleHtml)));
+    const snippet = compactSpaces(stripTags(stripMarks(hit.snippetHtml || '')));
+    return snippet ? `${title}. ${snippet}` : title;
+  };
+
+  // Speak / stop one hit
+  function speakHit(hit: UniversalHit) {
+    if (typeof window === 'undefined') return;
+    const w: any = window as any;
+    if (!w.speechSynthesis || !w.SpeechSynthesisUtterance) return;
+    const targetId = `${hit.kind}-${hit.id}`;
+
+    // If already speaking this one → cancel
+    if (speakingId === targetId && w.speechSynthesis.speaking) {
+      w.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+
+    // Cancel current, then speak
+    try { w.speechSynthesis.cancel(); } catch {}
+    const text = toSpeechText(hit);
+    const u = new w.SpeechSynthesisUtterance(text);
+    u.lang = /[\u0E00-\u0E7F]/.test(text) ? 'th-TH' : 'en-US';
+    u.rate = 1;
+    u.pitch = 1;
+    u.onend = () => setSpeakingId(null);
+    setSpeakingId(targetId);
+    w.speechSynthesis.speak(u);
+  }
+
+  // Stop all speech on unmount
+  useEffect(() => {
+    return () => {
+      try { (window as any).speechSynthesis?.cancel?.(); } catch {}
+    };
+  }, []);
+
   async function runSearch(query: string){
     const finalQ = query.trim();
-    if (!finalQ){ setTaxonHits([]); setDictGeneralHits([]); setDictSpecialHits([]); setTranslitHits([]); return; }
+    if (!finalQ){
+      setHasSearched(false);
+      setTaxonHits([]); setDictGeneralHits([]); setDictSpecialHits([]); setTranslitHits([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     setTaxonHits([]);
     setDictGeneralHits([]);
     setDictSpecialHits([]);
     setTranslitHits([]);
+    setHasSearched(true);
 
     try {
+      // stop any ongoing reading before new results
+      try { (window as any).speechSynthesis?.cancel?.(); } catch {}
+      setSpeakingId(null);
       // 1) TaxonEntry — try global taxonomy search (no taxonomyId)
       const taxonUrl = `/api/taxonomy/search?q=${encodeURIComponent(finalQ)}&page=1&pageSize=20`;
       // 2) DictionaryEntry — แยกเป็น 2 แหล่ง
@@ -165,7 +295,7 @@ export default function SearchPage() {
 
         const hits0: UniversalHit[] = arr0.slice(0, 5).map((it: any) => {
           const termTH = it.term_th || '';
-          const termEN = it.term_en || '';
+          const termEN = ''; //it.term_en || '';
           const titleHtml = (termTH || termEN)
             ? `${termTH}${termTH && termEN ? ' / ' : ''}${termEN}`
             : `คำศัพท์ #${it.id}`;
@@ -175,7 +305,7 @@ export default function SearchPage() {
           const snippetHtml = truncate(stripTags(defHtml || ''), 320);
           const qText0 = termTH || termEN || titleHtml || '';
           const url = `/dictionaries/${it.specializedDictionaryId ?? 0}?q=${toQueryParam(termTH)}`;
-          const meta = 'พจนานุกรม';
+          const meta = 'พจนานุกรมฉบับราชบัณฑิตยสถาน';
           return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
         });
         setDictGeneralHits(hits0);
@@ -202,7 +332,7 @@ export default function SearchPage() {
             : (it.definition || '');
           const snippetHtml = truncate(stripTags(defHtml || ''), 320);
           const url = `/dictionaries/${it.specializedDictionaryId ?? 3}?q=${toQueryParam(termTH)}`;
-          const meta = it.specializedDictionaryTitle || (it.SpecializedDictionary?.title) || 'พจนานุกรมเฉพาะสาขาวิชา';
+          const meta = it.specializedDictionaryTitle || (it.SpecializedDictionary?.title) || 'พจนานุกรมศัพท์เคมี';
           return { kind: 'dict', id: it.id, titleHtml, snippetHtml, url, meta };
         });
         setDictSpecialHits(hits3);
@@ -276,7 +406,44 @@ export default function SearchPage() {
               )}
               <div className="mt-1 text-md inline-flex items-center gap-2 text-black">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 text-black">{badge}</span>
-                <span className="truncate text-gray-900">{h.url}</span>
+
+                <button
+                  type="button"
+                  onClick={() => ttsSupported ? speakHit(h) : undefined}
+                  disabled={!ttsSupported}
+                  aria-pressed={speakingId === `${h.kind}-${h.id}`}
+                  aria-label={
+                    !ttsSupported
+                      ? 'เบราว์เซอร์ไม่รองรับการอ่านออกเสียง'
+                      : (speakingId === `${h.kind}-${h.id}` ? 'หยุดอ่านผลลัพธ์นี้' : 'อ่านข้อความผลลัพธ์นี้')
+                  }
+                  title={!ttsSupported ? 'เบราว์เซอร์ไม่รองรับการอ่านออกเสียง' : (speakingId === `${h.kind}-${h.id}` ? 'หยุดอ่าน' : 'อ่านข้อความนี้')}
+                  className={`inline-flex items-center justify-center h-8 w-8 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500
+                    ${speakingId === `${h.kind}-${h.id}`
+                      ? 'border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                    }
+                    ${!ttsSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {
+                    speakingId === `${h.kind}-${h.id}`
+                      ? (
+                        // Pause icon (active/reading)
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                          <path d="M6 4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H6Zm9 0a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3Z"/>
+                        </svg>
+                      )
+                      : (
+                        // Speaker icon (idle)
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                          <path d="M5 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2l3.29 2.47A1 1 0 0 0 10 17V7a1 1 0 0 0-1.71-.77L5 9Zm10.59-2.91a1 1 0 0 0-1.41 1.41A4 4 0 0 1 16 12a4 4 0 0 1-1.82 3.5 1 1 0 0 0 1.11 1.66A6 6 0 0 0 18 12a6 6 0 0 0-2.41-4.91Zm3.98-2.26a1 1 0 1 0-1.32 1.5A9 9 0 0 1 21 12a9 9 0 0 1-1.75 5.33 1 1 0 0 0 1.64 1.14A11 11 0 0 0 23 12a11 11 0 0 0-3.43-8.17Z"/>
+                        </svg>
+                      )
+                  }
+                  <span className="sr-only">{speakingId === `${h.kind}-${h.id}` ? 'หยุดอ่าน' : 'อ่านข้อความ'}</span>
+                </button>
+
+                {/*<span className="truncate text-gray-900">{h.url}</span>*/}
               </div>
             </div>
           ))
@@ -312,11 +479,43 @@ export default function SearchPage() {
             <input
               type="text"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setQ(v);
+                // If user is editing after a search that returned no results,
+                // revert UI to initial stage until they submit again.
+                if (!loading && hasSearched && !(
+                  (taxonHits && taxonHits.length) ||
+                  (dictGeneralHits && dictGeneralHits.length) ||
+                  (dictSpecialHits && dictSpecialHits.length) ||
+                  (translitHits && translitHits.length)
+                )) {
+                  setHasSearched(false);
+                  setError(null);
+                  setTaxonHits([]);
+                  setDictGeneralHits([]);
+                  setDictSpecialHits([]);
+                  setTranslitHits([]);
+                }
+              }}
               placeholder="พิมพ์คำค้น แล้วกด Enter"
               className="flex-1 px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               aria-label="ช่องค้นหา"
             />
+            <button
+              type="button"
+              onClick={() => (isListening ? stopVoiceSearch() : startVoiceSearch())}
+              disabled={!recSupported || loading}
+              aria-pressed={isListening}
+              aria-label={isListening ? 'หยุดฟังเสียง' : (recSupported ? 'ค้นหาด้วยเสียง' : 'เบราว์เซอร์ไม่รองรับการค้นหาด้วยเสียง')}
+              title={recSupported ? (isListening ? 'หยุดฟังเสียง' : 'ค้นหาด้วยเสียง') : 'เบราว์เซอร์ไม่รองรับ'}
+              className={`px-4 py-3 border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${(!recSupported || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {/* Mic icon */}
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm-7-3a1 1 0 1 1 2 0 5 5 0 1 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H10a1 1 0 1 1 0-2h3v-3.07A7 7 0 0 1 5 11Z"/>
+              </svg>
+            </button>
             <button
               type="submit"
               className={`px-4 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -329,9 +528,9 @@ export default function SearchPage() {
             <div className="mt-2">
               <div className="text-md text-black mb-1">คำค้นหายอดนิยม:</div>
               <div className="flex flex-wrap gap-2">
-                {popular.map((p) => (
+                {popular.map((p, idx) => (
                   <button
-                    key={p.query}
+                    key={`${p.query}-${idx}`}
                     type="button"
                     className="px-2.5 py-1 rounded-full bg-gray-100 text-black text-md hover:bg-gray-200"
                     onClick={() => { setQ(p.query); void runSearch(p.query); }}
@@ -376,9 +575,54 @@ export default function SearchPage() {
         )}
 
         {!loading && !error && !anyResults && (
-          <div className="text-center text-black py-10">พิมพ์คำค้นแล้วกด Enter เพื่อค้นหา</div>
+          hasSearched ? (
+            <div className="text-center text-gray-700 py-12" role="status" aria-live="polite">
+              <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                {/* Magnifier with X icon */}
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" className="text-gray-500">
+                  <path d="M10.5 3a7.5 7.5 0 1 1 4.98 13.23l3.64 3.65a1 1 0 0 1-1.42 1.41l-3.64-3.64A7.5 7.5 0 0 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm-1.53 3.97a1 1 0 0 1 1.41 0l1.12 1.12 1.12-1.12a1 1 0 1 1 1.41 1.41L12.91 11.5l1.12 1.12a1 1 0 0 1-1.41 1.41l-1.12-1.12-1.12 1.12a1 1 0 1 1-1.41-1.41l1.12-1.12-1.12-1.12a1 1 0 0 1 0-1.41Z"/>
+                </svg>
+              </div>
+              <div className="text-lg font-semibold">ไม่พบข้อมูลตามคำค้น</div>
+              <div className="mt-1 text-sm text-gray-600">
+                โปรดเปลี่ยนคำค้นหาใหม่อีกครั้ง{q ? <> สำหรับคำว่า “{q}”</> : null}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-black py-10" role="status" aria-live="polite">
+              พิมพ์คำค้นแล้วกด Enter เพื่อค้นหา
+            </div>
+          )
         )}
       </div>
+      {/* Voice Listening Modal */}
+      {isListening && (
+        <div role="dialog" aria-modal="true" aria-label="กำลังฟังคำค้น" className="fixed inset-0 z-[9999]">
+          <div className="absolute inset-0 bg-black/40" onClick={stopVoiceSearch} />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="mx-auto w-[min(92vw,360px)] rounded-xl shadow-2xl bg-white border border-gray-200 p-5 text-center">
+              <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true" className="animate-pulse text-blue-600">
+                  <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm-7-3a1 1 0 1 1 2 0 5 5 0 1 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H10a1 1 0 1 1 0-2h3v-3.07A7 7 0 0 1 5 11Z"/>
+                </svg>
+              </div>
+              <div className="font-semibold text-gray-900">กำลังฟัง…</div>
+              <div className="mt-1 text-sm text-gray-600">พูดคำค้นของคุณได้เลย แล้วหยุดพูดเพื่อสิ้นสุด</div>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={stopVoiceSearch}
+                  className="px-3 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="หยุดฟัง"
+                  title="หยุดฟัง"
+                >
+                  หยุดฟัง
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
