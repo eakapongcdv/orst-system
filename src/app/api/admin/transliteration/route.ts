@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
           version: true,
           updatedAt: true,
           createdAt: true,
+          meaning:true,
         },
       }),
     ]);

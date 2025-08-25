@@ -352,7 +352,7 @@ export default function SearchPage() {
             .filter(Boolean)
             .join(' • ');
           const raw = it.meaning || it.notes || '';
-          const snippetHtml = truncate(stripTags(String(raw)), 320);
+          const snippetHtml = '" ' + truncate(stripTags(String(raw)), 320) + ' "';
           const url = `/search-transliteration?q=${toQueryParam(it.transliteration1 || it.romanization || '')}`;
           const meta = it.category || it.wordType || '';
           return { kind: 'translit', id: it.id, titleHtml, snippetHtml, url, meta };
@@ -399,10 +399,10 @@ export default function SearchPage() {
         ) : (
           hits.map((h) => (
             <div key={`${h.kind}-${h.id}`} className="p-4 hover:bg-gray-50 transition-colors">
-              <a href={h.url} className="text-2xl font-medium text-blue-600 hover:text-blue-800 hover:underline block" dangerouslySetInnerHTML={{ __html: h.titleHtml }} />
-              {h.meta && <div className="text-md text-black mt-0.5">{h.meta}</div>}
+              <a href={h.url} className="text-2xl font-bold text-blue-600 hover:text-blue-800 hover:underline block" dangerouslySetInnerHTML={{ __html: h.titleHtml }} />
+              {h.meta && <div className="text-md text-yellow-800 mt-0.5 pl-3">{h.meta}</div>}
               {h.snippetHtml && (
-                <p className="mt-1 text-black text-md" dangerouslySetInnerHTML={{ __html: h.snippetHtml }} />
+                <p className="mt-1 text-black text-md pl-5" dangerouslySetInnerHTML={{ __html: h.snippetHtml }} />
               )}
               <div className="mt-1 text-md inline-flex items-center gap-2 text-black">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 text-black">{badge}</span>
