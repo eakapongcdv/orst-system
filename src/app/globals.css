@@ -332,7 +332,7 @@ html, body{
   align-items: center;
   gap: .5rem;
   padding: .5rem .25rem;
-  font-weight: 800;
+  font-weight: bolder;
   letter-spacing: .01em;
   border-bottom: 2px solid transparent;
   transition: color .15s ease, border-color .15s ease, transform .06s ease, filter .15s ease;
@@ -340,7 +340,8 @@ html, body{
 
   /* embossed gold text */
   color: transparent;
-  background: linear-gradient(180deg, #f8e6b8 0%, #e4c981 35%, #caa24f 60%, #9a7630 100%);
+  /*background: linear-gradient(180deg, #f8e6b8 0%, #e4c981 35%, #caa24f 60%, #9a7630 100%);*/
+  background-color: white;
   -webkit-background-clip: text;
   background-clip: text;
   opacity: .98;

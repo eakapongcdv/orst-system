@@ -53,8 +53,8 @@ export default async function RootLayout({
     //{ name: "คลังเอกสาร", href: "/file-manager" },
     //{ name: "นำเข้าคำศัพท์", href: "/file-manager/upload-dictionary" },
     { name: "นำเข้าคำศัพท์", href: "/file-manager/upload-transliteration" },
-    { name: "Open API", href: "/open-api/dashboard" },
     { name: "ผู้ใช้", href: "/users" },
+    { name: "Open API", href: "/open-api/dashboard" },
   ];
 
   return (
